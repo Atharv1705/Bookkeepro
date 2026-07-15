@@ -1,83 +1,66 @@
 import os
 import logging
+import smtplib
+from email.message import EmailMessage
 from pathlib import Path
 from dotenv import load_dotenv
 
+import aiosmtplib
+
 logger = logging.getLogger(__name__)
 
-# Load .env from project root
-BASE_DIR = Path(__file__).resolve().parents[3]
-load_dotenv(BASE_DIR / ".env")
-
-
-def _build_mail_client():
-    """Build FastMail client lazily so a bad SMTP config never crashes the app on startup."""
-    try:
-        from fastapi_mail import FastMail, ConnectionConfig
-
-        smtp_user = os.getenv("SMTP_USER")
-        smtp_password = os.getenv("SMTP_PASSWORD")
-        mail_from = os.getenv("MAIL_FROM")
-        smtp_host = os.getenv("SMTP_HOST")
-
-        # Refuse to build a broken config — missing critical values
-        if not all([smtp_user, smtp_password, mail_from, smtp_host]):
-            logger.warning(
-                "Email not configured: one or more SMTP env vars are missing. "
-                "Set SMTP_USER, SMTP_PASSWORD, MAIL_FROM, SMTP_HOST in .env"
-            )
-            return None
-
-        # Guard against placeholder value
-        if "PASTE" in (smtp_password or "").upper():
-            logger.warning(
-                "SMTP_PASSWORD looks like a placeholder. "
-                "Set a real SMTP Password in .env"
-            )
-            return None
-
-        conf = ConnectionConfig(
-            MAIL_USERNAME=smtp_user,
-            MAIL_PASSWORD=smtp_password,
-            MAIL_FROM=mail_from,
-            MAIL_PORT=int(os.getenv("SMTP_PORT", "587")),
-            MAIL_SERVER=smtp_host,
-            MAIL_STARTTLS=os.getenv("SMTP_TLS", "True").strip().lower() == "true",
-            MAIL_SSL_TLS=os.getenv("MAIL_SSL_TLS", "False").strip().lower() == "true",
-            MAIL_FROM_NAME=os.getenv("MAIL_FROM_NAME", "BookKeepro"),
-        )
-        return FastMail(conf)
-
-    except Exception as e:
-        logger.error(f"Failed to initialise email client: {e}")
-        return None
+# Load .env from project root (4 parents up: utils -> app -> api -> services -> Bookkeep)
+BASE_DIR = Path(__file__).resolve().parents[4]
+load_dotenv(BASE_DIR / ".env", override=True)
 
 
 async def send_email(to: str, subject: str, body: str) -> bool:
     """
-    Send an HTML email. Returns True on success, False on any failure.
-    Errors are logged but never crash the caller.
+    Send an HTML email via SMTP using the configured mail settings.
+    Falls back gracefully — errors are logged but never crash the caller.
+    Returns True on success, False on any failure.
     """
     try:
         if not to or "@" not in to:
             logger.warning(f"Invalid recipient email: {to}")
             return False
 
-        fm = _build_mail_client()
-        if fm is None:
-            logger.warning(f"Email skipped (client not configured) — would have sent to {to}: {subject}")
+        smtp_host = os.getenv("SMTP_HOST")
+        smtp_port = int(os.getenv("SMTP_PORT", "587"))
+        smtp_user = os.getenv("SMTP_USER")
+        smtp_password = os.getenv("SMTP_PASSWORD")
+        mail_from_email = os.getenv("MAIL_FROM") or smtp_user
+        mail_from_name = os.getenv("MAIL_FROM_NAME", "BookKeepro")
+        smtp_tls = os.getenv("SMTP_TLS", "True").strip().lower() == "true"
+        smtp_ssl_tls = os.getenv("MAIL_SSL_TLS", "False").strip().lower() == "true"
+
+        if not smtp_host:
+            logger.warning("SMTP_HOST not set — email skipped")
             return False
 
-        from fastapi_mail import MessageSchema
-        message = MessageSchema(
-            subject=subject,
-            recipients=[to],
-            body=body,
-            subtype="html",
+        if not mail_from_email:
+            logger.warning("MAIL_FROM not set — email skipped")
+            return False
+
+        message = EmailMessage()
+        message["From"] = f"{mail_from_name} <{mail_from_email}>"
+        message["To"] = to
+        message["Subject"] = subject
+        message.set_content("This email requires an HTML-capable email client.")
+        message.add_alternative(body, subtype="html")
+
+        await aiosmtplib.send(
+            message,
+            hostname=smtp_host,
+            port=smtp_port,
+            username=smtp_user,
+            password=smtp_password,
+            start_tls=smtp_tls and not smtp_ssl_tls,
+            use_tls=smtp_ssl_tls,
+            timeout=15,
         )
 
-        await fm.send_message(message)
-        logger.info(f"Email sent to {to}: {subject}")
+        logger.info(f"Email sent to {to} via SMTP: {subject}")
         return True
 
     except Exception as e:
