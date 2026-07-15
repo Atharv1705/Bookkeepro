@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>BookKeepPro | Personal Documents</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/css/base.css"/>
+  <link rel="stylesheet" href="/css/components.css"/>
+  <link rel="stylesheet" href="/css/animations.css"/>
+  <style>
+    .doc-slot {
+      display:flex; align-items:center; gap:14px; padding:14px 18px;
+      border:1.5px solid var(--border); border-radius:var(--radius-md);
+      background:var(--card); margin-bottom:10px;
+      transition:border-color var(--transition), background var(--transition);
+    }
+    .doc-slot:hover { border-color:#c5d9ee; background:#fafcff; }
+    .doc-slot-icon { font-size:22px; flex-shrink:0; }
+    .doc-slot-info { flex:1; min-width:0; }
+    .doc-slot-name { font-weight:600; font-size:13px; color:var(--navy); }
+    .doc-slot-status { font-size:12px; color:var(--muted); margin-top:3px; }
+    .doc-slot-actions { display:flex; gap:8px; flex-shrink:0; flex-wrap:wrap; }
+
+    .drop-area {
+      border:2px dashed #b8cfdf; border-radius:var(--radius-md); padding:28px 20px;
+      text-align:center; cursor:pointer; transition:all var(--transition);
+      background:var(--card);
+    }
+    .drop-area:hover, .drop-area.drag-over { border-color:var(--blue); background:var(--blue-light); }
+    .drop-area .da-icon  { font-size:32px; margin-bottom:8px; }
+    .drop-area .da-title { font-weight:600; font-size:14px; color:var(--navy); }
+    .drop-area .da-hint  { font-size:12px; color:var(--muted); margin-top:4px; }
+
+    .upload-track { display:flex; flex-direction:column; gap:6px; margin-top:12px; }
+    .upload-track-item {
+      display:flex; align-items:center; gap:10px; padding:8px 12px;
+      border-radius:var(--radius-sm); background:#f5f8fb; font-size:13px;
+    }
+    .upload-track-item .uti-name { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--navy); font-weight:500; }
+  </style>
+
+  <style>html{height:100%;}</style>  <script src="/js/theme.js?v=2"></script>
+</head>
+<body class="app-body">
+
+<header class="app-header">
+  <img class="logo" src="/images/bookkeeppro-logo.webp" onclick="window.location.href='/dashboard'" alt="BookKeepPro"/>
+  <div class="header-actions">
+
+      <!-- THEME TOGGLE -->
+      <button class="theme-toggle" onclick="toggleTheme()" style="background:none;border:none;color:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:8px;">
+        <span class="material-symbols-outlined theme-toggle-icon" style="font-size:24px;">dark_mode</span>
+      </button>
+    <button class="btn btn-ghost btn-sm" onclick="window.location.href='/dashboard'">← Dashboard</button>
+    <button class="btn btn-primary btn-sm" onclick="logoutUser()">Logout</button>
+  </div>
+</header>
+
+<main class="page-main page-enter">
+  <div class="page-heading">
+    <div>
+      <h1>Personal Documents</h1>
+      <p class="page-meta">Upload your personal tax documents securely</p>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+      <label class="form-label" style="margin:0;">Tax Year</label>
+      <select id="taxYearSelect" class="select-input" style="width:auto;padding:8px 14px;" onchange="onYearChange()"></select>
+    </div>
+  </div>
+
+  <!-- Named Documents -->
+  <div class="card" style="margin-bottom:20px;">
+    <h3 style="margin-bottom:16px;">Required Documents</h3>
+    <div id="docWrapper"></div>
+  </div>
+
+  <!-- Other Documents Drop Zone -->
+  <div class="card">
+    <div class="flex-between" style="margin-bottom:16px;">
+      <div>
+        <h3>Additional Documents</h3>
+        <p class="text-sm" style="margin-top:2px;">Upload any supplementary personal documents</p>
+      </div>
+      <label class="btn btn-secondary btn-sm" for="extraFile" tabindex="0" id="extraLabel"
+             style="border-radius:var(--radius-sm);cursor:pointer;">
+        + Choose Files
+        <input type="file" id="extraFile" multiple hidden accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"/>
+      </label>
+    </div>
+
+    <div class="drop-area" id="dropArea" onclick="document.getElementById('extraFile').click()">
+      <div class="da-icon"><span class="material-symbols-outlined" style="color: #ffca28;">folder</span></div>
+      <div class="da-title">Drag & drop files here</div>
+      <div class="da-hint">or click to browse · PDF, JPG, PNG, WEBP, DOC, DOCX · Max 10MB</div>
+    </div>
+
+    <div id="extraList" class="upload-track"></div>
+    <p id="extraStatus" class="text-sm mt-8"></p>
+  </div>
+</main>
+
+<footer class="app-footer">
+  <img src="/images/bookkeeppro-logo.webp" alt="BookKeepPro"/>
+  <small>© 2026 Bookkeeping Business Solutions</small>
+</footer>
+
+<script src="/js/auth.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/spinner.js"></script>
+<script src="/js/confirm-modal.js"></script>
+<script>
+guardAuth(["user"]);
+initSessionWarning();
+
+
+let currentDocs = [];
+function getDocs() { return currentDocs; }
+
+const uploadedFiles = {};
+const wrapper    = document.getElementById("docWrapper");
+const extraList  = document.getElementById("extraList");
+const extraStatus= document.getElementById("extraStatus");
+
+function getSelectedYear() { return parseInt(document.getElementById("taxYearSelect")?.value || String(new Date().getFullYear())); }
+
+async function loadTemplates() {
+  const year = getSelectedYear();
+  try {
+    const res = await authFetch(`/api/upload/templates?category=personal&tax_year=${year}`);
+    if (res && res.ok) {
+      currentDocs = await res.json();
+    } else {
+      currentDocs = [];
+    }
+  } catch (e) {
+    console.error("Failed to load templates", e);
+    currentDocs = [];
+  }
+}
+
+async function onYearChange() {
+  localStorage.setItem("selected_tax_year", getSelectedYear());
+  Object.keys(uploadedFiles).forEach(k => delete uploadedFiles[k]);
+  extraList.innerHTML = "";
+  
+  wrapper.innerHTML = Array(3).fill(`
+    <div class="doc-card" style="margin-bottom:12px;">
+      <div class="doc-left">
+        <div class="skeleton" style="width:24px;height:24px;border-radius:4px;margin-right:12px;"></div>
+        <div>
+          <div class="skeleton" style="width:140px;height:18px;margin-bottom:6px;"></div>
+          <div class="skeleton" style="width:80px;height:12px;"></div>
+        </div>
+      </div>
+      <div class="doc-right">
+         <div class="skeleton" style="width:100px;height:32px;border-radius:var(--radius-pill);"></div>
+      </div>
+    </div>
+  `).join("");
+
+  await loadTemplates();
+  renderDocs();
+  loadSavedDocuments();
+}
+
+function renderDocs() {
+  wrapper.innerHTML = "";
+  getDocs().forEach((doc, i) => {
+    const slot = document.createElement("div");
+    slot.className = "doc-slot fade-up";
+    slot.style.animationDelay = `${i * 0.04}s`;
+
+    const infoEl  = document.createElement("div"); infoEl.className = "doc-slot-info";
+    const nameEl  = document.createElement("div"); nameEl.className = "doc-slot-name"; nameEl.textContent = `${i+1}. ${doc.name}`;
+    const stEl    = document.createElement("div"); stEl.className   = "doc-slot-status"; stEl.id = `status${i}`;
+    infoEl.appendChild(nameEl); infoEl.appendChild(stEl);
+
+    const acts = document.createElement("div"); acts.className = "doc-slot-actions";
+
+    if (doc.download) {
+      const dlBtn = document.createElement("a");
+      dlBtn.href = doc.download; dlBtn.download = "";
+      dlBtn.className = "btn btn-sm btn-download-pill";
+      dlBtn.textContent = "Download"; acts.appendChild(dlBtn);
+    }
+
+    const ulLbl = document.createElement("label");
+    ulLbl.className = "btn btn-sm btn-upload-pill";
+    ulLbl.tabIndex = 0;
+    ulLbl.textContent = "Upload";
+    const fileIn = document.createElement("input"); fileIn.type="file"; fileIn.id=`file${i}`; fileIn.hidden=true;
+    ulLbl.appendChild(fileIn); acts.appendChild(ulLbl);
+    ulLbl.addEventListener("keydown", e => { if(e.key==="Enter"||e.key===" "){e.preventDefault();ulLbl.click();} });
+
+    const viewBtn = document.createElement("button");
+    viewBtn.id = `view${i}`; viewBtn.className="btn btn-secondary btn-xs"; viewBtn.style.display="none"; viewBtn.style.borderRadius="var(--radius-sm)";
+    viewBtn.textContent="View"; acts.appendChild(viewBtn);
+
+    const delBtn = document.createElement("button");
+    delBtn.id = `delete${i}`; delBtn.className="btn btn-danger btn-xs"; delBtn.style.display="none"; delBtn.style.borderRadius="var(--radius-sm)";
+    delBtn.textContent="Delete"; acts.appendChild(delBtn);
+
+    slot.appendChild(infoEl); slot.appendChild(acts);
+    wrapper.appendChild(slot);
+
+    fileIn.onchange = () => upload(i);
+    viewBtn.onclick  = () => viewFile(i);
+    delBtn.onclick   = () => deleteFile(i);
+  });
+}
+
+async function upload(i) {
+  const docs  = getDocs();
+  const input = document.getElementById(`file${i}`);
+  const file  = input.files[0];
+  if (!file) return;
+  const stEl = document.getElementById(`status${i}`);
+  stEl.textContent = "Uploading…"; stEl.style.color = "var(--muted)";
+  const fd = new FormData();
+  fd.append("file",file); fd.append("doc_type",docs[i].name); fd.append("tax_year",getSelectedYear());
+  const res = await authFetch("/api/upload/personal-documents",{method:"POST",body:fd});
+  if (!res) return;
+  if (!res.ok) { const e=await res.json().catch(()=>{}); stEl.textContent=`Upload failed: ${e?.detail||res.status}`; stEl.style.color="var(--error)"; return; }
+  const data = await res.json();
+  uploadedFiles[i] = {id:data.id,storage_key:data.storage_key};
+  stEl.innerHTML = `<span class="pill-pending"><span class="material-symbols-outlined">pending</span> Pending Review</span>`;
+  document.getElementById(`view${i}`).style.display="inline-flex";
+  document.getElementById(`delete${i}`).style.display="inline-flex";
+}
+
+function viewFile(i) {
+  if (!uploadedFiles[i]?.storage_key) return;
+  authFetch(`/api/upload/view-url?key=${encodeURIComponent(uploadedFiles[i].storage_key)}`).then(r=>r&&r.json()).then(d=>d&&window.open(d.url,"_blank")).catch(()=>showToast("Could not generate view link","error"));
+}
+
+async function deleteFile(i) {
+  const ok = await confirmModal("Delete this document?\nThis action cannot be undone.","Delete");
+  if (!ok) return;
+  const btn = document.getElementById(`delete${i}`); btn.disabled=true;
+  const res = await authFetch(`/api/upload/personal-documents/${uploadedFiles[i].id}`,{method:"DELETE"});
+  if (!res){btn.disabled=false;return;}
+  if (!res.ok){showToast("Failed to delete document","error");btn.disabled=false;return;}
+  delete uploadedFiles[i];
+  document.getElementById(`status${i}`).textContent="";
+  document.getElementById(`view${i}`).style.display="none";
+  btn.style.display="none";
+  document.getElementById(`file${i}`).value="";
+  showToast("Document deleted","success");
+}
+
+function addOtherDocItem(name, doc) {
+  const item = document.createElement("div"); item.className="upload-track-item";
+  const icon = document.createElement("span"); icon.innerHTML=`<span class="material-symbols-outlined">description</span>`; icon.style.fontSize="16px";
+  const nm   = document.createElement("span"); nm.className="uti-name"; nm.textContent=name;
+  const vBtn = document.createElement("button"); vBtn.className="btn btn-secondary btn-xs"; vBtn.style.borderRadius="var(--radius-sm)"; vBtn.textContent="View";
+  vBtn.addEventListener("click",()=>authFetch(`/api/upload/view-url?key=${encodeURIComponent(doc.storage_key)}`).then(r=>r&&r.json()).then(d=>d&&window.open(d.url,"_blank")).catch(()=>showToast("Could not generate view link","error")));
+  const dBtn = document.createElement("button"); dBtn.className="btn btn-danger btn-xs"; dBtn.style.borderRadius="var(--radius-sm)"; dBtn.textContent="Delete";
+  dBtn.addEventListener("click",async()=>{
+    const ok=await confirmModal("Delete this document?","Delete"); if(!ok) return;
+    dBtn.disabled=true;
+    const res=await authFetch(`/api/upload/personal-documents/${doc.id}`,{method:"DELETE"});
+    if(!res){dBtn.disabled=false;return;}
+    if(!res.ok){showToast("Failed to delete","error");dBtn.disabled=false;return;}
+    item.remove(); showToast("Document deleted","success");
+  });
+  item.appendChild(icon); item.appendChild(nm); item.appendChild(vBtn); item.appendChild(dBtn);
+  extraList.appendChild(item);
+}
+
+document.getElementById("extraFile").addEventListener("change", async e => {
+  extraStatus.textContent="Uploading…"; extraStatus.style.color="var(--muted)";
+  let ok=0,fail=0;
+  for (const file of e.target.files) {
+    const fd=new FormData(); fd.append("file",file); fd.append("doc_type","Other"); fd.append("tax_year",getSelectedYear());
+    const res=await authFetch("/api/upload/personal-documents",{method:"POST",body:fd});
+    if(!res) return;
+    if(res.ok){ok++;const d=await res.json();addOtherDocItem(file.name,{id:d.id,storage_key:d.storage_key});}
+    else fail++;
+  }
+  extraStatus.innerHTML = fail ? `${fail} upload(s) failed` : `${ok} file(s) uploaded <span class="material-symbols-outlined">check</span>`;
+  extraStatus.style.color = fail ? "var(--error)" : "var(--success)";
+  e.target.value="";
+});
+
+/* Drag & drop */
+const dropArea = document.getElementById("dropArea");
+dropArea.addEventListener("dragover",  e=>{e.preventDefault();dropArea.classList.add("drag-over");});
+dropArea.addEventListener("dragleave", ()=>dropArea.classList.remove("drag-over"));
+dropArea.addEventListener("drop", e=>{
+  e.preventDefault(); dropArea.classList.remove("drag-over");
+  const dt = e.dataTransfer;
+  if (dt.files.length) {
+    const input = document.getElementById("extraFile");
+    input.files = dt.files;
+    input.dispatchEvent(new Event("change"));
+  }
+});
+
+async function loadSavedDocuments() {
+  const year = getSelectedYear();
+  const res  = await authFetch(`/api/upload/personal-documents?tax_year=${year}`);
+  if (!res||!res.ok){hideSpinner(wrapper,'<p style="color:var(--error);padding:12px;">Failed to load saved documents.</p>');return;}
+  const files = await res.json();
+  hideSpinner(wrapper,""); renderDocs();
+  const docs = getDocs();
+  files.forEach(f => {
+    const index = docs.findIndex(d=>d.name.trim().toLowerCase()===f.doc_type?.trim().toLowerCase());
+    if (index!==-1) {
+      uploadedFiles[index]={id:f.id,storage_key:f.storage_key};
+      const st=document.getElementById(`status${index}`);
+      const p=f.review_status||"pending";
+      st.innerHTML=`<span class="pill-${p}">${p==="approved"?`<span class="material-symbols-outlined">check</span> Approved`:p==="rejected"?`<span class="material-symbols-outlined">close</span> Rejected`:`<span class="material-symbols-outlined">pending</span> Pending Review`}</span>`;
+      document.getElementById(`view${index}`).style.display="inline-flex";
+      document.getElementById(`delete${index}`).style.display="inline-flex";
+    } else {
+      addOtherDocItem(f.filename,{id:f.id,storage_key:f.storage_key});
+    }
+  });
+}
+
+(function init() {
+  const sy = localStorage.getItem("selected_tax_year");
+  buildYearOptions("taxYearSelect", sy ? parseInt(sy) : new Date().getFullYear());
+  onYearChange();
+})();
+</script>
+</body>
+</html>

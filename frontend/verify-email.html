@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BookKeepPro | Verify Email</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/css/base.css"/>
+  <link rel="stylesheet" href="/css/components.css"/>
+  <link rel="stylesheet" href="/css/animations.css"/>
+
+  <style>html,body{height:100%;}body{margin:0;}</style>  <script src="/js/theme.js?v=2"></script>
+</head>
+<body style="margin:0;padding:0;">
+
+<div class="auth-shell page-enter">
+
+  <div class="auth-brand">
+    <img class="brand-logo" src="/images/bookkeeppro-logo.webp" alt="BookKeepPro"/>
+    <div class="brand-divider"></div>
+    <h2>Almost There</h2>
+    <p>We're verifying your email address right now.</p>
+  </div>
+
+  <div class="auth-form-side">
+    <div class="auth-box text-center" id="card">
+      <div style="font-size:48px;margin-bottom:16px;"><span class="material-symbols-outlined">pending</span></div>
+      <h2>Verifying your email…</h2>
+      <p class="auth-subtitle">Please wait a moment.</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const token  = params.get("token");
+  const card   = document.getElementById("card");
+
+  async function verify() {
+    if (!token) {
+      card.innerHTML = `
+        <div style="font-size:48px;margin-bottom:16px;"><span class="material-symbols-outlined">cancel</span></div>
+        <h2>Invalid Link</h2>
+        <p class="auth-subtitle">This verification link is missing a token.<br>Please use the link from your email.</p>
+        <a href="/login" class="btn btn-primary" style="border-radius:var(--radius-sm);margin-top:24px;display:inline-flex;">Go to Sign In</a>`;
+      return;
+    }
+    try {
+      const res  = await fetch(`/api/auth/verify-email?token=${encodeURIComponent(token)}`);
+      const data = await res.json();
+
+      if (res.ok && (data.message === "verified" || data.message === "already_verified")) {
+        card.innerHTML = `
+          <div style="font-size:48px;margin-bottom:16px;"><span class="material-symbols-outlined">check_circle</span></div>
+          <h2>${data.message === "already_verified" ? "Already Verified" : "Email Verified!"}</h2>
+          <p class="auth-subtitle">${data.message === "already_verified"
+            ? "Your email is already verified. You can sign in below."
+            : "Your email has been verified. You can now sign in to your account."}</p>
+          <a href="/login" class="btn btn-primary" style="border-radius:var(--radius-sm);margin-top:24px;display:inline-flex;">Sign In</a>`;
+      } else {
+        card.innerHTML = `
+          <div style="font-size:48px;margin-bottom:16px;"><span class="material-symbols-outlined">cancel</span></div>
+          <h2>Verification Failed</h2>
+          <p class="auth-subtitle">${data.detail || "This link is invalid or has expired."}</p>
+          <a href="/resend-verification" class="btn btn-primary" style="border-radius:var(--radius-sm);margin-top:24px;display:inline-flex;">Request New Link</a>`;
+      }
+    } catch {
+      card.innerHTML = `
+        <div style="font-size:48px;margin-bottom:16px;"><span class="material-symbols-outlined">warning</span></div>
+        <h2>Something went wrong</h2>
+        <p class="auth-subtitle">Could not connect to the server. Please try again later.</p>`;
+    }
+  }
+  verify();
+</script>
+</body>
+</html>

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>About Us — BookKeepro</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="/css/base.css?v=4">
+<link rel="stylesheet" href="/css/components.css?v=4">
+<link rel="stylesheet" href="/css/marketing.css?v=4">
+  <script src="/js/theme.js?v=2"></script>
+</head>
+
+<body>
+
+<!-- NAVBAR -->
+{% include 'partials/navbar.html' %}
+
+<!-- HERO -->
+<div class="page-hero">
+  <div>
+    <h1>About Us</h1>
+    <p>Our People Are Passionate About What We Do</p>
+  </div>
+</div>
+
+<!-- CONTENT -->
+<div class="about-wrapper">
+
+  <div class="about-block">
+    <div class="about-text">
+      <h2>Who We Are</h2>
+
+      <p>
+        Our journey began in 1998 as a Chartered Accountant firm in India,
+        built on strong fundamentals of accounting, compliance, integrity,
+        and long-term client relationships.
+      </p>
+
+      <br>
+
+      <p>
+        In 2018, we strengthened our presence in Pune & Mumbai — transitioning
+        from a traditional CA practice into a scalable financial services
+        organization.
+      </p>
+    </div>
+
+    <img class="about-img"
+         src="./images/about-us-block-1.webp"
+         alt="Bookkeepro Team">
+  </div>
+
+  <div class="about-block reverse">
+    <div class="about-text">
+      <h2>About Bookkeepro</h2>
+
+      <p>
+        As our client base expanded globally — especially across the US — we aligned
+        our operating model to support international growth.
+      </p>
+
+      <br>
+
+      <p>
+        In 2023, we launched:
+        <br><br>
+        <b>• Bookkeeping Business Solutions Pvt Ltd (India)</b><br>
+        <b>• Bookkeeping Business Solutions LLC (USA)</b>
+      </p>
+
+      <br>
+
+      <p>
+        Today, Bookkeepro serves global businesses, startups & enterprises with
+        scalable, compliant bookkeeping and financial operations support.
+      </p>
+    </div>
+
+    <img class="about-img"
+         src="./images/about-us-block-2.webp"
+         alt="About Bookkeepro">
+  </div>
+
+</div>
+
+<div class="about-block" style="width:min(1200px,92%);margin:auto;">
+  <div class="about-text">
+    <h2>Who We Are Today</h2>
+
+    <p>
+      ✔️ 25+ years of accounting & compliance expertise<br>
+      ✔️ Operations across India & USA<br>
+      ✔️ Secure, process-driven financial workflows<br>
+      ✔️ Strong confidentiality & data protection practices
+    </p>
+
+    <br>
+
+    <p>
+      We help businesses build financial clarity, compliance confidence,
+      and operational efficiency.
+    </p>
+  </div>
+
+  <img class="about-img"
+       src="./images/Gemini_Generated_Image_5pqvpl5pqvpl5pqv.webp"
+       alt="Global Bookkeepro Team">
+</div>
+
+<!-- FOOTER -->
+{% include 'partials/footer.html' %}
+
+<script>
+function toggleMenu(){
+  document.getElementById("navMenu").classList.toggle("active");
+}
+</script>
+
+</body>
+</html>

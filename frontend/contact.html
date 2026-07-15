@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contact — BookKeepro</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="/css/base.css?v=4">
+<link rel="stylesheet" href="/css/components.css?v=4">
+<link rel="stylesheet" href="/css/marketing.css?v=5">
+  <script src="/js/theme.js?v=2"></script>
+</head>
+
+<body>
+
+{% set navbar_class = 'navbar-solid' %}
+{% include 'partials/navbar.html' %}
+
+<!-- ================= CONTACT SECTION ================= -->
+
+<section class="contact-section">
+
+  <h2 class="contact-title">
+    CONTACT  <span class="blue"> BOOK</span><span class="orange">KEEPRO</span>
+  </h2>
+
+  <div class="contact-container">
+
+    <div class="contact-info">
+
+      <div class="info-box usa">
+        <h3>USA</h3>
+        <p>2520 Indigo Dr<br>McKinney, TX<br>75072, United States</p>
+        <p class="phone"><img src="/images/call.webp"> +1469-796-6151</p>
+      </div>
+
+      <div class="info-box ind">
+        <h3>IND</h3>
+        <p>508, White Square,<br>Hinjewadi Road, Pune<br>411057, India</p>
+        <p class="phone"><img src="/images/call.webp"> +91 738 793 6020</p>
+      </div>
+
+    </div>
+
+    <div>
+      <form class="contact-form" id="contactForm">
+
+        <div class="form-row">
+          <input type="text" name="first_name" placeholder="First Name" required>
+          <input type="text" name="last_name" placeholder="Last Name" required>
+        </div>
+
+        <input type="email" name="email" placeholder="Email Address" required>
+
+        <div class="phone-row">
+          <input type="text" name="phone" placeholder="Mobile Number" required>
+        </div>
+
+        <div class="message-row">
+          <textarea name="message" placeholder="Your Message" required style="width: 100%; padding: 12px; border: 1.5px solid var(--border); border-radius: 6px; font-family: inherit; font-size: 14px; outline: none; margin-bottom: 16px; resize: vertical; min-height: 100px;"></textarea>
+        </div>
+
+        <button type="submit">SUBMIT</button>
+
+      </form>
+    </div>
+
+  </div>
+</section>
+
+{% include 'partials/footer.html' %}
+
+<script src="/js/spinner.js"></script>
+<script src="/js/toast.js"></script>
+<script>
+/* submit contact form */
+const form = document.getElementById("contactForm");
+const statusBox = document.getElementById("contactStatus");
+
+form.addEventListener("submit", async (e)=>{
+  e.preventDefault();
+
+  const data = {
+    first_name: form.first_name.value,
+    last_name: form.last_name.value,
+    email: form.email.value,
+    phone: form.phone.value,
+    message: form.message.value,
+  };
+
+  const btn = form.querySelector("button[type='submit']");
+  setButtonLoading(btn, true, "Sending...");
+
+  try{
+    const res = await fetch("/api/contact",{
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body:JSON.stringify(data)
+    });
+
+    if(!res.ok) throw new Error();
+
+    showToast("Message sent successfully!", "success");
+    form.reset();
+
+  }catch{
+    showToast("Failed to send message. Please try again.", "error");
+  } finally {
+    setButtonLoading(btn, false, "SUBMIT");
+  }
+});
+</script>
+
+</body>
+</html>
