@@ -12,7 +12,7 @@ services:
       MYSQL_USER: ${MYSQL_USER:-bookkeep}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-bookkeepro_pass}
     ports:
-      - "80:8000"
+      - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
