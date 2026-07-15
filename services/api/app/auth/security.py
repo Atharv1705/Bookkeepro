@@ -98,35 +98,22 @@ async def forgot_password(
     frontend_url = os.getenv("FRONTEND_URL", "https://bookkeepro.net")
     reset_link = f"{frontend_url}/reset-password?token={reset_token}"
 
-    # Add email task with error handling
-    async def send_reset_email_safely():
-        try:
-            await send_email(
-                to=user.email,
-                subject="Reset your BookKeepro password",
-                body=f"""
-                Hi {user.name},<br><br>
-                Click the button below to reset your password:<br><br>
-
-                <a href="{reset_link}"
-                   style="padding:12px 18px;
-                          background:#FF7F11;
-                          color:#fff;
-                          text-decoration:none;
-                          border-radius:6px;">
-                    Reset Password
-                </a>
-                <br><br>
-                This link expires in 15 minutes.<br><br>
-                BookKeepro Team
-                """
-            )
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Failed to send reset email to {user.email}: {e}")
-
-    background.add_task(send_reset_email_safely)
+    reset_body = (
+        f"Hi {user.name},<br><br>"
+        f"Click the button below to reset your password:<br><br>"
+        f'<a href="{reset_link}" '
+        f'style="padding:12px 18px;background:#FF7F11;color:#fff;'
+        f'text-decoration:none;border-radius:6px;">'
+        f"Reset Password</a><br><br>"
+        f"This link expires in 15 minutes.<br><br>"
+        f"BookKeepro Team"
+    )
+    background.add_task(
+        send_email,
+        to=user.email,
+        subject="Reset your BookKeepro password",
+        body=reset_body,
+    )
 
     return {"message": "If the email exists, a reset link has been sent"}
 
@@ -255,29 +242,22 @@ async def signup(request: Request, payload: SignupRequest, background: Backgroun
         verify_token = create_email_verification_token(user.email)
         frontend_url = os.getenv("FRONTEND_URL", "https://bookkeepro.net")
         verify_link = f"{frontend_url}/verify-email?token={verify_token}"
-
-        async def send_verify_email():
-            try:
-                await send_email(
-                    to=user.email,
-                    subject="Verify your BookKeepro email",
-                    body=f"""
-                    Hi {user.name},<br><br>
-                    Welcome to BookKeepro! Please verify your email address to activate your account.<br><br>
-                    <a href="{verify_link}"
-                       style="padding:12px 24px;background:#FF7F11;color:#fff;
-                              text-decoration:none;border-radius:6px;font-weight:600;">
-                        Verify My Email
-                    </a>
-                    <br><br>
-                    This link expires in 24 hours. If you did not sign up, ignore this email.<br><br>
-                    BookKeepro Team
-                    """
-                )
-            except Exception as e:
-                logger.error(f"Verification email failed for {user.email}: {e}")
-
-        background.add_task(send_verify_email)
+        verify_body = (
+            f"Hi {user.name},<br><br>"
+            f"Welcome to BookKeepro! Please verify your email address to activate your account.<br><br>"
+            f'<a href="{verify_link}" '
+            f'style="padding:12px 24px;background:#FF7F11;color:#fff;'
+            f'text-decoration:none;border-radius:6px;font-weight:600;">'
+            f"Verify My Email</a><br><br>"
+            f"This link expires in 24 hours. If you did not sign up, ignore this email.<br><br>"
+            f"BookKeepro Team"
+        )
+        background.add_task(
+            send_email,
+            to=user.email,
+            subject="Verify your BookKeepro email",
+            body=verify_body,
+        )
 
     return {
         "access_token": "",        # no token until verified
@@ -370,28 +350,22 @@ async def resend_verification(
     frontend_url = os.getenv("FRONTEND_URL", "https://bookkeepro.net")
     verify_link = f"{frontend_url}/verify-email?token={verify_token}"
 
-    async def send_resend_email():
-        try:
-            await send_email(
-                to=user.email,
-                subject="Verify your BookKeepro email",
-                body=f"""
-                Hi {user.name},<br><br>
-                Here is your new verification link:<br><br>
-                <a href="{verify_link}"
-                   style="padding:12px 24px;background:#FF7F11;color:#fff;
-                          text-decoration:none;border-radius:6px;font-weight:600;">
-                    Verify My Email
-                </a>
-                <br><br>
-                This link expires in 24 hours.<br><br>
-                BookKeepro Team
-                """
-            )
-        except Exception as e:
-            logger.error(f"Resend verification email failed for {user.email}: {e}")
-
-    background.add_task(send_resend_email)
+    resend_body = (
+        f"Hi {user.name},<br><br>"
+        f"Here is your new verification link:<br><br>"
+        f'<a href="{verify_link}" '
+        f'style="padding:12px 24px;background:#FF7F11;color:#fff;'
+        f'text-decoration:none;border-radius:6px;font-weight:600;">'
+        f"Verify My Email</a><br><br>"
+        f"This link expires in 24 hours.<br><br>"
+        f"BookKeepro Team"
+    )
+    background.add_task(
+        send_email,
+        to=user.email,
+        subject="Verify your BookKeepro email",
+        body=resend_body,
+    )
     return {"message": "If the email exists and is unverified, a new link has been sent"}
 
 
