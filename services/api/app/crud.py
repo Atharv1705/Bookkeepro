@@ -1,9 +1,7 @@
+import warnings
 from sqlalchemy.orm import Session
-from passlib.context import CryptContext
+import bcrypt
 from app.models import User, AuditLog
-
-# Single shared password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 # ─────────────────────────────────────────────
@@ -31,7 +29,7 @@ def create_user(
         name=name,
         email=email,
         phone=phone,
-        hashed_password=pwd_context.hash(password),
+        hashed_password=hash_password(password),
         role=role,
         is_verified=is_verified,
     )
@@ -53,11 +51,14 @@ def update_user_password(db: Session, user: User, hashed_password: str) -> None:
 # ─────────────────────────────────────────────
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+    except Exception:
+        return False
 
 
 def hash_password(plain_password: str) -> str:
-    return pwd_context.hash(plain_password)
+    return bcrypt.hashpw(plain_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 
 def authenticate_user(db: Session, email: str, password: str) -> User | None:

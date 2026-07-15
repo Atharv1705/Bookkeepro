@@ -25,8 +25,8 @@ async function signupUser() {
 
         // Email verification required — show message, do NOT log in
         if (data.email_verification_required) {
-            const container = document.getElementById('signupForm')?.closest('.container')
-                           || document.querySelector('.container');
+            const container = document.getElementById('signupForm')?.closest('.auth-box')
+                           || document.querySelector('.auth-box');
             if (container) {
                 container.innerHTML = `
                     <div style="text-align:center;padding:10px 0;">
