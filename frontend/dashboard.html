@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BookKeepPro | Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/components.css" />
+  <link rel="stylesheet" href="/css/animations.css" />
+  <style>
+    .action-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 8px;
+    }
+
+    .action-card {
+      padding: 24px 20px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      background: var(--card);
+      cursor: pointer;
+      text-align: center;
+      transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+    }
+
+    .action-card:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-md);
+      border-color: #c5d9ee;
+    }
+
+    .action-card .ac-icon {
+      font-size: 32px;
+      margin-bottom: 10px;
+    }
+
+    .action-card .ac-title {
+      font-weight: 600;
+      color: var(--navy);
+      font-size: 15px;
+    }
+
+    .action-card .ac-desc {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .action-card.personal {
+      border-top: 4px solid var(--blue);
+    }
+
+    .action-card.business {
+      border-top: 4px solid var(--orange);
+    }
+
+    @media(max-width:480px) {
+      .action-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+
+  <style>
+    html {
+      height: 100%;
+    }
+  </style>
+  <script src="/js/theme.js?v=2"></script>
+</head>
+
+<body class="app-body">
+
+  <header class="app-header">
+    <img class="logo" src="/images/bookkeeppro-logo.webp" onclick="window.location.href='/dashboard'"
+      alt="BookKeepPro" />
+    <div class="header-actions">
+
+      <!-- THEME TOGGLE -->
+      <button class="theme-toggle" onclick="toggleTheme()" style="background:none;border:none;color:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:8px;">
+        <span class="material-symbols-outlined theme-toggle-icon" style="font-size:24px;">dark_mode</span>
+      </button>
+      <button class="btn btn-secondary btn-sm" onclick="window.location.href='/profile'">My Profile</button>
+      <button class="btn btn-primary btn-sm" onclick="logoutUser()">Logout</button>
+    </div>
+  </header>
+
+  <main class="page-main page-enter" style="max-width:860px;">
+
+    <!-- Engagement Banner -->
+    <div class="engagement-banner" id="engagementBanner">
+      <div class="banner-icon"></div>
+      <div class="banner-text">
+        <strong>General Engagement Letter</strong>
+        <span>Please download and read the engagement letter before uploading documents.</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;flex-shrink:0;flex-wrap:wrap;">
+        <a href="./images/general_engagement_letter_2025-1 - common.pdf" download class="btn btn-secondary btn-sm"
+          style="border-radius:var(--radius-sm);">
+          Download
+        </a>
+        <label
+          style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500;white-space:nowrap;">
+          <input type="checkbox" id="ackCheckbox" onchange="acknowledgeEngagement(this)"
+            style="width:16px;height:16px;accent-color:var(--blue);" />
+          I acknowledge
+        </label>
+      </div>
+    </div>
+    <p id="ackStatus" style="font-size:12px;color:var(--success);margin:-12px 0 20px;display:none;"></p>
+
+    <!-- Welcome + Stats -->
+    <div class="page-heading">
+      <div>
+        <h1>Welcome back! </h1>
+        <p class="page-meta">Manage your tax documents and review filings below.</p>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="card" style="margin-bottom:24px;">
+      <h3 style="margin-bottom:16px;">Upload Documents</h3>
+      <div class="action-grid">
+        <div class="action-card personal" onclick="window.location.href='/upload-personal'">
+          <div class="ac-icon"></div>
+          <div class="ac-title">Personal Documents</div>
+          <div class="ac-desc">W-2, 1099, tax organizer and more</div>
+        </div>
+        <div class="action-card business" onclick="window.location.href='/upload-business'">
+          <div class="ac-icon"></div>
+          <div class="ac-title">Business Documents</div>
+          <div class="ac-desc">S-Corp, LLC, partnership organizers</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Admin Returns -->
+    <div class="card" id="adminDocsBox">
+      <div class="flex-between" style="margin-bottom:16px;">
+        <h3>Returns for Review</h3>
+        <span class="badge badge-blue" id="returnCount" style="display:none;"></span>
+      </div>
+      <div id="adminDocsList">
+        <div class="empty-state">
+          <div class="empty-icon"><span class="material-symbols-outlined">inbox</span></div>
+          <div class="empty-title">No returns yet</div>
+          <div class="empty-hint">When your accountant uploads your tax returns, they'll appear here.</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="app-footer">
+    <img src="/images/bookkeeppro-logo.webp" alt="BookKeepPro" />
+    <small>© 2026 Bookkeeping Business Solutions. All rights reserved.</small>
+  </footer>
+
+  <script src="/js/auth.js"></script>
+  <script src="/js/toast.js"></script>
+  <script src="/js/spinner.js"></script>
+  <script src="/js/confirm-modal.js"></script>
+  <script>
+    guardAuth(["user"]);
+    initSessionWarning();
+
+
+    /* ── Engagement ── */
+    async function loadAcknowledgementStatus() {
+      const res = await authFetch("/api/auth/me");
+      if (!res || !res.ok) return;
+      const data = await res.json();
+      if (data.engagement_acknowledged_at) {
+        const banner = document.getElementById("engagementBanner");
+        banner.classList.add("acknowledged");
+        banner.querySelector(".banner-text strong").textContent = "Engagement Letter Acknowledged";
+        banner.querySelector(".banner-text span").textContent = `Acknowledged on ${new Date(data.engagement_acknowledged_at).toLocaleDateString()}`;
+        const ack = banner.querySelector("label");
+        if (ack) { ack.previousElementSibling?.remove(); ack.remove(); }
+      }
+    }
+
+    async function acknowledgeEngagement(checkbox) {
+      if (!checkbox.checked) return;
+      const res = await authFetch("/api/auth/acknowledge-engagement", { method: "POST" });
+      if (!res || !res.ok) { showToast("Failed to save acknowledgement", "error"); checkbox.checked = false; return; }
+      checkbox.disabled = true;
+      const banner = document.getElementById("engagementBanner");
+      banner.classList.add("acknowledged");
+      banner.querySelector(".banner-text span").textContent = `Acknowledged on ${new Date().toLocaleDateString()}`;
+      showToast("Engagement letter acknowledged", "success");
+    }
+
+    /* ── Admin Docs ── */
+    async function loadAdminUploadedDocs() {
+      const list = document.getElementById("adminDocsList");
+      list.innerHTML = Array(3).fill(`
+        <div class="doc-row fade-up" style="border: 1px solid var(--border); padding: 12px 16px; border-radius: var(--radius-md); margin-bottom: 8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+            <div>
+              <div class="skeleton" style="width:180px;height:20px;margin-bottom:6px;"></div>
+              <div class="skeleton" style="width:120px;height:14px;"></div>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <div class="skeleton" style="width:60px;height:28px;border-radius:var(--radius-pill);"></div>
+              <div class="skeleton" style="width:80px;height:28px;border-radius:var(--radius-pill);"></div>
+            </div>
+          </div>
+        </div>
+      `).join("");
+      
+      let res;
+      try { res = await authFetch("/api/upload/admin-documents"); if (!res) return; }
+      catch { list.innerHTML = `<div class="empty-state"><div class="empty-hint">Failed to load documents.</div></div>`; return; }
+
+      let documents;
+      try { documents = await res.json(); } catch { list.innerHTML = `<div class="empty-state"><div class="empty-hint">Invalid response.</div></div>`; return; }
+      if (!Array.isArray(documents) || !documents.length) {
+        hideSpinner(list, `<div class="empty-state"><div class="empty-icon"><span class="material-symbols-outlined">inbox</span></div><div class="empty-title">No returns yet</div><div class="empty-hint">When your accountant uploads your tax returns, they'll appear here.</div></div>`);
+        return;
+      }
+
+      const countBadge = document.getElementById("returnCount");
+      countBadge.textContent = `${documents.length} document${documents.length !== 1 ? 's' : ''}`;
+      countBadge.style.display = "inline-flex";
+
+      list.innerHTML = "";
+      documents.forEach(d => {
+        const row = document.createElement("div");
+        row.className = "doc-row fade-up";
+
+        const left = document.createElement("div");
+        left.className = "doc-row-left";
+        const title = document.createElement("div"); title.className = "doc-row-name"; title.textContent = d.doc_label;
+        const fname = document.createElement("div"); fname.className = "doc-row-type"; fname.textContent = d.filename;
+        left.appendChild(title); left.appendChild(fname);
+
+        const actions = document.createElement("div");
+        actions.className = "doc-row-actions";
+
+        const viewBtn = document.createElement("button");
+        viewBtn.className = "btn btn-secondary btn-xs"; viewBtn.textContent = "View";
+        viewBtn.addEventListener("click", () =>
+          authFetch(`/api/upload/view-url?key=${encodeURIComponent(d.storage_key)}`)
+            .then(r => r && r.json()).then(x => x && window.open(x.url, "_blank"))
+            .catch(() => showToast("Could not generate view link", "error"))
+        );
+
+        const approveBtn = document.createElement("button");
+        approveBtn.id = `approveBtn_${d.id}`;
+        approveBtn.className = "btn btn-sm"; approveBtn.classList.add("btn-approve");
+        approveBtn.innerHTML = `<span class="material-symbols-outlined">check</span> Approve`;
+        approveBtn.addEventListener("click", () => approveAdminDoc(d.id));
+
+        const rejectBtn = document.createElement("button");
+        rejectBtn.id = `rejectBtn_${d.id}`;
+        rejectBtn.className = "btn btn-sm"; rejectBtn.classList.add("btn-reject");
+        rejectBtn.innerHTML = `<span class="material-symbols-outlined">close</span> Reject`;
+        rejectBtn.addEventListener("click", () => showRejectBox(d.id, rejectBox));
+
+        actions.appendChild(viewBtn); actions.appendChild(approveBtn); actions.appendChild(rejectBtn);
+
+        const rejectBox = document.createElement("div");
+        rejectBox.id = `rejectBox_${d.id}`;
+        rejectBox.className = "reject-box";
+        const ta = document.createElement("textarea");
+        ta.id = `rejectReason_${d.id}`; ta.placeholder = "Reason for rejection";
+        ta.className = "reject-textarea";
+        const subBtn = document.createElement("button");
+        subBtn.className = "btn btn-secondary btn-sm"; subBtn.style.marginTop = "8px"; subBtn.textContent = "Submit Rejection";
+        subBtn.addEventListener("click", () => submitRejection(d.id));
+        rejectBox.appendChild(ta); rejectBox.appendChild(subBtn);
+
+        const wrapper = document.createElement("div");
+        wrapper.appendChild(left); wrapper.appendChild(actions);
+        wrapper.className = "doc-row-wrapper";
+        row.appendChild(wrapper); row.appendChild(rejectBox);
+        list.appendChild(row);
+      });
+    }
+
+    function showRejectBox(docId, boxEl) { const box = boxEl || document.getElementById(`rejectBox_${docId}`); if (box) box.style.display = "block"; }
+    function viewStoredDoc(key) { authFetch(`/api/upload/view-url?key=${encodeURIComponent(key)}`).then(r => r && r.json()).then(d => d && window.open(d.url, "_blank")).catch(() => showToast("Could not generate view link", "error")); }
+
+    async function approveAdminDoc(docId) {
+      const ok = await confirmModal("Approve this document?", "Approve");
+      if (!ok) return;
+      const res = await authFetch("/api/review/admin-doc-response", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ doc_id: docId, status: "approved" }) });
+      if (!res) return;
+      if (!res.ok) { showToast("Failed to send approval", "error"); return; }
+      showToast("Approval sent", "success");
+      const aBtn = document.getElementById(`approveBtn_${docId}`);
+      const rBtn = document.getElementById(`rejectBtn_${docId}`);
+      const rBox = document.getElementById(`rejectBox_${docId}`);
+      if(aBtn) { aBtn.outerHTML = '<span style="color:var(--success); font-weight:600; font-size:14px; margin-left:10px;">✓ Approved</span>'; }
+      if(rBtn) rBtn.remove();
+      if(rBox) rBox.remove();
+    }
+
+    async function submitRejection(docId) {
+      const reason = document.getElementById(`rejectReason_${docId}`)?.value.trim();
+      if (!reason) { showToast("Please enter a rejection reason", "warning"); return; }
+      const res = await authFetch("/api/review/admin-doc-response", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ doc_id: docId, status: "rejected", reason }) });
+      if (!res) return;
+      if (!res.ok) { showToast("Failed to send rejection", "error"); return; }
+      showToast("Rejection sent to admin", "success");
+      const aBtn = document.getElementById(`approveBtn_${docId}`);
+      const rBtn = document.getElementById(`rejectBtn_${docId}`);
+      const rBox = document.getElementById(`rejectBox_${docId}`);
+      if(rBtn) { rBtn.outerHTML = '<span style="color:var(--danger); font-weight:600; font-size:14px; margin-left:10px;">✗ Rejected</span>'; }
+      if(aBtn) aBtn.remove();
+      if(rBox) rBox.remove();
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      loadAcknowledgementStatus();
+      loadAdminUploadedDocs();
+    });
+  </script>
+</body>
+
+</html>

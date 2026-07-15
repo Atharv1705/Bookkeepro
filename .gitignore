@@ -1,0 +1,19 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+!.env.docker.example
+credentials.json
+oauth_token.json
+
+# IDEs and OS
+.vscode/
+.idea/
+.DS_Store
+
+# User Uploads & Temp Data
+uploads/
+services/temp/
