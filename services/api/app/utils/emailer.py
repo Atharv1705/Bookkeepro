@@ -32,7 +32,7 @@ def _build_mail_client():
         if "PASTE" in (smtp_password or "").upper():
             logger.warning(
                 "SMTP_PASSWORD looks like a placeholder. "
-                "Set a real Gmail App Password in .env"
+                "Set a real SMTP Password in .env"
             )
             return None
 
