@@ -81,7 +81,7 @@
       const { pct, label: lbl, cls } = checkStrength(val);
       bar.style.width = pct + "%";
       bar.className = "pw-strength-bar " + cls;
-      label.textContent = lbl;
+      label.innerHTML = lbl;
       label.style.color = cls === "pw-weak" ? "#c62828" : cls === "pw-medium" ? "#f57f17" : "#2e7d32";
     });
   };
