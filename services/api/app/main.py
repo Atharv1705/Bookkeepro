@@ -49,6 +49,12 @@ try:
 except Exception as exc:
     log.exception("Failed to load review router: %s", exc)
 
+try:
+    from app.routers import chatbot  # type: ignore
+    app.include_router(chatbot.router)
+except Exception as exc:
+    log.exception("Failed to load chatbot router: %s", exc)
+
 # ─────────────────────────────────────────────
 # CORS
 # ─────────────────────────────────────────────
