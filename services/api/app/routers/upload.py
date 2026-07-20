@@ -266,6 +266,7 @@ def list_admin_documents(
             "doc_label":   d.doc_label,
             "filename":    d.filename,
             "storage_key": d.storage_key,
+            "created_at":  d.uploaded_at.isoformat() if d.uploaded_at else None,
         }
         for d in docs
     ]
