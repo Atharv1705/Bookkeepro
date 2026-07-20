@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "C:\Users\abhil\Desktop\Bookkeepro\Bookkeep\services/api\app\routers\chatbot.py", line 204, in ask_chatbot
+    return data['choices'][0]['message']
+           ~~~~^^^^^^^^^^^
+KeyError: 'choices'

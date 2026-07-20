@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BookKeepPro | Admin Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/components.css" />
+  <link rel="stylesheet" href="/css/animations.css" />
+  <link rel="stylesheet" href="/css/chatbot.css" />
+  <style>
+    .users-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 16px;
+      margin-top: 20px;
+    }
+  </style>
+
+  <style>
+    html {
+      height: 100%;
+    }
+  </style>
+  <script src="/js/theme.js?v=2"></script>
+</head>
+
+<body class="app-body">
+
+  <header class="app-header">
+    <img class="logo" src="/images/bookkeeppro-logo.webp" onclick="window.location.href='/admin-dashboard'"
+      alt="BookKeepPro" />
+    <div class="header-actions">
+
+      <!-- THEME TOGGLE -->
+      <button class="theme-toggle" onclick="toggleTheme()" style="background:none;border:none;color:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:8px;">
+        <span class="material-symbols-outlined theme-toggle-icon" style="font-size:24px;">dark_mode</span>
+      </button>
+      <button class="btn btn-secondary btn-sm" onclick="window.location.href='/profile'">My Profile</button>
+      <button class="btn btn-primary btn-sm" onclick="logoutUser()">Logout</button>
+    </div>
+  </header>
+
+  <main class="page-main-wide page-enter">
+
+    <!-- Stats Row -->
+    <div class="stat-row" id="statRow" style="margin-bottom:24px;"></div>
+
+    <!-- Heading + Search -->
+    <div class="flex-between" style="flex-wrap:wrap;gap:12px;margin-bottom:8px;">
+      <div>
+        <div style="display:flex; gap: 16px; margin-bottom: 4px; align-items: baseline;">
+          <h1 id="tabUsersBtn" style="cursor:pointer;" onclick="switchAdminTab('users')">Users</h1>
+          <h1 id="tabTemplatesBtn" style="cursor:pointer; color: var(--muted);" onclick="switchAdminTab('templates')" class="super-admin-only">Templates</h1>
+        </div>
+        <p class="text-muted" id="userCount" style="font-size:13px;"></p>
+      </div>
+      <div class="search-bar" id="userSearchDiv">
+        <span class="search-icon"></span>
+        <input type="text" id="searchInput" placeholder="Search by name or email…" oninput="filterUsers()" />
+      </div>
+    </div>
+
+    <div id="usersTab" class="admin-tab">
+      <div id="users" class="users-grid">
+        <div class="empty-state" style="grid-column:1/-1;">
+          <div class="empty-icon"><span class="material-symbols-outlined">pending</span></div>
+          <div class="empty-title">Loading users…</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="templatesTab" class="admin-tab" style="display:none;">
+      <div class="card">
+        <h3>Manage Required Templates</h3>
+        <p class="text-sm">Upload new templates for users to download.</p>
+        
+        <div style="margin-top: 20px; display:flex; gap: 12px; flex-wrap: wrap;">
+          <select id="tplCategory" class="select-input" style="width: auto;" onchange="loadAdminTemplates()">
+            <option value="personal">Personal</option>
+            <option value="business">Business</option>
+          </select>
+          <select id="tplYear" class="select-input" style="width: auto;" onchange="loadAdminTemplates()"></select>
+          <button class="btn btn-secondary btn-sm" onclick="loadAdminTemplates()">Load Templates</button>
+        </div>
+
+        <div id="tplList" style="margin-top: 20px;"></div>
+
+        <hr style="margin: 20px 0;">
+
+        <h4>Upload New Template</h4>
+        <form id="tplForm" onsubmit="handleTplUpload(event)" style="display:flex; flex-direction: column; gap: 12px; margin-top: 12px; max-width: 400px;">
+          <input type="text" id="tplName" class="input" placeholder="Template Name (e.g. Individual Tax Organizer)" required />
+          <input type="file" id="tplFile" class="input" accept=".pdf,.doc,.docx" />
+          <button type="submit" class="btn btn-primary">Upload Template</button>
+        </form>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="app-footer">
+    <img src="/images/bookkeeppro-logo.webp" alt="BookKeepPro" />
+    <small>© 2026 Bookkeeping Business Solutions</small>
+  </footer>
+
+  <script src="/js/auth.js"></script>
+  <script src="/js/toast.js"></script>
+  <script src="/js/spinner.js"></script>
+  <script>
+    const token = localStorage.getItem("token");
+    const role = localStorage.getItem("role");
+    const isSuperAdmin = role === "super_admin";
+    if (!token || (role !== "admin" && role !== "super_admin")) window.location.href = "/login";
+    initSessionWarning();
+
+
+
+    let allUsers = [];
+
+    async function changeRole(userId, selectEl, btnEl) {
+      const newRole = selectEl.value;
+      btnEl.disabled = true; btnEl.textContent = "Saving…";
+      const res = await authFetch(`/api/auth/admin/users/${userId}/role`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role: newRole }) });
+      if (!res) return;
+      if (!res.ok) { const e = await res.json().catch(() => { }); showToast(e?.detail || "Role change failed", "error"); btnEl.disabled = false; btnEl.textContent = "Save"; return; }
+      const data = await res.json();
+      showToast(data.message || "Role updated", "success");
+      const badge = selectEl.closest(".user-card")?.querySelector(".role-badge");
+      if (badge) { badge.textContent = newRole; badge.className = `badge badge-${newRole === "admin" ? "orange" : "blue"} role-badge`; }
+      btnEl.disabled = false; btnEl.textContent = "Save";
+    }
+
+    function buildCard(u) {
+      const card = document.createElement("div");
+      card.className = "user-card stagger fade-up";
+      card.dataset.name = (u.name || "").toLowerCase();
+      card.dataset.email = (u.email || "").toLowerCase();
+
+      const canEditRole = isSuperAdmin && u.role !== "super_admin";
+      const myUserId = parseInt(localStorage.getItem("user_id") || "0");
+      const isSelf = u.id === myUserId;
+
+      let roleSection = "";
+      if (canEditRole && !isSelf) {
+        roleSection = `
+      <div class="role-controls" onclick="event.stopPropagation()">
+        <select class="role-select" id="rs-${u.id}">
+          <option value="user"  ${u.role === "user" ? "selected" : ""}>User</option>
+          <option value="admin" ${u.role === "admin" ? "selected" : ""}>Admin</option>
+        </select>
+        <button class="role-save-btn" onclick="changeRole(${u.id},document.getElementById('rs-${u.id}'),this)">Save</button>
+      </div>`;
+      } else {
+        const cls = u.role === "super_admin" ? "badge-red" : u.role === "admin" ? "badge-orange" : "badge-blue";
+        roleSection = `<span class="badge ${cls} role-badge">${u.role}</span>`;
+      }
+
+      card.innerHTML = `
+    <div class="user-top">
+      <div class="user-avatar"></div>
+      <div class="user-info">
+        <div class="u-name"></div>
+        <div class="u-email"></div>
+      </div>
+    </div>
+    <div class="user-bottom">
+      ${roleSection}
+    </div>
+    <div class="click-layer"></div>`;
+
+      card.querySelector(".user-avatar").textContent = (u.name || "U").charAt(0).toUpperCase();
+      card.querySelector(".u-name").textContent = u.name || "—";
+      card.querySelector(".u-email").textContent = u.email || "—";
+
+      if (u.pending_docs > 0) {
+        const badge = document.createElement("span");
+        badge.className = "badge badge-orange pulse"; badge.style.cursor = "default";
+        badge.textContent = `${u.pending_docs} pending`;
+        card.querySelector(".user-bottom").appendChild(badge);
+      }
+
+      card.addEventListener("click", () => window.location.href = `/admin-user-detail?user_id=${u.id}`);
+      return card;
+    }
+
+    function renderUsers(users) {
+      const container = document.getElementById("users");
+      container.innerHTML = "";
+      if (!users.length) {
+        container.innerHTML = `<div class="empty-state" style="grid-column:1/-1;"><div class="empty-icon"><span class="material-symbols-outlined">search</span></div><div class="empty-title">No users found</div><div class="empty-hint">Try a different search term.</div></div>`;
+        return;
+      }
+      users.forEach(u => container.appendChild(buildCard(u)));
+    }
+
+    function filterUsers() {
+      const q = document.getElementById("searchInput").value.toLowerCase().trim();
+      if (!q) { renderUsers(allUsers); return; }
+      renderUsers(allUsers.filter(u => u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q)));
+    }
+
+    function buildStats(users) {
+      const total = users.length;
+      const pending = users.reduce((s, u) => s + (u.pending_docs || 0), 0);
+      const admins = users.filter(u => u.role === "admin" || u.role === "super_admin").length;
+      const row = document.getElementById("statRow");
+      row.innerHTML = `
+    <div class="stat-card accent-blue">
+      <div class="stat-icon"><span class="material-symbols-outlined">group</span></div>
+      <div class="stat-value">${total}</div>
+      <div class="stat-label">Total Users</div>
+    </div>
+    <div class="stat-card accent-orange">
+      <div class="stat-icon"><span class="material-symbols-outlined">pending</span></div>
+      <div class="stat-value">${pending}</div>
+      <div class="stat-label">Pending Docs</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon"><span class="material-symbols-outlined">security</span></div>
+      <div class="stat-value">${admins}</div>
+      <div class="stat-label">Admin Accounts</div>
+    </div>`;
+    }
+
+    async function loadUsers() {
+      const container = document.getElementById("users");
+      showSpinner(container);
+      try {
+        const res = await authFetch("/api/auth/admin/users");
+        if (!res) return;
+        const payload = await res.json();
+        allUsers = Array.isArray(payload) ? payload : (payload.users || []);
+        document.getElementById("userCount").textContent = `${allUsers.length} user${allUsers.length !== 1 ? "s" : ""}`;
+        buildStats(allUsers);
+        renderUsers(allUsers);
+      } catch (err) {
+        console.error(err);
+        container.innerHTML = `<div class="empty-state" style="grid-column:1/-1;"><div class="empty-icon"><span class="material-symbols-outlined">warning</span></div><div class="empty-title">Error loading users</div></div>`;
+      }
+    }
+
+    buildYearOptions("tplYear");
+    loadUsers();
+
+    if (!isSuperAdmin) {
+      document.querySelectorAll(".super-admin-only").forEach(el => el.style.display = 'none');
+    }
+
+    function switchAdminTab(tabName) {
+      document.getElementById('usersTab').style.display = tabName === 'users' ? 'block' : 'none';
+      document.getElementById('templatesTab').style.display = tabName === 'templates' ? 'block' : 'none';
+      document.getElementById('tabUsersBtn').style.color = tabName === 'users' ? 'var(--navy)' : 'var(--muted)';
+      document.getElementById('tabTemplatesBtn').style.color = tabName === 'templates' ? 'var(--navy)' : 'var(--muted)';
+      document.getElementById('userSearchDiv').style.display = tabName === 'users' ? 'flex' : 'none';
+      
+      if (tabName === 'templates') {
+        loadAdminTemplates();
+      }
+    }
+
+    async function loadAdminTemplates() {
+      const category = document.getElementById("tplCategory").value;
+      const year = document.getElementById("tplYear").value;
+      const listDiv = document.getElementById("tplList");
+      
+      showSpinner(listDiv);
+      try {
+        const res = await authFetch(`/api/upload/templates?category=${category}&tax_year=${year}`);
+        const data = await res.json();
+        hideSpinner(listDiv, "");
+
+        if (!data || data.length === 0) {
+          listDiv.innerHTML = `<p class="text-muted">No templates found for ${category} ${year}.</p>`;
+          return;
+        }
+
+        listDiv.innerHTML = data.map(t => `
+          <div class="card-flat" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <div>
+              <h5 style="margin-bottom:4px;">${t.name}</h5>
+              ${t.download ? `<a href="${t.download}" target="_blank" class="text-sm" style="color:var(--blue)">View File</a>` : `<span class="text-sm text-muted">No file</span>`}
+            </div>
+            <button class="btn btn-danger btn-sm" onclick="deleteTemplate(${t.id})">Delete</button>
+          </div>
+        `).join("");
+      } catch (e) {
+        hideSpinner(listDiv, `<p class="text-muted" style="color:var(--error);">Failed to load templates.</p>`);
+      }
+    }
+
+    async function handleTplUpload(e) {
+      e.preventDefault();
+      const btn = e.target.querySelector("button[type=submit]");
+      btn.disabled = true;
+      btn.textContent = "Uploading...";
+
+      const category = document.getElementById("tplCategory").value;
+      const year = document.getElementById("tplYear").value;
+      const name = document.getElementById("tplName").value;
+      const fileInput = document.getElementById("tplFile");
+
+      const fd = new FormData();
+      fd.append("category", category);
+      fd.append("tax_year", year);
+      fd.append("name", name);
+      if (fileInput.files.length > 0) fd.append("file", fileInput.files[0]);
+
+      try {
+        const res = await authFetch("/api/upload/admin/templates", {
+          method: "POST",
+          body: fd
+        });
+        if (res.ok) {
+          showToast("Template uploaded successfully", "success");
+          e.target.reset();
+          loadAdminTemplates();
+        } else {
+          const err = await res.json();
+          showToast(err.detail || "Upload failed", "error");
+        }
+      } catch (err) {
+        showToast("Error uploading template", "error");
+      }
+      btn.disabled = false;
+      btn.textContent = "Upload Template";
+    }
+
+    async function deleteTemplate(id) {
+      if (!confirm("Are you sure you want to delete this template?")) return;
+      try {
+        const res = await authFetch(`/api/upload/admin/templates/${id}`, { method: "DELETE" });
+        if (res.ok) {
+          showToast("Template deleted", "success");
+          loadAdminTemplates();
+        } else {
+          showToast("Failed to delete template", "error");
+        }
+      } catch (err) {
+        showToast("Error deleting template", "error");
+      }
+    }
+  </script>
+  <script src="/js/admin-chatbot.js"></script>
+</body>
+
+</html>

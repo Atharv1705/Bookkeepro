@@ -7,7 +7,7 @@ from typing import Generator
 
 # load .env located at myapp/.env (three levels up from this file)
 env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".env"))
-load_dotenv(env_path)
+load_dotenv(env_path, override=True)
 
 DB_USER = os.getenv("MYSQL_USER", "root")
 DB_PASS = os.getenv("MYSQL_PASSWORD", "")

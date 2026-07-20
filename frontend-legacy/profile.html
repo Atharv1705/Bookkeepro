@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>BookKeepPro | My Profile</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/css/base.css"/>
+  <link rel="stylesheet" href="/css/components.css"/>
+  <link rel="stylesheet" href="/css/animations.css"/>
+  <link rel="stylesheet" href="/css/chatbot.css"/>
+
+  <style>html{height:100%;}</style>  <script src="/js/theme.js?v=2"></script>
+</head>
+<body class="app-body">
+
+<header class="app-header">
+  <img class="logo" src="/images/bookkeeppro-logo.webp" onclick="goBack()" alt="BookKeepPro"/>
+  <div class="header-actions">
+
+      <!-- THEME TOGGLE -->
+      <button class="theme-toggle" onclick="toggleTheme()" style="background:none;border:none;color:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:8px;">
+        <span class="material-symbols-outlined theme-toggle-icon" style="font-size:24px;">dark_mode</span>
+      </button>
+    <button class="btn btn-ghost btn-sm" onclick="goBack()">← Dashboard</button>
+    <button class="btn btn-primary btn-sm" onclick="logoutUser()">Logout</button>
+  </div>
+</header>
+
+<main class="page-main page-enter" style="max-width:680px;">
+  <div class="page-heading">
+    <div>
+      <h1>My Profile</h1>
+      <p class="page-meta">Update your name, phone number, or password</p>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:20px;">
+    <h3 style="margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid var(--border);">Account Info</h3>
+
+    <div class="form-group">
+      <label class="form-label">Email Address <span style="color:var(--muted);font-weight:400">(cannot be changed)</span></label>
+      <input type="email" id="email" class="input" readonly/>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+      <div class="form-group">
+        <label class="form-label" for="name">Full Name</label>
+        <input type="text" id="name" class="input" placeholder="Your full name"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="phone">Phone Number</label>
+        <input type="tel" id="phone" class="input" placeholder="+1 (555) 000-0000"/>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:24px;">
+    <div class="flex-between" style="margin-bottom:4px;cursor:pointer;" onclick="togglePwSection()">
+      <h3>Change Password</h3>
+      <span id="pwToggleIcon" style="color:var(--muted);font-size:18px;">▶</span>
+    </div>
+    <p class="text-sm" style="margin-bottom:0;">Click to expand and update your password</p>
+
+    <div class="pw-section" id="pwSection" style="display:none;margin-top:20px;padding-top:20px;border-top:1px solid var(--border);">
+      <div class="form-group">
+        <label class="form-label" for="currentPw">Current Password</label>
+        <input type="password" id="currentPw" class="input" placeholder="Enter current password"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="newPw">New Password</label>
+        <div class="password-wrap">
+          <input type="password" id="newPw" class="input" placeholder="At least 8 characters" style="padding-right:56px;"/>
+          <button type="button" class="password-toggle" onclick="toggleField('newPw',this)">Show</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="confirmPw">Confirm New Password</label>
+        <input type="password" id="confirmPw" class="input" placeholder="Repeat new password"/>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn btn-primary w-full" id="saveBtn" onclick="saveProfile()" style="border-radius:var(--radius-sm);">
+    Save Changes
+  </button>
+</main>
+
+<footer class="app-footer">
+  <img src="/images/bookkeeppro-logo.webp" alt="BookKeepPro"/>
+  <small>© 2026 Bookkeeping Business Solutions</small>
+</footer>
+
+<script src="/js/auth.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/password-strength.js"></script>
+<script>
+guardAuth(["user", "admin", "super_admin"]);
+initSessionWarning();
+
+
+function goBack() {
+  const role = localStorage.getItem("role");
+  window.location.href = (role === "admin" || role === "super_admin") ? "/admin-dashboard" : "/dashboard";
+}
+
+function togglePwSection() {
+  const sec  = document.getElementById("pwSection");
+  const icon = document.getElementById("pwToggleIcon");
+  const open = sec.style.display === "none";
+  sec.style.display = open ? "block" : "none";
+  icon.textContent  = open ? "▼" : "▶";
+  if (open) initPasswordStrength("newPw");
+}
+
+function toggleField(id, btn) {
+  const input = document.getElementById(id);
+  input.type = input.type === "password" ? "text" : "password";
+  btn.textContent = input.type === "password" ? "Show" : "Hide";
+}
+
+async function loadProfile() {
+  const res = await authFetch("/api/auth/me");
+  if (!res || !res.ok) return;
+  const data = await res.json();
+  document.getElementById("email").value = data.email || "";
+  document.getElementById("name").value  = data.name  || "";
+  document.getElementById("phone").value = data.phone || "";
+}
+
+async function saveProfile() {
+  const btn     = document.getElementById("saveBtn");
+  btn.disabled  = true; btn.textContent = "Saving…";
+
+  const name   = document.getElementById("name").value.trim();
+  const phone  = document.getElementById("phone").value.trim();
+  const curPw  = document.getElementById("currentPw").value;
+  const newPw  = document.getElementById("newPw").value;
+  const confPw = document.getElementById("confirmPw").value;
+  const pwOpen = document.getElementById("pwSection").style.display !== "none";
+
+  if (pwOpen && newPw) {
+    if (newPw.length < 8)      { showToast("New password must be at least 8 characters", "error"); btn.disabled=false; btn.textContent="Save Changes"; return; }
+    if (newPw !== confPw)      { showToast("Passwords do not match", "error"); btn.disabled=false; btn.textContent="Save Changes"; return; }
+    if (!curPw)                { showToast("Enter your current password to change it", "warning"); btn.disabled=false; btn.textContent="Save Changes"; return; }
+  }
+
+  const body = { name, phone };
+  if (pwOpen && newPw) { body.current_password = curPw; body.new_password = newPw; }
+
+  const res  = await authFetch("/api/auth/me", { method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) });
+  btn.disabled=false; btn.textContent="Save Changes";
+  if (!res) return;
+  const data = await res.json();
+  if (!res.ok) { showToast(data.detail || "Failed to save profile", "error"); return; }
+  showToast("Profile updated successfully", "success");
+  document.getElementById("currentPw").value = "";
+  document.getElementById("newPw").value      = "";
+  document.getElementById("confirmPw").value  = "";
+}
+
+loadProfile();
+</script>
+<script src="/js/chatbot.js"></script>
+</body>
+</html>
