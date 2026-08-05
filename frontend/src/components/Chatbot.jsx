@@ -48,6 +48,7 @@ export default function Chatbot() {
   const [view, setView] = useState('menu'); // menu, category, chat
   const [activeCategory, setActiveCategory] = useState(null);
   const [inputText, setInputText] = useState("");
+  const [menuInput, setMenuInput] = useState("");        // free-text from menu
   const [isTyping, setIsTyping] = useState(false);
   const chatEndRef = useRef(null);
 
@@ -113,30 +114,51 @@ export default function Chatbot() {
     setIsTyping(true);
 
     try {
-      // Convert messages to format expected by backend
       const backendMessages = currentMessages.map(m => ({
         role: m.role || (m.type === 'bot' ? 'assistant' : 'user'),
         content: m.text,
-        reasoning_details: m.reasoning_details || null
+        reasoning_details: null,
       }));
-
       const res = await authFetch('/api/chatbot/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: backendMessages })
+        body: JSON.stringify({ messages: backendMessages }),
       });
-
       if (res.ok) {
         const data = await res.json();
-        // Extract content and optional reasoning details
-        const contentText = data.content || "Sorry, I couldn't understand that.";
-        const reasoning = data.reasoning_details;
-        setMessages(prev => [...prev, { type: 'bot', role: 'assistant', text: contentText, reasoning_details: reasoning }]);
+        setMessages(prev => [...prev, { type: 'bot', role: 'assistant', text: data.content || "Sorry, I couldn't understand that." }]);
       } else {
-        setMessages(prev => [...prev, { type: 'bot', role: 'assistant', text: 'Sorry, I am having trouble connecting to the server.' }]);
+        setMessages(prev => [...prev, { type: 'bot', role: 'assistant', text: 'Having trouble connecting. Please try again.' }]);
       }
-    } catch (err) {
-      setMessages(prev => [...prev, { type: 'bot', role: 'assistant', text: 'Network error occurred. Please try again.' }]);
+    } catch {
+      setMessages(prev => [...prev, { type: 'bot', role: 'assistant', text: 'Network error. Please try again.' }]);
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  const handleMenuAsk = async (e) => {
+    e.preventDefault();
+    if (!menuInput.trim()) return;
+    const userMessage = { type: 'user', role: 'user', text: menuInput.trim() };
+    setMessages([userMessage]);
+    setMenuInput("");
+    setView('chat');
+    setIsTyping(true);
+    try {
+      const res = await authFetch('/api/chatbot/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [{ role: 'user', content: userMessage.text, reasoning_details: null }] }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMessages(prev => [...prev, { type: 'bot', role: 'assistant', text: data.content || "Sorry, I couldn't understand that." }]);
+      } else {
+        setMessages(prev => [...prev, { type: 'bot', role: 'assistant', text: 'Having trouble connecting. Please try again.' }]);
+      }
+    } catch {
+      setMessages(prev => [...prev, { type: 'bot', role: 'assistant', text: 'Network error. Please try again.' }]);
     } finally {
       setIsTyping(false);
     }
@@ -171,6 +193,21 @@ export default function Chatbot() {
                   <span className="material-symbols-outlined sparkle">auto_awesome</span>
                   <p>How can we help you today?</p>
                 </div>
+
+                {/* free-text ask from menu */}
+                <form onSubmit={handleMenuAsk} style={{ marginBottom: '12px', display: 'flex', gap: '6px' }}>
+                  <input
+                    type="text"
+                    value={menuInput}
+                    onChange={e => setMenuInput(e.target.value)}
+                    placeholder="Ask anything…"
+                    style={{ flex: 1, padding: '8px 12px', borderRadius: 'var(--radius-pill)', border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--navy)', fontSize: '13px' }}
+                  />
+                  <button type="submit" style={{ background: 'var(--emerald)', color: '#fff', border: 'none', borderRadius: 'var(--radius-pill)', padding: '8px 14px', cursor: 'pointer', fontSize: '13px' }}>
+                    Ask
+                  </button>
+                </form>
+
                 {user && (
                   <button className="quick-reply-btn" style={{display: 'flex', width: '100%', marginBottom: '8px'}} onClick={handleDocStatusCheck}>
                     <span className="qr-icon">📋</span>
@@ -227,7 +264,7 @@ export default function Chatbot() {
                   placeholder="Ask a question..."
                   style={{ flex: 1, padding: '8px 12px', borderRadius: 'var(--radius-pill)', border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--navy)' }}
                 />
-                <button type="submit" style={{ background: 'var(--navy)', color: '#fff', border: 'none', borderRadius: 'var(--radius-pill)', padding: '8px 16px', cursor: 'pointer' }}>
+                <button type="submit" style={{ background: 'var(--emerald)', color: '#fff', border: 'none', borderRadius: 'var(--radius-pill)', padding: '8px 16px', cursor: 'pointer' }}>
                   Send
                 </button>
               </form>

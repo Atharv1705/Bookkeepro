@@ -10,7 +10,7 @@ export default function DashboardLayout() {
   return (
     <div className="app-body">
       <header className="app-header">
-        <Link to="/dashboard">
+        <Link to={(user?.role === 'admin' || user?.role === 'super_admin') ? '/admin-dashboard' : '/dashboard'}>
           <img className="logo" src="/images/bookkeeppro-logo.webp" alt="BookKeepPro" />
         </Link>
         <div className="header-actions">

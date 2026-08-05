@@ -7,6 +7,7 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    JSON,
     UniqueConstraint,
     func,
 )
@@ -61,6 +62,7 @@ class PersonalDocument(Base):
     review_status = Column(String(20), default="pending", nullable=False)
     review_note   = Column(String(500), nullable=True)
     tax_year      = Column(Integer, default=2025, nullable=False)
+    extracted_data = Column(JSON, nullable=True)
 
     user = relationship("User")
 
@@ -87,6 +89,7 @@ class BusinessDocument(Base):
     review_status = Column(String(20), default="pending", nullable=False)
     review_note   = Column(String(500), nullable=True)
     tax_year      = Column(Integer, default=2025, nullable=False)
+    extracted_data = Column(JSON, nullable=True)
 
     user = relationship("User")
 

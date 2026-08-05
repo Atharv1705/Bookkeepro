@@ -1,6 +1,6 @@
 import os
 import logging
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -92,9 +92,15 @@ def mount_if_exists(route: str, subdir: str, name: str):
         log.debug("Static directory not found, skipping: %s", path)
 
 
-mount_if_exists("/js",     "js",     "js")
-mount_if_exists("/images", "images", "images")
-mount_if_exists("/css",    "css",    "css")
+mount_if_exists("/js",     "dist/js",     "js")
+mount_if_exists("/images", "dist/images", "images")
+mount_if_exists("/css",    "dist/css",    "css")
+
+# Mount Vite build assets (JS bundles, hashed chunks)
+DIST_ASSETS = os.path.join(FRONTEND_DIR, "dist", "assets")
+if os.path.isdir(DIST_ASSETS):
+    app.mount("/assets", StaticFiles(directory=DIST_ASSETS), name="assets")
+    log.info("Mounted Vite assets -> %s", DIST_ASSETS)
 
 UPLOAD_DIR = os.path.abspath(os.path.join(FRONTEND_DIR, "..", "uploads"))
 if not os.path.exists(UPLOAD_DIR):
@@ -103,25 +109,14 @@ if not os.path.exists(UPLOAD_DIR):
 log.info("FRONTEND_DIR resolved to: %s", FRONTEND_DIR)
 log.info("CSS dir exists: %s", os.path.isdir(os.path.join(FRONTEND_DIR, "css")))
 
+DIST_DIR = os.path.join(FRONTEND_DIR, "dist")
+SPA_INDEX = os.path.join(DIST_DIR, "index.html")
 
-from fastapi.templating import Jinja2Templates
-
-templates = Jinja2Templates(directory=FRONTEND_DIR)
-
-def serve_frontend_file(request: Request, filename: str):
-    full = os.path.join(FRONTEND_DIR, filename)
-    if os.path.isfile(full):
-        return templates.TemplateResponse(
-            name=filename,
-            context={"request": request},
-            headers={
-                "Cache-Control": "no-store, no-cache, must-revalidate",
-                "Pragma": "no-cache",
-                "Expires": "0",
-            },
-        )
-    log.warning("Frontend file not found: %s", full)
-    raise HTTPException(status_code=404, detail="Page not found")
+# Mount the Vite dist folder for hashed static assets not already mounted above
+# (favicon, icons.svg, etc.)
+if os.path.isdir(DIST_DIR):
+    # Serve root-level static assets that Vite places at dist/
+    app.mount("/dist", StaticFiles(directory=DIST_DIR), name="dist_root")
 
 
 # ─────────────────────────────────────────────
@@ -141,57 +136,19 @@ def logout():
 
 
 # ─────────────────────────────────────────────
-# Frontend page routes
+# SPA catch-all — serve index.html for every non-API GET route
+# so React Router handles client-side navigation on direct URL access
 # ─────────────────────────────────────────────
 
-@app.get("/",                   tags=["frontend"]) 
-def home(request: Request):                     return serve_frontend_file(request, "home.html")
-
-@app.get("/home",               tags=["frontend"])#route to home page
-def home_page(request: Request):                return serve_frontend_file(request, "home.html")
-
-@app.get("/login",              tags=["frontend"]) #route to login page
-def login_page(request: Request):               return serve_frontend_file(request, "login.html") 
-
-@app.get("/signup",             tags=["frontend"]) #route to signup page
-def signup_page(request: Request):              return serve_frontend_file(request, "signup.html") 
-
-@app.get("/dashboard",          tags=["frontend"])
-def dashboard_page(request: Request):           return serve_frontend_file(request, "dashboard.html") #route to dashboard page
-
-@app.get("/admin-dashboard",    tags=["frontend"])
-def admin_dashboard_page(request: Request):     return serve_frontend_file(request, "admin-dashboard.html") #route to admin dashboard page
-
-@app.get("/admin-user-detail",  tags=["frontend"])
-def admin_user_detail(request: Request):        return serve_frontend_file(request, "admin-user-detail.html") #route to admin-user-detail page
-
-@app.get("/upload-personal",    tags=["frontend"])
-def upload_personal(request: Request):          return serve_frontend_file(request, "upload-personal.html") #route to upload-personal
-
-@app.get("/upload-business",    tags=["frontend"])
-def upload_business(request: Request):          return serve_frontend_file(request, "upload-business.html") #route to upload-business
-
-@app.get("/contact",            tags=["frontend"])
-def contact_page(request: Request):             return serve_frontend_file(request, "contact.html") #route to contact page
-
-@app.get("/services",           tags=["frontend"])
-def services_page(request: Request):            return serve_frontend_file(request, "services.html") #route to service page
-
-@app.get("/about-us",           tags=["frontend"])
-def about_us_page(request: Request):            return serve_frontend_file(request, "about-us.html") # route to about-us page
-
-
-@app.get("/forgot-password",    tags=["frontend"])
-def forgot_password_page(request: Request):     return serve_frontend_file(request, "forgot-password.html")
-
-@app.get("/profile",            tags=["frontend"])
-def profile_page(request: Request):             return serve_frontend_file(request, "profile.html") #route to forgot-password page
-
-@app.get("/reset-password",     tags=["frontend"])
-def reset_password_page(request: Request):      return serve_frontend_file(request, "reset-password.html") #route to reset-password page
-
-@app.get("/verify-email",       tags=["frontend"])
-def verify_email_page(request: Request):        return serve_frontend_file(request, "verify-email.html")# route to verify-email page
-
-@app.get("/resend-verification", tags=["frontend"]) # route to resend-verification page
-def resend_verification_page(request: Request): return serve_frontend_file(request, "resend-verification.html")
+@app.get("/{full_path:path}", tags=["frontend"])
+def spa_fallback(full_path: str):
+    if os.path.isfile(SPA_INDEX):
+        return FileResponse(
+            SPA_INDEX,
+            headers={
+                "Cache-Control": "no-store, no-cache, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
+    raise HTTPException(status_code=404, detail="Frontend not built. Run 'npm run build' in /frontend.")

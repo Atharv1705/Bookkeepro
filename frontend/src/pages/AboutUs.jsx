@@ -1,29 +1,19 @@
 export default function AboutUs() {
   return (
     <>
-      {/* HERO */}
-      <div className="page-hero" style={{
-        backgroundImage: 'linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url("/images/About-us-background-image.webp")',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        minHeight: '400px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        textAlign: 'center',
-        color: '#fff'
-      }}>
-        <div>
-          <h1>About Us</h1>
-          <p>Our People Are Passionate About What We Do</p>
+      <div className="page-hero" style={{ '--hero-img': 'url("/images/About-us-background-image.webp")' }}>
+        <div className="page-hero-inner">
+          <span className="eyebrow">About BookKeepPro</span>
+          <h1>Our people are passionate about what we do</h1>
+          <p>Twenty-seven years of accounting, compliance and long-term client relationships.</p>
         </div>
       </div>
 
-      {/* CONTENT */}
       <div className="about-wrapper">
-        <div className="about-block">
+        <div className="about-block reveal">
           <div className="about-text">
-            <h2>Who We Are</h2>
+            <span className="eyebrow">1998 — where it started</span>
+            <h2 style={{ margin: '14px 0' }}>Who we are</h2>
             <p>
               Our journey began in 1998 as a Chartered Accountant firm in India,
               built on strong fundamentals of accounting, compliance, integrity,
@@ -31,48 +21,57 @@ export default function AboutUs() {
             </p>
             <br />
             <p>
-              In 2018, we strengthened our presence in Pune & Mumbai — transitioning
-              from a traditional CA practice into a scalable financial services
-              organization.
+              In 2018, we strengthened our presence in Pune and Mumbai —
+              transitioning from a traditional CA practice into a scalable
+              financial services organization.
             </p>
           </div>
-          <img className="about-img" src="/images/about-us-block-1.webp" alt="Bookkeepro Team" style={{ objectFit: 'cover' }} />
+          <img className="about-img" src="/images/about-us-block-1.webp" alt="BookKeepPro Team" />
         </div>
 
-        <div className="about-block reverse">
+        <div className="about-block reverse reveal">
           <div className="about-text">
-            <h2>About Bookkeepro</h2>
+            <span className="eyebrow">2023 — going global</span>
+            <h2 style={{ margin: '14px 0' }}>About BookKeepPro</h2>
             <p>
-              As our client base expanded globally — especially across the US — we aligned
-              our operating model to support international growth.
+              As our client base expanded globally — especially across the US —
+              we aligned our operating model to support international growth.
             </p>
             <br />
             <p>
               In 2023, we launched:<br /><br />
-              <b>• Bookkeeping Business Solutions Pvt Ltd (India)</b><br />
-              <b>• Bookkeeping Business Solutions LLC (USA)</b>
+              <b>Bookkeeping Business Solutions Pvt Ltd</b> (India)<br />
+              <b>Bookkeeping Business Solutions LLC</b> (USA)
             </p>
             <br />
             <p>
-              Today, Bookkeepro serves global businesses, startups & enterprises with
-              scalable, compliant bookkeeping and financial operations support.
+              Today, BookKeepPro serves global businesses, startups and
+              enterprises with scalable, compliant bookkeeping and financial
+              operations support.
             </p>
           </div>
-          <img className="about-img" src="/images/young-business-people-using-computer-in-office.jpg" alt="About Bookkeepro" style={{ objectFit: 'cover' }} />
+          <img className="about-img" src="/images/young-business-people-using-computer-in-office.jpg" alt="About BookKeepPro" />
         </div>
       </div>
 
-      <div className="about-block" style={{ width: 'min(1200px, 92%)', margin: 'auto', marginBottom: '80px', padding: '40px', justifyContent: 'center', textAlign: 'center', flexWrap: 'wrap' }}>
-        <div className="about-text" style={{ flex: '1 1 100%' }}>
-          <h2 style={{ marginBottom: '24px' }}>Who We Are Today</h2>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', justifyContent: 'center' }}>
-            <p style={{ background: 'var(--blue-light)', color: 'var(--navy)', padding: '12px 24px', borderRadius: '30px', fontWeight: '500' }}>✔️ 25+ years of accounting & compliance expertise</p>
-            <p style={{ background: 'var(--blue-light)', color: 'var(--navy)', padding: '12px 24px', borderRadius: '30px', fontWeight: '500' }}>✔️ Operations across India & USA</p>
-            <p style={{ background: 'var(--blue-light)', color: 'var(--navy)', padding: '12px 24px', borderRadius: '30px', fontWeight: '500' }}>✔️ Secure, process-driven financial workflows</p>
-            <p style={{ background: 'var(--blue-light)', color: 'var(--navy)', padding: '12px 24px', borderRadius: '30px', fontWeight: '500' }}>✔️ Strong confidentiality & data protection practices</p>
-          </div>
+      <section className="section reveal" style={{ marginTop: 0, marginBottom: '90px' }}>
+        <div className="section-head" style={{ textAlign: 'center', margin: '0 auto 32px', maxWidth: '640px' }}>
+          <span className="eyebrow" style={{ justifyContent: 'center' }}>Where we stand today</span>
+          <h2>Who we are today</h2>
         </div>
-      </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'center' }}>
+          {[
+            '27+ years of accounting & compliance expertise',
+            'Operations across India and the USA',
+            'Secure, process-driven financial workflows',
+            'Strong confidentiality & data protection practices',
+          ].map((item) => (
+            <p key={item} className="badge badge-blue" style={{ padding: '12px 22px', fontSize: '13.5px', fontWeight: 500, letterSpacing: 0 }}>
+              {item}
+            </p>
+          ))}
+        </div>
+      </section>
     </>
   );
 }

@@ -15,11 +15,14 @@ from jose import jwt, JWTError
 from datetime import timedelta
 
 from app.models import AdminDocument, PersonalDocument, BusinessDocument, User, UserRole
-from app.db import get_db
+from app.db import get_db, SessionLocal
 import app.crud as crud
 from app.auth.security import get_current_user, require_admin, SECRET_KEY, ALGORITHM
 from app.utils.emailer import send_email
+from app.utils.ai import extract_document_data
 from app.schemas import UploadCompleteNotify, ReviewStatusUpdate
+from app.limiter import limiter
+from fastapi import Request
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +37,26 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parents[4]
 UPLOAD_DIR = BASE_DIR / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+def process_ai_extraction(table: str, doc_id: int, file_path: str, doc_type: str):
+    extracted = extract_document_data(file_path, doc_type)
+    if extracted is None:
+        return
+        
+    db = SessionLocal()
+    try:
+        if table == "personal":
+            doc = db.query(PersonalDocument).filter_by(id=doc_id).first()
+        else:
+            doc = db.query(BusinessDocument).filter_by(id=doc_id).first()
+            
+        if doc:
+            doc.extracted_data = extracted
+            db.commit()
+    except Exception as e:
+        logger.error(f"Failed to update DB with AI extraction: {e}")
+    finally:
+        db.close()
 
 async def upload_to_storage(file: UploadFile) -> str:
     """Upload to local disk. Returns the filename (storage_key)."""
@@ -53,6 +76,8 @@ async def upload_to_storage(file: UploadFile) -> str:
         "image/webp",
         "application/msword",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     }
     
     kind = filetype.guess(contents)
@@ -60,15 +85,15 @@ async def upload_to_storage(file: UploadFile) -> str:
     
     ext = os.path.splitext(file.filename or "file")[1].lower()
     
-    # Fallback for legacy .doc and inconsistent .docx sniffing
+    # Fallback for legacy .doc, .xls, and inconsistent .docx/.xlsx sniffing (which are just zip files)
     if sniffed_mime is None or sniffed_mime == "application/zip":
-        if ext in [".doc", ".docx"] and file.content_type in ALLOWED_TYPES:
+        if ext in [".doc", ".docx", ".xls", ".xlsx"] and file.content_type in ALLOWED_TYPES:
             sniffed_mime = file.content_type
 
     if sniffed_mime not in ALLOWED_TYPES:
         raise HTTPException(
             status_code=400,
-            detail=f"File type not allowed or could not be verified. Allowed: PDF, JPG, PNG, WEBP, DOC, DOCX."
+            detail=f"File type not allowed or could not be verified. Allowed: PDF, JPG, PNG, WEBP, DOC, DOCX, XLS, XLSX."
         )
 
     ext = os.path.splitext(file.filename or "file")[1].lower()
@@ -345,6 +370,9 @@ async def upload_personal_document(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    if not current_user.engagement_acknowledged_at:
+        raise HTTPException(status_code=403, detail="You must acknowledge the engagement letter before uploading.")
+
     logger.info(f"User {current_user.id} uploading personal document: {file.filename}")
     storage_key = await upload_to_storage(file)
 
@@ -380,6 +408,14 @@ async def upload_personal_document(
             body=f"<p><strong>{current_user.email}</strong> uploaded a personal document: <strong>{file.filename}</strong> ({doc_type}).</p>",
         )
 
+    background.add_task(
+        process_ai_extraction,
+        "personal",
+        record.id,
+        str(UPLOAD_DIR / storage_key),
+        doc_type
+    )
+
     return {
         "id":          record.id,
         "filename":    record.filename,
@@ -407,8 +443,8 @@ def delete_personal_document(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    logger.info(f"User {current_user.id} deleting personal document {doc_id}")
-    delete_from_storage(doc.storage_key)
+    logger.info(f"User {current_user.id} deleting personal document {doc_id} (soft delete)")
+    # Soft delete (Option B): Keep file in storage, only mark as deleted in DB
     doc.deleted_at = datetime.utcnow()
     db.commit()
     crud.log_action(db, "delete_personal", user_id=current_user.id, target=f"personal_doc:{doc_id}")
@@ -437,6 +473,7 @@ def list_business_documents(
     return [
         {
             "id":            d.id,
+            "doc_type":      d.business_type,
             "business_type": d.business_type,
             "filename":      d.filename,
             "storage_key":   d.storage_key,
@@ -458,6 +495,9 @@ async def upload_business_document(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    if not current_user.engagement_acknowledged_at:
+        raise HTTPException(status_code=403, detail="You must acknowledge the engagement letter before uploading.")
+
     logger.info(f"User {current_user.id} uploading business document: {file.filename}")
     storage_key = await upload_to_storage(file)
 
@@ -491,6 +531,14 @@ async def upload_business_document(
             subject="New Business Document Uploaded — BookKeepro",
             body=f"<p><strong>{current_user.email}</strong> uploaded a business document: <strong>{file.filename}</strong> ({doc_type}).</p>",
         )
+        
+    background.add_task(
+        process_ai_extraction,
+        "business",
+        record.id,
+        str(UPLOAD_DIR / storage_key),
+        doc_type
+    )
 
     return {
         "id":            record.id,
@@ -513,8 +561,8 @@ def delete_business_document(
     if doc.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    logger.info(f"User {current_user.id} deleting business document {doc_id}")
-    delete_from_storage(doc.storage_key)
+    logger.info(f"User {current_user.id} deleting business document {doc_id} (soft delete)")
+    # Soft delete (Option B): Keep file in storage, only mark as deleted in DB
     doc.deleted_at = datetime.utcnow()
     db.commit()
     crud.log_action(db, "delete_business", user_id=current_user.id, target=f"business_doc:{doc_id}")
@@ -626,6 +674,7 @@ def get_user_all_documents(
             "tax_year":      d.tax_year,
             "review_status": d.review_status,
             "review_note":   d.review_note,
+            "extracted_data": d.extracted_data,
         }
         for d in personal_docs
     ] + [
@@ -639,6 +688,7 @@ def get_user_all_documents(
             "tax_year":      d.tax_year,
             "review_status": d.review_status,
             "review_note":   d.review_note,
+            "extracted_data": d.extracted_data,
         }
         for d in business_docs
     ]
@@ -730,7 +780,9 @@ def delete_user_completely(
 # ─────────────────────────────────────────────
 
 @router.post("/notify-upload-complete")
+@limiter.limit("5/minute")
 async def notify_upload_complete(
+    request: Request,
     payload: UploadCompleteNotify,
     background: BackgroundTasks,
     db: Session = Depends(get_db),

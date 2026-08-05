@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -13,11 +13,7 @@ export default function UploadPersonal() {
   const fileInputRefs = useRef({});
   const extraFileRef = useRef(null);
 
-  useEffect(() => {
-    fetchTemplatesAndDocs();
-  }, [taxYear]);
-
-  const fetchTemplatesAndDocs = async () => {
+  const fetchTemplatesAndDocs = useCallback(async () => {
     setLoading(true);
     try {
       // Fetch required templates
@@ -36,9 +32,13 @@ export default function UploadPersonal() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [authFetch, taxYear]);
 
-  const uploadFile = async (file, docType) => {
+  useEffect(() => {
+    fetchTemplatesAndDocs();
+  }, [taxYear, fetchTemplatesAndDocs]);
+
+  const uploadFile = async (file, docType, skipFetch = false) => {
     if (file.size > 10 * 1024 * 1024) {
       showToast("File size exceeds 10MB limit", "error");
       return;
@@ -54,7 +54,7 @@ export default function UploadPersonal() {
       });
       if (res.ok) {
         showToast("Document uploaded successfully", "success");
-        fetchTemplatesAndDocs();
+        if (!skipFetch) fetchTemplatesAndDocs();
       } else {
         const data = await res.json().catch(() => ({}));
         showToast(data.detail || "Upload failed", "error");
@@ -95,12 +95,20 @@ export default function UploadPersonal() {
 
   const handleExtraUpload = async (e) => {
     const files = Array.from(e.target.files);
+    const validFiles = [];
     for (let file of files) {
       if (file.size > 10 * 1024 * 1024) {
         showToast(`File ${file.name} exceeds 10MB limit`, "error");
         continue;
       }
-      await uploadFile(file, "other");
+      validFiles.push(file);
+    }
+    
+    if (validFiles.length > 0) {
+      await Promise.all(validFiles.map((file, idx) => 
+        uploadFile(file, `other_${Date.now()}_${idx}`, true)
+      ));
+      fetchTemplatesAndDocs();
     }
     e.target.value = "";
   };
@@ -174,7 +182,12 @@ export default function UploadPersonal() {
                     hidden 
                     accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
                     ref={el => fileInputRefs.current[dt.name] = el}
-                    onChange={(e) => e.target.files[0] && uploadFile(e.target.files[0], dt.name)}
+                    onChange={(e) => {
+                      if (e.target.files[0]) {
+                        uploadFile(e.target.files[0], dt.name);
+                        e.target.value = null;
+                      }
+                    }}
                   />
                   <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
                     {dt.download && (
@@ -187,9 +200,11 @@ export default function UploadPersonal() {
                     )}
                   </div>
                   {uploaded.map(doc => (
-                    <div key={doc.id} style={{display:'flex', gap:'8px'}}>
-                      <button className="btn btn-secondary btn-xs" style={{borderRadius:'var(--radius-sm)'}} onClick={() => viewDoc(doc.storage_key)}>View</button>
-                      <button className="btn btn-danger btn-xs" style={{borderRadius:'var(--radius-sm)'}} onClick={() => deleteDoc(doc.id)}>Delete</button>
+                    <div key={doc.id} style={{display:'flex', flexDirection:'column', gap:'8px', alignItems:'flex-end'}}>
+                      <div style={{display:'flex', gap:'8px'}}>
+                        <button className="btn btn-secondary btn-xs" style={{borderRadius:'var(--radius-sm)'}} onClick={() => viewDoc(doc.storage_key)}>View</button>
+                        <button className="btn btn-danger btn-xs" style={{borderRadius:'var(--radius-sm)'}} onClick={() => deleteDoc(doc.id)}>Delete</button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -205,30 +220,53 @@ export default function UploadPersonal() {
             <h3>Additional Documents</h3>
             <p className="text-sm" style={{marginTop:'2px'}}>Upload any supplementary personal documents</p>
           </div>
-          <label className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)', cursor:'pointer'}}>
+          <label 
+            className="btn btn-secondary btn-sm" 
+            style={{borderRadius:'var(--radius-sm)', cursor:'pointer'}}
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                extraFileRef.current?.click();
+              }
+            }}
+          >
             + Choose Files
             <input type="file" multiple hidden accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx" onChange={handleExtraUpload} />
           </label>
         </div>
 
-        <div className="drop-area" style={{ border:'2px dashed #b8cfdf', borderRadius:'var(--radius-md)', padding:'28px 20px', textAlign:'center', cursor:'pointer', background:'var(--card)' }} onClick={() => extraFileRef.current?.click()}>
-          <div className="da-icon"><span className="material-symbols-outlined" style={{color: '#ffca28', fontSize: '32px'}}>folder</span></div>
+        <div 
+          className="drop-area" 
+          style={{ border:'2px dashed #cfc7ad', borderRadius:'var(--radius-md)', padding:'28px 20px', textAlign:'center', cursor:'pointer', background:'var(--card)' }} 
+          onClick={() => extraFileRef.current?.click()}
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              extraFileRef.current?.click();
+            }
+          }}
+        >
+          <div className="da-icon"><span className="material-symbols-outlined" style={{color: 'var(--brass)', fontSize: '32px'}}>folder</span></div>
           <div className="da-title" style={{fontWeight: 600, color: 'var(--navy)', fontSize: '14px'}}>Drag & drop files here</div>
           <div className="da-hint" style={{fontSize: '12px', color: 'var(--muted)'}}>or click to browse · PDF, JPG, PNG, WEBP, DOC, DOCX · Max 10MB</div>
         </div>
         <input type="file" multiple hidden ref={extraFileRef} onChange={handleExtraUpload} />
 
         <div className="upload-track mt-12">
-          {docs.filter(d => d.doc_type === "other").map(doc => (
-            <div key={doc.id} className="upload-track-item" style={{display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', borderRadius:'var(--radius-sm)', background:'#f5f8fb', fontSize:'13px', marginBottom:'6px'}}>
-              <span className="material-symbols-outlined" style={{color:'var(--green)', fontSize:'18px'}}>check_circle</span>
-              <div className="uti-name" style={{flex:1}}>{doc.filename}</div>
-              <button className="btn btn-secondary btn-sm" style={{padding:'4px'}} onClick={() => viewDoc(doc.storage_key)}>
-                <span className="material-symbols-outlined" style={{fontSize:'16px'}}>visibility</span>
-              </button>
-              <button className="btn btn-danger btn-sm" style={{padding:'4px'}} onClick={() => deleteDoc(doc.id)}>
-                <span className="material-symbols-outlined" style={{fontSize:'16px'}}>delete</span>
-              </button>
+          {docs.filter(d => d.doc_type.startsWith("other")).map(doc => (
+            <div key={doc.id} style={{marginBottom:'6px'}}>
+              <div className="upload-track-item" style={{display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', borderRadius:'var(--radius-sm)', background:'var(--paper)', fontSize:'13px'}}>
+                <span className="material-symbols-outlined" style={{color:'var(--green)', fontSize:'18px'}}>check_circle</span>
+                <div className="uti-name" style={{flex:1}}>{doc.filename}</div>
+                <button className="btn btn-secondary btn-sm" style={{padding:'4px'}} onClick={() => viewDoc(doc.storage_key)}>
+                  <span className="material-symbols-outlined" style={{fontSize:'16px'}}>visibility</span>
+                </button>
+                <button className="btn btn-danger btn-sm" style={{padding:'4px'}} onClick={() => deleteDoc(doc.id)}>
+                  <span className="material-symbols-outlined" style={{fontSize:'16px'}}>delete</span>
+                </button>
+              </div>
             </div>
           ))}
         </div>

@@ -6,6 +6,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Install Tesseract OCR + English + Hindi language data (Stage 2 of extraction pipeline)
+# tesseract-ocr: ~50MB — CPU-only, no GPU needed
+# tesseract-ocr-hin: Hindi language pack for bilingual Indian documents (Aadhaar, PAN, etc.)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    tesseract-ocr-hin \
+    libgl1 \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY services/api/requirements.txt /tmp/requirements.txt
 RUN python - <<'PY'
 from pathlib import Path

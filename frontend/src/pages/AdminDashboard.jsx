@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 export default function AdminDashboard() {
-  const { user, authFetch } = useAuth();
-  const [stats, setStats] = useState({ total_users: 0, pending_docs: 0, admins: 0 });
+  const { authFetch } = useAuth();
+  const [stats, setStats] = useState({ total_users: 0, pending_personal: 0, pending_business: 0, admins: 0 });
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("users");
@@ -19,17 +19,7 @@ export default function AdminDashboard() {
   const [tplFile, setTplFile] = useState(null);
   const [tplLoading, setTplLoading] = useState(false);
 
-  useEffect(() => {
-    fetchAdminData();
-  }, [authFetch]);
-
-  useEffect(() => {
-    if (tab === "templates") {
-      loadTemplates();
-    }
-  }, [tab, tplCategory, tplYear]);
-
-  const fetchAdminData = async () => {
+  const fetchAdminData = useCallback(async () => {
     setLoading(true);
     try {
       const res = await authFetch("/api/auth/admin/users");
@@ -39,21 +29,22 @@ export default function AdminDashboard() {
         const usersArray = Array.isArray(payload) ? payload : (payload.users || []);
         setUsers(usersArray);
         
-        // Compute stats locally like legacy frontend
-        const total = usersArray.length;
-        const pending = usersArray.reduce((s, u) => s + (u.pending_docs || 0), 0);
-        const admins = usersArray.filter(u => u.role === "admin" || u.role === "super_admin").length;
+        // Compute stats locally
+        const total    = usersArray.length;
+        const pendingP = usersArray.reduce((s, u) => s + (u.pending_personal || 0), 0);
+        const pendingB = usersArray.reduce((s, u) => s + (u.pending_business || 0), 0);
+        const admins   = usersArray.filter(u => u.role === "admin" || u.role === "super_admin").length;
         
-        setStats({ total_users: total, pending_docs: pending, admins: admins });
+        setStats({ total_users: total, pending_personal: pendingP, pending_business: pendingB, admins: admins });
       }
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [authFetch]);
 
-  const loadTemplates = async () => {
+  const loadTemplates = useCallback(async () => {
     setTplLoading(true);
     try {
       const res = await authFetch(`/api/upload/templates?category=${tplCategory}&tax_year=${tplYear}`);
@@ -68,7 +59,17 @@ export default function AdminDashboard() {
     } finally {
       setTplLoading(false);
     }
-  };
+  }, [authFetch, tplCategory, tplYear]);
+
+  useEffect(() => {
+    fetchAdminData();
+  }, [authFetch, fetchAdminData]);
+
+  useEffect(() => {
+    if (tab === "templates") {
+      loadTemplates();
+    }
+  }, [tab, tplCategory, tplYear, loadTemplates]);
 
   const handleTplUpload = async (e) => {
     e.preventDefault();
@@ -168,9 +169,14 @@ export default function AdminDashboard() {
               <div className="stat-label">Admin Accounts</div>
             </div>
             <div className="stat-card accent-orange">
-              <div className="stat-icon"><span className="material-symbols-outlined">pending</span></div>
-              <div className="stat-value">{stats.pending_docs}</div>
-              <div className="stat-label">Pending Docs</div>
+              <div className="stat-icon"><span className="material-symbols-outlined">description</span></div>
+              <div className="stat-value">{stats.pending_personal}</div>
+              <div className="stat-label">Pending Personal</div>
+            </div>
+            <div className="stat-card accent-orange">
+              <div className="stat-icon"><span className="material-symbols-outlined">business</span></div>
+              <div className="stat-value">{stats.pending_business}</div>
+              <div className="stat-label">Pending Business</div>
             </div>
           </div>
 
@@ -199,8 +205,17 @@ export default function AdminDashboard() {
                     <span className={`badge role-badge ${u.role === 'super_admin' ? 'badge-red' : u.role === 'admin' ? 'badge-orange' : 'badge-blue'}`}>
                       {u.role}
                     </span>
-                    {u.pending_docs > 0 && (
-                      <span className="badge badge-orange pulse" style={{ cursor: 'default' }}>{u.pending_docs} pending</span>
+                    {u.pending_personal > 0 && (
+                      <span className="badge badge-orange pulse" style={{ cursor: 'default' }}>
+                        <span className="material-symbols-outlined" style={{fontSize:'12px', verticalAlign:'middle'}}>description</span>
+                        {' '}{u.pending_personal} personal
+                      </span>
+                    )}
+                    {u.pending_business > 0 && (
+                      <span className="badge badge-orange pulse" style={{ cursor: 'default' }}>
+                        <span className="material-symbols-outlined" style={{fontSize:'12px', verticalAlign:'middle'}}>business</span>
+                        {' '}{u.pending_business} business
+                      </span>
                     )}
                   </div>
                   <div className="click-layer"></div>
