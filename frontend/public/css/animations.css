@@ -1,91 +1,69 @@
 /* ============================================================
-   animations.css — Micro-interactions & transitions
+   animations.css — Micro-interactions & motion (Ledger system)
    ============================================================ */
 
-/* ── Page transition ─────────────────────────────────────── */
-.page-enter {
-  animation: fadeIn 0.3s ease both;
-}
+.page-enter { animation: fadeIn 0.35s ease both; }
 
-/* ── Card hover lift ─────────────────────────────────────── */
-.lift {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-.lift:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-md);
-}
+.lift { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.lift:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
 
-/* ── Button press feedback ───────────────────────────────── */
 .btn:active { transform: translateY(1px) scale(0.97); }
 
-/* ── Pulse (for pending badge) ───────────────────────────── */
-@keyframes pulse-orange {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255,127,17,0.35); }
-  50%       { box-shadow: 0 0 0 5px rgba(255,127,17,0); }
+@keyframes pulse-brass {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(176,128,61,0.35); }
+  50%       { box-shadow: 0 0 0 5px rgba(176,128,61,0); }
 }
-.pulse { animation: pulse-orange 2s infinite; }
+.pulse { animation: pulse-brass 2s infinite; }
 
-/* ── Skeleton shimmer ────────────────────────────────────── */
-@keyframes shimmer {
-  from { background-position: -600px 0; }
-  to   { background-position:  600px 0; }
-}
-.skeleton {
-  background: linear-gradient(90deg, #e8edf2 25%, #f4f6f9 50%, #e8edf2 75%);
-  background-size: 600px 100%;
-  animation: shimmer 1.4s infinite linear;
-  border-radius: var(--radius-sm);
-  color: transparent !important;
-}
+@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+.fade-up { animation: fadeUp 0.4s ease both; }
 
-/* ── Slide in from right (toast) ─────────────────────────── */
-@keyframes toast-in {
-  from { opacity: 0; transform: translateX(20px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-
-/* ── Fade up (cards on load) ─────────────────────────────── */
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.fade-up { animation: fadeUp 0.3s ease both; }
-
-/* ── Staggered children ──────────────────────────────────── */
 .stagger > *:nth-child(1) { animation-delay: 0.00s; }
-.stagger > *:nth-child(2) { animation-delay: 0.05s; }
-.stagger > *:nth-child(3) { animation-delay: 0.10s; }
-.stagger > *:nth-child(4) { animation-delay: 0.15s; }
-.stagger > *:nth-child(5) { animation-delay: 0.20s; }
-.stagger > *:nth-child(6) { animation-delay: 0.25s; }
+.stagger > *:nth-child(2) { animation-delay: 0.06s; }
+.stagger > *:nth-child(3) { animation-delay: 0.12s; }
+.stagger > *:nth-child(4) { animation-delay: 0.18s; }
+.stagger > *:nth-child(5) { animation-delay: 0.24s; }
+.stagger > *:nth-child(6) { animation-delay: 0.30s; }
 
-/* ── Checkbox animate ────────────────────────────────────── */
-input[type=checkbox] {
-  accent-color: var(--blue);
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-}
+input[type=checkbox] { accent-color: var(--emerald); width: 16px; height: 16px; cursor: pointer; }
 
-/* ── Focus ring ──────────────────────────────────────────── */
-:focus-visible {
-  outline: 2px solid var(--blue);
-  outline-offset: 2px;
-}
-
-/* ── Smooth link underline ───────────────────────────────── */
+/* Ledger-rule underline — the signature link treatment: a brass
+   rule draws itself in, like a line struck under a checked entry */
 .fancy-link {
   position: relative;
   text-decoration: none;
-  color: var(--blue);
+  color: var(--emerald);
 }
 .fancy-link::after {
   content: '';
   position: absolute;
-  bottom: -1px; left: 0;
+  bottom: -2px; left: 0;
   width: 0; height: 1.5px;
-  background: var(--blue);
-  transition: width 0.2s ease;
+  background: var(--brass);
+  transition: width 0.25s cubic-bezier(0.4,0,0.2,1);
 }
 .fancy-link:hover::after { width: 100%; }
+
+/* Scroll reveal — sections rise into place as they enter view */
+.reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity 0.6s cubic-bezier(0.16,1,0.3,1), transform 0.6s cubic-bezier(0.16,1,0.3,1);
+}
+.reveal.in-view { opacity: 1; transform: translateY(0); }
+.reveal-delay-1.in-view { transition-delay: 0.08s; }
+.reveal-delay-2.in-view { transition-delay: 0.16s; }
+.reveal-delay-3.in-view { transition-delay: 0.24s; }
+
+/* Ruled counter tick — used behind hero stat figures */
+@keyframes tickIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.tick-in { animation: tickIn 0.5s cubic-bezier(0.16,1,0.3,1) both; }
+
+/* Spin — used for AI Summary "Processing..." indicator */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}

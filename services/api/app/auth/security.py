@@ -479,7 +479,7 @@ def list_users_for_admin(
     """
     from sqlalchemy import func as sqlfunc
 
-    def _pending_count(uid: int) -> int:
+    def _pending_count(uid: int) -> dict:
         p = db.query(sqlfunc.count(PersonalDocument.id)).filter(
             PersonalDocument.user_id       == uid,
             PersonalDocument.review_status == "pending",
@@ -490,7 +490,7 @@ def list_users_for_admin(
             BusinessDocument.review_status == "pending",
             BusinessDocument.deleted_at    == None,
         ).scalar() or 0
-        return p + b
+        return {"pending_personal": p, "pending_business": b, "pending_docs": p + b}
 
     if current_user.role == UserRole.super_admin:
         q = db.query(UserModel)
@@ -503,12 +503,12 @@ def list_users_for_admin(
     return {
         "users": [
             {
-                "id":           u.id,
-                "name":         u.name,
-                "email":        u.email,
-                "phone":        u.phone,
-                "role":         u.role.value if hasattr(u.role, "value") else str(u.role),
-                "pending_docs": _pending_count(u.id),
+                "id":               u.id,
+                "name":             u.name,
+                "email":            u.email,
+                "phone":            u.phone,
+                "role":             u.role.value if hasattr(u.role, "value") else str(u.role),
+                **_pending_count(u.id),   # inlines pending_personal, pending_business, pending_docs (total)
             }
             for u in users
         ],

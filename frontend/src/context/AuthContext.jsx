@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const AuthContext = createContext();
@@ -9,18 +9,7 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (token) {
-      localStorage.setItem('token', token);
-      fetchUser();
-    } else {
-      localStorage.removeItem('token');
-      setUser(null);
-      setLoading(false);
-    }
-  }, [token]);
-
-  const fetchUser = async () => {
+  const fetchUser = useCallback(async () => {
     try {
       const res = await fetch('/api/auth/me', {
         headers: {
@@ -39,7 +28,18 @@ export function AuthProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    if (token) {
+      localStorage.setItem('token', token);
+      fetchUser();
+    } else {
+      localStorage.removeItem('token');
+      setUser(null);
+      setLoading(false);
+    }
+  }, [token, fetchUser]);
 
   const login = (newToken) => {
     setLoading(true);

@@ -1,76 +1,109 @@
 import { Link } from 'react-router-dom';
 
+const SERVICES = [
+  {
+    label: 'Bookkeeping',
+    title: 'Monthly books, closed clean and on time',
+    img: '/images/services-1.jpg',
+  },
+  {
+    label: 'Payroll',
+    title: 'Payroll runs your team can set a clock by',
+    img: '/images/services-2.jpg',
+  },
+  {
+    label: 'Tax',
+    title: 'Tax planning and prep built around your entity',
+    img: '/images/services-3.jpg',
+  },
+];
+
 export default function Home() {
   return (
     <>
       {/* ================= HERO ================= */}
-      <div className="home-hero" style={{
-        backgroundImage: 'linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url("/images/home-background.jpg")',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        minHeight: '600px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        textAlign: 'center',
-        color: '#fff',
-        padding: '20px'
-      }}>
-        <div style={{ maxWidth: '800px' }}>
-          <h1 style={{ fontSize: 'clamp(32px, 5vw, 56px)', fontWeight: '700', marginBottom: '20px', color: '#fff' }}>PRECISION | COMPLIANCE | FINANCIAL GROWTH</h1>
-          <p style={{ fontSize: 'clamp(18px, 2vw, 24px)', marginBottom: '30px', color: '#e2eaf2' }}>Your Trusted Bookkeeping & Financial Operations Partner for Growing Businesses</p>
-          <Link to="/contact">
-            <button className="btn btn-primary" style={{ padding: '12px 32px', fontSize: '18px', borderRadius: '30px' }}>Get Started</button>
-          </Link>
+      <div className="hero">
+        <div className="hero-inner reveal in-view">
+          <span className="hero-eyebrow">Bookkeeping · Payroll · Tax</span>
+          <h1>Every entry accounted for. <em>Every deadline kept.</em></h1>
+          <p className="hero-sub">
+            BookKeepPro handles the books, the payroll and the filings for growing
+            businesses across the US and India, so nothing slips between the cracks
+            of a busy quarter.
+          </p>
+          <div className="hero-actions">
+            <Link to="/contact"><button className="btn btn-primary">Get started</button></Link>
+            <Link to="/services"><button className="btn btn-outline" style={{ borderColor: 'rgba(255,255,255,0.5)', color: '#fff' }}>See our services</button></Link>
+          </div>
+        </div>
+
+        <div className="hero-stats">
+          <div className="stat-block">
+            <div className="stat-figure tnum">27</div>
+            <div className="stat-caption">Years in accounting</div>
+          </div>
+          <div className="stat-block">
+            <div className="stat-figure tnum">2</div>
+            <div className="stat-caption">Countries operating</div>
+          </div>
+          <div className="stat-block">
+            <div className="stat-figure tnum">100%</div>
+            <div className="stat-caption">Filings on schedule</div>
+          </div>
         </div>
       </div>
 
       {/* ================= ABOUT ================= */}
-      <section className="about-section" style={{ display: 'flex', gap: '40px', padding: '80px 20px', maxWidth: '1200px', margin: '0 auto', alignItems: 'center', flexWrap: 'wrap' }}>
-        <div className="text" style={{ flex: '1 1 500px' }}>
-          <h2 style={{ fontSize: '36px', marginBottom: '24px' }}>
-            We are <span style={{ color: '#0077C8' }}>BOOK</span><span style={{ color: '#FF7F11' }}>KEEPRO</span>
-          </h2>
-          <p style={{ fontSize: '16px', lineHeight: '1.8', marginBottom: '16px' }}>
-            Our journey began in 1998 as a Chartered Accountant firm in India, built on strong fundamentals of accounting, compliance, integrity, and long-term client relationships. Over the years, we earned the trust of businesses by delivering accurate, compliant, and dependable financial services.
+      <section className="section about-grid reveal">
+        <div className="about-copy">
+          <span className="eyebrow">Who we are</span>
+          <h2 style={{ marginTop: '14px', marginBottom: '20px' }}>Twenty-seven years of getting the numbers right</h2>
+          <p>
+            Our journey began in 1998 as a Chartered Accountant firm in India, built
+            on strong fundamentals of accounting, compliance, integrity, and
+            long-term client relationships.
           </p>
-          <p style={{ fontSize: '16px', lineHeight: '1.8', marginBottom: '24px' }}>
-            In 2018, responding to growing demand and an expanding client base, we strengthened our presence by establishing operations in Pune and Mumbai, two of India’s major business hubs. This phase marked our evolution from a traditional CA practice into a more structured, process-driven financial services organization.
+          <p>
+            In 2018, responding to growing demand, we expanded into Pune and
+            Mumbai — evolving from a traditional CA practice into a structured,
+            process-driven financial services organization.
           </p>
-          <p className="note" style={{ fontStyle: 'italic', color: 'var(--muted)', fontWeight: '500' }}>-- Our People Are Passionate About What We Do</p>
+          <p className="note">— Our people are passionate about what we do</p>
         </div>
-        <div style={{ flex: '1 1 400px' }}>
-          <img src="/images/home-about.jpg" alt="About BookKeepPro" style={{ width: '100%', borderRadius: '20px', boxShadow: 'var(--shadow-lg)', objectFit: 'cover' }} />
+        <div className="about-media">
+          <img src="/images/home-about.jpg" alt="BookKeepPro team at work" />
         </div>
       </section>
 
       {/* ================= SERVICES ================= */}
-      <section className="services-section">
-        <h2>OUR SERVICES</h2>
-        <div className="services-grid">
-          <div className="service-card" style={{ flex: '1 1 300px' }}>
-            <img src="/images/services-1.jpg" alt="Bookkeeping" style={{ width: '100%', height: '220px', objectFit: 'cover', borderTopLeftRadius: '15px', borderTopRightRadius: '15px' }} />
-            <div style={{ padding: '24px' }}>
-              <h3 style={{ fontSize: '20px', marginBottom: '16px' }}>Professional Bookkeeping for Firms & Businesses</h3>
-              <Link to="/contact"><button className="btn btn-outline" style={{ width: '100%' }}>Get Consultation</button></Link>
+      <section className="section reveal">
+        <div className="section-head">
+          <span className="eyebrow">What we handle</span>
+          <h2>The three ledgers every business runs on</h2>
+        </div>
+        <div className="services-grid stagger">
+          {SERVICES.map((s) => (
+            <div className="service-card fade-up" key={s.label}>
+              <div className="service-media">
+                <img src={s.img} alt={s.title} />
+              </div>
+              <div className="service-body">
+                <span className="service-label">{s.label}</span>
+                <h3>{s.title}</h3>
+                <Link to="/contact"><button className="btn btn-outline btn-sm w-full">Get consultation</button></Link>
+              </div>
             </div>
-          </div>
-          <div className="service-card" style={{ flex: '1 1 300px' }}>
-            <img src="/images/services-2.jpg" alt="Payroll" style={{ width: '100%', height: '220px', objectFit: 'cover', borderTopLeftRadius: '15px', borderTopRightRadius: '15px' }} />
-            <div style={{ padding: '24px' }}>
-              <h3 style={{ fontSize: '20px', marginBottom: '16px' }}>Professional & Globally Trusted Payroll Solutions</h3>
-              <Link to="/contact"><button className="btn btn-outline" style={{ width: '100%' }}>Get Consultation</button></Link>
-            </div>
-          </div>
-          <div className="service-card" style={{ flex: '1 1 300px' }}>
-            <img src="/images/services-3.jpg" alt="Tax Planning" style={{ width: '100%', height: '220px', objectFit: 'cover', borderTopLeftRadius: '15px', borderTopRightRadius: '15px' }} />
-            <div style={{ padding: '24px' }}>
-              <h3 style={{ fontSize: '20px', marginBottom: '16px' }}>Professional Tax Planning & Preparation</h3>
-              <Link to="/contact"><button className="btn btn-outline" style={{ width: '100%' }}>Get Consultation</button></Link>
-            </div>
-          </div>
+          ))}
         </div>
       </section>
+
+      {/* ================= CTA ================= */}
+      <div className="cta-band reveal">
+        <span className="eyebrow" style={{ justifyContent: 'center', color: '#E4C98A' }}>Ready when you are</span>
+        <h2 style={{ marginTop: '14px' }}>Hand us the receipts. We'll handle the rest.</h2>
+        <p>Book a short call and we'll map out exactly what your books need this quarter.</p>
+        <Link to="/contact"><button className="btn btn-primary">Talk to us</button></Link>
+      </div>
     </>
   );
 }

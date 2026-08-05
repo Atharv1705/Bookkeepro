@@ -5,12 +5,12 @@ export default function Footer() {
     <footer className="footer">
       <div className="footer-top">
         <div className="footer-left">
-          <img src="/images/bookkeeppro-logo.webp" className="footer-logo" alt="Bookkeepro" />
-          <p>Your Globally Trusted Bookkeeping Partner.</p>
+          <img src="/images/bookkeeppro-logo.webp" className="footer-logo" alt="BookKeepPro" />
+          <p>Bookkeeping, payroll and tax preparation for growing businesses — kept precise, kept compliant.</p>
         </div>
 
         <div className="footer-links">
-          <h4>Quick Links</h4>
+          <h4>Navigate</h4>
           <Link to="/">Home</Link>
           <Link to="/about-us">About Us</Link>
           <Link to="/services">Services</Link>
@@ -18,11 +18,11 @@ export default function Footer() {
         </div>
 
         <div className="footer-contact">
-          <h4>Contact</h4>
-          <p>📍 USA: McKinney, TX</p>
-          <p>📍 India: Pune, Maharashtra</p>
-          <p>📧 vedant.aiindia@gmail.com</p>
-          <p>📞 +918275367267</p>
+          <h4>Reach us</h4>
+          <p>USA · 2520 Indigo Dr, McKinney, TX 75072</p>
+          <p>India · 508 White Square, Hinjewadi Road, Pune 411057</p>
+          <p>atharvg.aiindia@gmail.com</p>
+          <p>+91 8275367267</p>
         </div>
       </div>
 

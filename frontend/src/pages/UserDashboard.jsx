@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -13,12 +13,9 @@ export default function UserDashboard() {
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [docLoading, setDocLoading] = useState(false);
 
-  useEffect(() => {
-    checkEngagement();
-    loadAdminDocs();
-  }, []);
+  // ── declare callbacks BEFORE the effects that reference them ──
 
-  const checkEngagement = async () => {
+  const checkEngagement = useCallback(async () => {
     try {
       const res = await authFetch("/api/auth/me");
       if (res.ok) {
@@ -31,16 +28,33 @@ export default function UserDashboard() {
     } catch (err) {
       console.error(err);
     }
-  };
+  }, [authFetch]);
+
+  const loadAdminDocs = useCallback(async () => {
+    setLoadingDocs(true);
+    try {
+      const res = await authFetch("/api/upload/admin-documents");
+      if (res.ok) {
+        setAdminDocs(await res.json());
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingDocs(false);
+    }
+  }, [authFetch]);
+
+  useEffect(() => {
+    checkEngagement();
+    loadAdminDocs();
+  }, [checkEngagement, loadAdminDocs]);
 
   const handleEngagementChange = async (e) => {
     const isChecked = e.target.checked;
     if (!isChecked) {
-      // Don't allow unchecking
       setEngagementChecked(true);
       return;
     }
-
     try {
       setEngagementChecked(true);
       const res = await authFetch("/api/auth/acknowledge-engagement", { method: "POST" });
@@ -52,20 +66,6 @@ export default function UserDashboard() {
       }
     } catch (err) {
       setEngagementChecked(false);
-    }
-  };
-
-  const loadAdminDocs = async () => {
-    setLoadingDocs(true);
-    try {
-      const res = await authFetch("/api/upload/admin-documents");
-      if (res.ok) {
-        setAdminDocs(await res.json());
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoadingDocs(false);
     }
   };
 
@@ -85,13 +85,11 @@ export default function UserDashboard() {
 
   const respondDoc = async (docId, approved) => {
     if (docLoading) return;
-    
     let reason = "";
     if (!approved) {
       reason = window.prompt("Reason for rejection:");
       if (reason === null) return;
     }
-
     setDocLoading(true);
     try {
       const res = await authFetch("/api/review/admin-doc-response", {
@@ -123,22 +121,23 @@ export default function UserDashboard() {
       <div className="card fade-up">
         <h3 style={{marginBottom: '16px'}}>Engagement Letter</h3>
         <p className="text-sm" style={{marginBottom: '16px'}}>Please acknowledge the engagement letter before uploading documents.</p>
-        <div style={{
+        <label style={{
           display: 'flex', alignItems: 'center', gap: '12px', padding: '16px',
-          background: 'var(--bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)'
+          background: 'var(--bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)',
+          cursor: engagementDisabled ? 'not-allowed' : 'pointer'
         }}>
-          <input 
-            type="checkbox" 
+          <input
+            type="checkbox"
             checked={engagementChecked}
             disabled={engagementDisabled}
             onChange={handleEngagementChange}
-            style={{width:'20px', height:'20px', cursor: engagementDisabled ? 'not-allowed' : 'pointer'}} 
+            style={{width:'20px', height:'20px', cursor: engagementDisabled ? 'not-allowed' : 'pointer'}}
           />
           <div>
             <div style={{fontWeight: 600, color: 'var(--navy)'}}>I acknowledge the Engagement Letter</div>
             <div style={{fontSize: '13px', color: 'var(--muted)', marginTop: '2px'}}>By checking this, you agree to our terms of service for the current tax year.</div>
           </div>
-        </div>
+        </label>
       </div>
 
       <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginTop: '20px'}}>
@@ -148,23 +147,23 @@ export default function UserDashboard() {
             <h3 style={{margin:0}}>Personal Documents</h3>
           </div>
           <p className="text-sm text-muted" style={{marginBottom: '20px', minHeight: '40px'}}>Upload your W-2s, 1099s, IDs, and other individual tax forms.</p>
-          <button 
-            className="btn btn-primary w-full" 
+          <button
+            className="btn btn-primary w-full"
             disabled={!engagementChecked}
             onClick={() => navigate('/upload-personal')}
           >
             Go to Personal Upload
           </button>
         </div>
-        
+
         <div className="card fade-up" style={{animationDelay: '0.2s'}}>
           <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom: '12px'}}>
             <span className="material-symbols-outlined" style={{color:'var(--orange)', fontSize:'28px'}}>business</span>
             <h3 style={{margin:0}}>Business Documents</h3>
           </div>
           <p className="text-sm text-muted" style={{marginBottom: '20px', minHeight: '40px'}}>Upload corporate documents, bookkeeping ledgers, and business receipts.</p>
-          <button 
-            className="btn btn-primary w-full" 
+          <button
+            className="btn btn-primary w-full"
             disabled={!engagementChecked}
             onClick={() => navigate('/upload-business')}
           >
@@ -176,7 +175,7 @@ export default function UserDashboard() {
       <div className="card fade-up" style={{animationDelay: '0.3s', marginTop: '20px'}}>
         <h3 style={{marginBottom: '16px'}}>Admin Returns / Documents</h3>
         <p className="text-sm" style={{marginBottom: '16px'}}>Documents and tax returns finalized by the admin.</p>
-        
+
         {loadingDocs ? (
           <div className="empty-state">Loading documents...</div>
         ) : adminDocs.length === 0 ? (

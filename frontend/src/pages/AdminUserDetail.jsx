@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import ExpandableSummaryBlock from '../components/ExpandableSummaryBlock';
 
 export default function AdminUserDetail() {
   const [searchParams] = useSearchParams();
@@ -13,7 +14,7 @@ export default function AdminUserDetail() {
   const [userDetail, setUserDetail] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [activeTab, setActiveTab] = useState('personal');
-  const [taxYear, setTaxYear] = useState(new Date().getFullYear().toString());
+  const [taxYear, setTaxYear] = useState("");
   const [loading, setLoading] = useState(true);
 
   // States for Review Emails
@@ -26,15 +27,7 @@ export default function AdminUserDetail() {
 
   const adminDocInputRef = useRef(null);
 
-  useEffect(() => {
-    if (!userId) {
-      navigate('/admin-dashboard');
-      return;
-    }
-    fetchUserDetails();
-  }, [userId, taxYear]);
-
-  const fetchUserDetails = async () => {
+  const fetchUserDetails = useCallback(async () => {
     setLoading(true);
     try {
       const url = taxYear ? `/api/upload/admin/users/${userId}/documents?tax_year=${taxYear}` : `/api/upload/admin/users/${userId}/documents`;
@@ -47,15 +40,35 @@ export default function AdminUserDetail() {
       
       const payload = await res.json();
       setUserDetail(payload.user);
-      setDocuments(payload.documents || []);
+      
+      // Map 'table' to 'type' for personal and business docs
+      const userDocs = (payload.documents || []).map(d => ({ ...d, type: d.table }));
+      
+      // Fetch admin docs separately
+      const adminDocsRes = await authFetch(`/api/upload/admin-documents?user_id=${userId}`);
+      let adminDocs = [];
+      if (adminDocsRes.ok) {
+        adminDocs = await adminDocsRes.json();
+        adminDocs = adminDocs.map(d => ({ ...d, type: 'admin', uploaded_at: d.created_at }));
+      }
+      
+      setDocuments([...userDocs, ...adminDocs]);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [authFetch, navigate, taxYear, userId]);
 
-  const loadAuditLog = async () => {
+  useEffect(() => {
+    if (!userId) {
+      navigate('/admin-dashboard');
+      return;
+    }
+    fetchUserDetails();
+  }, [userId, taxYear, navigate, fetchUserDetails]);
+
+  const loadAuditLog = useCallback(async () => {
     try {
       const res = await authFetch(`/api/auth/admin/audit-logs?user_id=${userId}&limit=30`);
       if (res.ok) {
@@ -65,13 +78,23 @@ export default function AdminUserDetail() {
     } catch (err) {
       console.error(err);
     }
-  };
+  }, [authFetch, userId]);
 
   useEffect(() => {
     if (activeTab === 'audit' && !auditLoaded) {
       loadAuditLog();
     }
-  }, [activeTab]);
+  }, [activeTab, auditLoaded, loadAuditLog]);
+
+  // Auto-refresh if any doc is still awaiting AI extraction (background task lag)
+  useEffect(() => {
+    const hasPending = documents.some(
+      d => (d.type === 'personal' || d.type === 'business') && d.extracted_data === null
+    );
+    if (!hasPending) return;
+    const timer = setTimeout(() => fetchUserDetails(), 5000);
+    return () => clearTimeout(timer);
+  }, [documents, fetchUserDetails]);
 
   const deleteUser = async () => {
     if (!window.confirm("WARNING: This will permanently delete this user, all their documents, and their audit history. Are you sure?")) return;
@@ -144,6 +167,10 @@ export default function AdminUserDetail() {
     const fd = new FormData();
     fd.append("file", file);
     fd.append("user_id", userId);
+    // doc_key and doc_label are required by the backend
+    const label = file.name.replace(/\.[^.]+$/, ''); // strip extension for a clean label
+    fd.append("doc_key", `admin_${Date.now()}`);
+    fd.append("doc_label", label);
     try {
       const res = await authFetch("/api/upload/admin-documents", {
         method: "POST",
@@ -243,9 +270,9 @@ export default function AdminUserDetail() {
   return (
     <div className="page-main-wide page-enter">
       {/* User Info Bar */}
-      <div className="card" style={{marginBottom: '20px'}}>
-        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'16px'}}>
-          <div style={{display:'flex', alignItems:'center', gap:'16px'}}>
+      <div className="card aud-user-bar" style={{marginBottom: '20px'}}>
+        <div className="aud-bar-inner">
+          <div className="aud-bar-left">
             <div style={{width:'52px', height:'52px', borderRadius:'50%', background:'linear-gradient(135deg,var(--header-bg),var(--blue-light))', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:'20px', color:'var(--navy)', flexShrink:0}}>
               {(userDetail.name || "U").charAt(0).toUpperCase()}
             </div>
@@ -271,13 +298,38 @@ export default function AdminUserDetail() {
                   <span className="badge badge-yellow"><span className="material-symbols-outlined" style={{fontSize: '14px'}}>pending</span> Engagement not acknowledged</span>
                 )}
               </div>
+
+              {/* Doc count summary */}
+              <div style={{display:'flex', gap:'12px', marginTop:'10px', flexWrap:'wrap'}}>
+                <div className="doc-count-chip">
+                  <span className="material-symbols-outlined" style={{fontSize:'14px', color:'var(--emerald)'}}>description</span>
+                  <span style={{fontWeight:600, color:'var(--navy)'}}>{personalDocs.length}</span>
+                  <span style={{color:'var(--muted)'}}>personal</span>
+                </div>
+                <div className="doc-count-chip">
+                  <span className="material-symbols-outlined" style={{fontSize:'14px', color:'var(--brass)'}}>business</span>
+                  <span style={{fontWeight:600, color:'var(--navy)'}}>{businessDocs.length}</span>
+                  <span style={{color:'var(--muted)'}}>business</span>
+                </div>
+                <div className="doc-count-chip">
+                  <span className="material-symbols-outlined" style={{fontSize:'14px', color:'var(--muted)'}}>upload_file</span>
+                  <span style={{fontWeight:600, color:'var(--navy)'}}>{returnDocs.length}</span>
+                  <span style={{color:'var(--muted)'}}>returns</span>
+                </div>
+                <div className="doc-count-chip" style={{borderLeft:'1px solid var(--border)', paddingLeft:'12px'}}>
+                  <span className="material-symbols-outlined" style={{fontSize:'14px', color:'var(--muted)'}}>folder</span>
+                  <span style={{fontWeight:700, color:'var(--navy)'}}>{personalDocs.length + businessDocs.length + returnDocs.length}</span>
+                  <span style={{color:'var(--muted)'}}>total</span>
+                </div>
+              </div>
             </div>
           </div>
-          <div style={{display:'flex', gap:'10px', alignItems:'center', flexWrap:'wrap'}}>
+          <div className="aud-bar-actions">
             <button className="btn btn-primary btn-sm" onClick={submitAllDocs} style={{borderRadius:'var(--radius-sm)'}}>Trigger Submit Review</button>
-            <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', marginLeft: '12px', paddingLeft: '16px', borderLeft: '1px solid var(--border)'}}>
+            <div className="aud-year-picker">
               <label className="form-label" style={{margin:0, fontSize: '11px'}}>Tax Year</label>
               <select className="select-input" style={{width: 'auto', padding: '6px 12px', fontSize: '13px'}} value={taxYear} onChange={(e) => setTaxYear(e.target.value)}>
+                <option value="">All Years</option>
                 {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
               </select>
             </div>
@@ -297,35 +349,59 @@ export default function AdminUserDetail() {
       {/* Tab: Personal */}
       {activeTab === 'personal' && (
         <div className="tab-panel active">
-          <div style={{display:'flex', gap:'20px', flexWrap:'wrap'}}>
-            <div style={{flex:2, minWidth:0}}>
+          <div className="doc-review-layout">
+            <div className="doc-review-main">
               <div className="card-flat">
                 {personalDocs.length === 0 ? (
-                  <p className="text-muted">No personal documents uploaded for {taxYear}.</p>
+                  <p className="text-muted">No personal documents uploaded{taxYear ? ` for ${taxYear}` : ''}.</p>
                 ) : (
                   personalDocs.map(doc => (
-                    <div key={doc.id} style={{ display:'flex', alignItems:'flex-start', gap:'16px', padding:'14px 0', borderBottom:'1px solid var(--border)'}}>
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontWeight:600, fontSize:'13px', color:'var(--navy)' }}>{doc.doc_type}</div>
-                        <div style={{ fontSize:'12px', color:'var(--muted)', marginTop:'2px' }}>Uploaded {new Date(doc.uploaded_at).toLocaleDateString()}</div>
-                        {doc.notes && <div style={{ fontSize:'12px', color:'var(--warn)', marginTop:'3px' }}>Notes: {doc.notes}</div>}
-                        {doc.review_status && (
-                          <div style={{ fontSize:'12px', color: doc.review_status === "approved" ? "var(--success)" : doc.review_status === "rejected" ? "var(--error)" : "var(--yellow)", marginTop:'3px', fontWeight:600, textTransform:'uppercase' }}>
-                            {doc.review_status}
+                    <div key={doc.id} className="doc-review-row">
+                      <div className="doc-review-row-top">
+                        <div className="doc-review-info">
+                          <div style={{ fontWeight:700, fontSize:'15px', color:'var(--navy)', lineHeight:'1.3' }}>{doc.doc_type}</div>
+                          <div style={{ fontSize:'12px', color:'var(--muted)', marginTop:'3px' }}>
+                            <span className="material-symbols-outlined" style={{fontSize:'12px', verticalAlign:'middle', marginRight:'3px'}}>calendar_today</span>
+                            {new Date(doc.uploaded_at).toLocaleDateString('en-US', {year:'numeric', month:'short', day:'numeric'})}
+                            {doc.tax_year && <span style={{marginLeft:'8px', fontWeight:600, color:'var(--brass)'}}>TY {doc.tax_year}</span>}
                           </div>
-                        )}
+                          {doc.notes && <div style={{ fontSize:'12px', color:'var(--warn)', marginTop:'3px', fontWeight:500 }}>⚠ {doc.notes}</div>}
+                          {doc.review_status && (
+                            <div style={{ marginTop:'5px' }}>
+                              <span className={`badge ${doc.review_status === 'approved' ? 'badge-green' : doc.review_status === 'rejected' ? 'badge-red' : 'badge-yellow'}`} style={{fontWeight:700}}>
+                                {doc.review_status.toUpperCase()}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="doc-review-actions">
+                          <button onClick={() => viewDoc(doc.storage_key)} className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)'}}>View</button>
+                          <button className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)'}} onClick={() => handleDocApprove(doc.id, doc.type, true)}>Approve</button>
+                          <button className="btn btn-danger btn-sm" style={{borderRadius:'var(--radius-sm)'}} onClick={() => handleDocApprove(doc.id, doc.type, false)}>Reject</button>
+                        </div>
                       </div>
-                      <div style={{ display:'flex', alignItems:'center', gap:'8px', flexShrink:0, flexWrap:'wrap' }}>
-                        <button onClick={() => viewDoc(doc.storage_key)} className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)'}}>View</button>
-                        <button className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)'}} onClick={() => handleDocApprove(doc.id, doc.type, true)}>Approve</button>
-                        <button className="btn btn-danger btn-sm" style={{borderRadius:'var(--radius-sm)'}} onClick={() => handleDocApprove(doc.id, doc.type, false)}>Reject</button>
-                      </div>
+                      {doc.extracted_data && Object.keys(doc.extracted_data).length > 0 ? (
+                        <div className="ai-summary-block">
+                          <div className="ai-summary-label">
+                            <span className="material-symbols-outlined" style={{ fontSize: '14px', verticalAlign: 'middle', marginRight: '4px' }}>auto_awesome</span>
+                            AI Summary
+                          </div>
+                          <ExpandableSummaryBlock extractedData={doc.extracted_data} />
+                        </div>
+                      ) : doc.extracted_data === null ? (
+                        <div className="ai-summary-block" style={{ opacity: 0.6 }}>
+                          <div className="ai-summary-label">
+                            <span className="material-symbols-outlined" style={{ fontSize: '14px', verticalAlign: 'middle', marginRight: '4px', animation: 'spin 1.2s linear infinite' }}>progress_activity</span>
+                            AI Summary — Processing…
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   ))
                 )}
               </div>
             </div>
-            <div style={{flex:1, minWidth:'240px'}}>
+            <div className="doc-review-sidebar">
               <div className="card-flat" style={{display:'flex', flexDirection:'column', gap:'16px'}}>
                 <h3>Filing Timeline</h3>
                 <div className="timeline-control">
@@ -348,35 +424,59 @@ export default function AdminUserDetail() {
       {/* Tab: Business */}
       {activeTab === 'business' && (
         <div className="tab-panel active">
-          <div style={{display:'flex', gap:'20px', flexWrap:'wrap'}}>
-            <div style={{flex:2, minWidth:0}}>
+          <div className="doc-review-layout">
+            <div className="doc-review-main">
               <div className="card-flat">
                 {businessDocs.length === 0 ? (
-                  <p className="text-muted">No business documents uploaded for {taxYear}.</p>
+                  <p className="text-muted">No business documents uploaded{taxYear ? ` for ${taxYear}` : ''}.</p>
                 ) : (
                   businessDocs.map(doc => (
-                    <div key={doc.id} style={{ display:'flex', alignItems:'flex-start', gap:'16px', padding:'14px 0', borderBottom:'1px solid var(--border)'}}>
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontWeight:600, fontSize:'13px', color:'var(--navy)' }}>{doc.doc_type}</div>
-                        <div style={{ fontSize:'12px', color:'var(--muted)', marginTop:'2px' }}>Uploaded {new Date(doc.uploaded_at).toLocaleDateString()}</div>
-                        {doc.notes && <div style={{ fontSize:'12px', color:'var(--warn)', marginTop:'3px' }}>Notes: {doc.notes}</div>}
-                        {doc.review_status && (
-                          <div style={{ fontSize:'12px', color: doc.review_status === "approved" ? "var(--success)" : doc.review_status === "rejected" ? "var(--error)" : "var(--yellow)", marginTop:'3px', fontWeight:600, textTransform:'uppercase' }}>
-                            {doc.review_status}
+                    <div key={doc.id} className="doc-review-row">
+                      <div className="doc-review-row-top">
+                        <div className="doc-review-info">
+                          <div style={{ fontWeight:700, fontSize:'15px', color:'var(--navy)', lineHeight:'1.3' }}>{doc.doc_type}</div>
+                          <div style={{ fontSize:'12px', color:'var(--muted)', marginTop:'3px' }}>
+                            <span className="material-symbols-outlined" style={{fontSize:'12px', verticalAlign:'middle', marginRight:'3px'}}>calendar_today</span>
+                            {new Date(doc.uploaded_at).toLocaleDateString('en-US', {year:'numeric', month:'short', day:'numeric'})}
+                            {doc.tax_year && <span style={{marginLeft:'8px', fontWeight:600, color:'var(--brass)'}}>TY {doc.tax_year}</span>}
                           </div>
-                        )}
+                          {doc.notes && <div style={{ fontSize:'12px', color:'var(--warn)', marginTop:'3px', fontWeight:500 }}>⚠ {doc.notes}</div>}
+                          {doc.review_status && (
+                            <div style={{ marginTop:'5px' }}>
+                              <span className={`badge ${doc.review_status === 'approved' ? 'badge-green' : doc.review_status === 'rejected' ? 'badge-red' : 'badge-yellow'}`} style={{fontWeight:700}}>
+                                {doc.review_status.toUpperCase()}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="doc-review-actions">
+                          <button onClick={() => viewDoc(doc.storage_key)} className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)'}}>View</button>
+                          <button className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)'}} onClick={() => handleDocApprove(doc.id, doc.type, true)}>Approve</button>
+                          <button className="btn btn-danger btn-sm" style={{borderRadius:'var(--radius-sm)'}} onClick={() => handleDocApprove(doc.id, doc.type, false)}>Reject</button>
+                        </div>
                       </div>
-                      <div style={{ display:'flex', alignItems:'center', gap:'8px', flexShrink:0, flexWrap:'wrap' }}>
-                        <button onClick={() => viewDoc(doc.storage_key)} className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)'}}>View</button>
-                        <button className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)'}} onClick={() => handleDocApprove(doc.id, doc.type, true)}>Approve</button>
-                        <button className="btn btn-danger btn-sm" style={{borderRadius:'var(--radius-sm)'}} onClick={() => handleDocApprove(doc.id, doc.type, false)}>Reject</button>
-                      </div>
+                      {doc.extracted_data && Object.keys(doc.extracted_data).length > 0 ? (
+                        <div className="ai-summary-block">
+                          <div className="ai-summary-label">
+                            <span className="material-symbols-outlined" style={{ fontSize: '14px', verticalAlign: 'middle', marginRight: '4px' }}>auto_awesome</span>
+                            AI Summary
+                          </div>
+                          <ExpandableSummaryBlock extractedData={doc.extracted_data} />
+                        </div>
+                      ) : doc.extracted_data === null ? (
+                        <div className="ai-summary-block" style={{ opacity: 0.6 }}>
+                          <div className="ai-summary-label">
+                            <span className="material-symbols-outlined" style={{ fontSize: '14px', verticalAlign: 'middle', marginRight: '4px', animation: 'spin 1.2s linear infinite' }}>progress_activity</span>
+                            AI Summary — Processing…
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   ))
                 )}
               </div>
             </div>
-            <div style={{flex:1, minWidth:'240px'}}>
+            <div className="doc-review-sidebar">
               <div className="card-flat" style={{display:'flex', flexDirection:'column', gap:'16px'}}>
                 <h3>Filing Timeline</h3>
                 <div className="timeline-control">
@@ -465,10 +565,9 @@ export default function AdminUserDetail() {
                       <tr key={log.id}>
                         <td style={{whiteSpace:'nowrap', color:'var(--muted)'}}>{new Date(log.created_at).toLocaleString()}</td>
                         <td><span className="badge badge-blue">{log.action}</span></td>
-                        <td>{log.details}</td>
+                        <td>{log.detail}</td>
                         <td className="text-sm text-muted">
-                          {log.ip_address}<br/>
-                          <span style={{fontSize:'10px'}}>{log.user_agent?.substring(0, 30)}...</span>
+                          {log.ip_address}
                         </td>
                       </tr>
                     ))}
