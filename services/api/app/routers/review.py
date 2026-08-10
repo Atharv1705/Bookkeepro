@@ -1,3 +1,4 @@
+import os
 import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/review", tags=["review"])
 
-DASHBOARD_LINK = "https://bookkeepro.net/dashboard"
+DASHBOARD_LINK = f"{os.getenv('FRONTEND_URL', 'https://aiindiacpa.duckdns.org')}/dashboard"
 
 
 # ─────────────────────────────────────────────
