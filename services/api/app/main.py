@@ -61,7 +61,7 @@ _ALLOWED_ORIGINS = [
     o.strip()
     for o in os.getenv(
         "ALLOWED_ORIGINS",
-        "https://bookkeepro.net,http://localhost:8000",
+        "https://aiindiacpa.duckdns.org,http://localhost:8000",
     ).split(",")
     if o.strip()
 ]
