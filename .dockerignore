@@ -1,16 +1,52 @@
+# Git and IDE
 .git
 .github
+.vscode
+
+# Python
 __pycache__
 *.pyc
 *.pyo
 *.pyd
 *.log
-.env*
 .venv
 venv
+
+# Node
 node_modules
+frontend/.vite
+
+# Environment — never bake secrets into the image
+.env*
+
+# Test / cache artifacts
 .pytest_cache
 .mypy_cache
 .ruff_cache
 services/api/temp
+
+# User uploads — stored in a named Docker volume, not in the image
 uploads
+
+# Legacy frontend (not used by the React app)
+frontend-legacy
+
+# Docs and blog content — not needed at runtime
+blog_images
+*.md
+*.docx
+*.patch
+*.msi
+AI_ENGINEERING_ONE_PAGER.md
+COMPREHENSIVE_REVIEW.md
+DEPLOYMENT.md
+PROJECT_AUDIT.md
+
+# Dev/utility scripts
+check_docs.py
+changes_from_last_commit.patch
+openrouter_error.log
+
+# Windows / macOS artifacts
+Thumbs.db
+.DS_Store
