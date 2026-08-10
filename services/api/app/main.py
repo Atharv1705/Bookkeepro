@@ -4,8 +4,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from app.limiter import limiter
 from app import models
@@ -13,9 +12,9 @@ from app.db import engine
 
 log = logging.getLogger("uvicorn.error")
 
-app = FastAPI(title="BookKeepPro API")
+app = FastAPI(title="BookKeepPro API", docs_url=None, redoc_url=None)  # hide docs in production
 
-# Rate limiter — import from limiter.py to avoid circular imports
+# Rate limiter
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -23,34 +22,34 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 models.Base.metadata.create_all(bind=engine)
 
 # ─────────────────────────────────────────────
-# Routers — each isolated so one failure never kills the others
+# Routers — isolated so one failure never kills the others
 # ─────────────────────────────────────────────
 try:
-    from app.routers import auth  # type: ignore
+    from app.routers import auth      # type: ignore
     app.include_router(auth.router)
 except Exception as exc:
     log.exception("Failed to load auth router: %s", exc)
 
 try:
-    from app.routers import upload  # type: ignore
+    from app.routers import upload    # type: ignore
     app.include_router(upload.router)
 except Exception as exc:
     log.exception("Failed to load upload router: %s", exc)
 
 try:
-    from app.routers import contact  # type: ignore
+    from app.routers import contact   # type: ignore
     app.include_router(contact.router)
 except Exception as exc:
     log.exception("Failed to load contact router: %s", exc)
 
 try:
-    from app.routers import review  # type: ignore
+    from app.routers import review    # type: ignore
     app.include_router(review.router)
 except Exception as exc:
     log.exception("Failed to load review router: %s", exc)
 
 try:
-    from app.routers import chatbot  # type: ignore
+    from app.routers import chatbot   # type: ignore
     app.include_router(chatbot.router)
 except Exception as exc:
     log.exception("Failed to load chatbot router: %s", exc)
@@ -76,68 +75,47 @@ app.add_middleware(
 )
 
 # ─────────────────────────────────────────────
-# Static file mounts
+# Static files — fallback for when nginx is not in front
+# In production, nginx serves /css, /assets, /images directly
 # ─────────────────────────────────────────────
 FRONTEND_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "..", "frontend")
 )
+DIST_DIR   = os.path.join(FRONTEND_DIR, "dist")
+SPA_INDEX  = os.path.join(DIST_DIR, "index.html")
 
 
-def mount_if_exists(route: str, subdir: str, name: str):
-    path = os.path.join(FRONTEND_DIR, subdir)
+def _mount_if_exists(route: str, path: str, name: str) -> None:
     if os.path.isdir(path):
         app.mount(route, StaticFiles(directory=path), name=name)
-        log.info("Mounted static %s -> %s", route, path)
-    else:
-        log.debug("Static directory not found, skipping: %s", path)
+        log.info("Mounted static %s → %s", route, path)
 
 
-mount_if_exists("/js",     "dist/js",     "js")
-mount_if_exists("/images", "dist/images", "images")
-mount_if_exists("/css",    "dist/css",    "css")
+_mount_if_exists("/css",    os.path.join(DIST_DIR, "css"),    "css")
+_mount_if_exists("/assets", os.path.join(DIST_DIR, "assets"), "assets")
+_mount_if_exists("/images", os.path.join(DIST_DIR, "images"), "images")
 
-# Mount Vite build assets (JS bundles, hashed chunks)
-DIST_ASSETS = os.path.join(FRONTEND_DIR, "dist", "assets")
-if os.path.isdir(DIST_ASSETS):
-    app.mount("/assets", StaticFiles(directory=DIST_ASSETS), name="assets")
-    log.info("Mounted Vite assets -> %s", DIST_ASSETS)
-
+# Ensure uploads directory exists
 UPLOAD_DIR = os.path.abspath(os.path.join(FRONTEND_DIR, "..", "uploads"))
-if not os.path.exists(UPLOAD_DIR):
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-log.info("FRONTEND_DIR resolved to: %s", FRONTEND_DIR)
-log.info("CSS dir exists: %s", os.path.isdir(os.path.join(FRONTEND_DIR, "css")))
-
-DIST_DIR = os.path.join(FRONTEND_DIR, "dist")
-SPA_INDEX = os.path.join(DIST_DIR, "index.html")
-
-# Mount the Vite dist folder for hashed static assets not already mounted above
-# (favicon, icons.svg, etc.)
-if os.path.isdir(DIST_DIR):
-    # Serve root-level static assets that Vite places at dist/
-    app.mount("/dist", StaticFiles(directory=DIST_DIR), name="dist_root")
-
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # ─────────────────────────────────────────────
-# Ops endpoints
+# Ops
 # ─────────────────────────────────────────────
 
 @app.get("/health", tags=["ops"])
 def health():
-    """Health check for monitoring and load balancers."""
     return {"status": "ok"}
 
 
 @app.post("/logout", tags=["auth"])
 def logout():
-    # JWT is stateless — token is invalidated client-side by clearing localStorage
     return {"message": "Logged out"}
 
 
 # ─────────────────────────────────────────────
-# SPA catch-all — serve index.html for every non-API GET route
-# so React Router handles client-side navigation on direct URL access
+# SPA catch-all — serve index.html for all non-API routes
+# React Router handles client-side navigation
 # ─────────────────────────────────────────────
 
 @app.get("/{full_path:path}", tags=["frontend"])
@@ -147,8 +125,11 @@ def spa_fallback(full_path: str):
             SPA_INDEX,
             headers={
                 "Cache-Control": "no-store, no-cache, must-revalidate",
-                "Pragma": "no-cache",
-                "Expires": "0",
+                "Pragma":        "no-cache",
+                "Expires":       "0",
             },
         )
-    raise HTTPException(status_code=404, detail="Frontend not built. Run 'npm run build' in /frontend.")
+    raise HTTPException(
+        status_code=404,
+        detail="Frontend not built. Run 'npm run build' in /frontend.",
+    )
