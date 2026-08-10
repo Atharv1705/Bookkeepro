@@ -6,9 +6,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Install Tesseract OCR + English + Hindi language data (Stage 2 of extraction pipeline)
-# tesseract-ocr: ~50MB — CPU-only, no GPU needed
-# tesseract-ocr-hin: Hindi language pack for bilingual Indian documents (Aadhaar, PAN, etc.)
+# System deps: Tesseract OCR (Stage 2 of extraction pipeline — CPU-only, no GPU)
+# eng: English, hin: Hindi — for bilingual Indian documents (Aadhaar, PAN, etc.)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     tesseract-ocr-eng \
@@ -16,21 +15,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Python dependencies (plain UTF-8 requirements.txt)
 COPY services/api/requirements.txt /tmp/requirements.txt
-RUN python - <<'PY'
-from pathlib import Path
+RUN pip install --upgrade pip && pip install -r /tmp/requirements.txt
 
-src = Path('/tmp/requirements.txt')
-text = src.read_text(encoding='utf-16')
-Path('/tmp/requirements-utf8.txt').write_text(text, encoding='utf-8')
-PY
-
-RUN pip install --upgrade pip && pip install -r /tmp/requirements-utf8.txt
-
+# Copy app source
 COPY . /app
 
 WORKDIR /app/services/api
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4", "--proxy-headers"]
+# --forwarded-allow-ips=* trusts X-Forwarded-For from nginx container
+# Required so rate limiter and audit logs see real client IPs (not nginx's internal IP)
+CMD ["uvicorn", "app.main:app", \
+     "--host", "0.0.0.0", \
+     "--port", "8000", \
+     "--workers", "4", \
+     "--proxy-headers", \
+     "--forwarded-allow-ips=*"]
