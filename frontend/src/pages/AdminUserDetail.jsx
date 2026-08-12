@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import ExpandableSummaryBlock from '../components/ExpandableSummaryBlock';
 
+
 export default function AdminUserDetail() {
   const [searchParams] = useSearchParams();
   const userId = searchParams.get('user_id');
@@ -16,6 +17,7 @@ export default function AdminUserDetail() {
   const [activeTab, setActiveTab] = useState('personal');
   const [taxYear, setTaxYear] = useState("");
   const [loading, setLoading] = useState(true);
+
 
   // States for Review Emails
   const [personalTimeline, setPersonalTimeline] = useState(0);
@@ -41,10 +43,8 @@ export default function AdminUserDetail() {
       const payload = await res.json();
       setUserDetail(payload.user);
       
-      // Map 'table' to 'type' for personal and business docs
       const userDocs = (payload.documents || []).map(d => ({ ...d, type: d.table }));
       
-      // Fetch admin docs separately
       const adminDocsRes = await authFetch(`/api/upload/admin-documents?user_id=${userId}`);
       let adminDocs = [];
       if (adminDocsRes.ok) {
@@ -52,7 +52,10 @@ export default function AdminUserDetail() {
         adminDocs = adminDocs.map(d => ({ ...d, type: 'admin', uploaded_at: d.created_at }));
       }
       
-      setDocuments([...userDocs, ...adminDocs]);
+      const allDocs = [...userDocs, ...adminDocs];
+      setDocuments(allDocs);
+
+
     } catch (err) {
       console.error(err);
     } finally {
@@ -337,6 +340,7 @@ export default function AdminUserDetail() {
           </div>
         </div>
       </div>
+
 
       {/* Tabs */}
       <div className="tab-bar">

@@ -24,7 +24,12 @@ export default function Login() {
       });
 
       if (!res.ok) {
-        throw new Error("Invalid credentials");
+        const errData = await res.json().catch(() => ({}));
+        if (res.status === 403 && errData.detail === "EMAIL_NOT_VERIFIED") {
+          setError("EMAIL_NOT_VERIFIED");
+          return;
+        }
+        throw new Error(errData.detail || "Invalid credentials");
       }
 
       const data = await res.json();
@@ -60,7 +65,16 @@ export default function Login() {
           <h1>Sign In</h1>
           <p className="auth-subtitle">Enter your credentials to continue</p>
 
-          {error && <div style={{color: 'var(--error)', marginBottom: '1rem', fontSize: '14px'}}>{error}</div>}
+          {error && (
+            <div style={{color: 'var(--error)', marginBottom: '1rem', fontSize: '14px'}}>
+              {error === 'EMAIL_NOT_VERIFIED' ? (
+                <>
+                  Your email is not verified. Please check your inbox or{' '}
+                  <Link to="/resend-verification" className="fancy-link">resend the verification link</Link>.
+                </>
+              ) : error}
+            </div>
+          )}
 
           <form onSubmit={handleLogin}>
             <div className="form-group">
