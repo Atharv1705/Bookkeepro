@@ -95,7 +95,7 @@ async def forgot_password(
 
     reset_token = create_password_reset_token(user.email)
 
-    frontend_url = os.getenv("FRONTEND_URL", "https://bookkeepro.net")
+    frontend_url = os.getenv("FRONTEND_URL", "https://aiindiacpa.duckdns.org")
     reset_link = f"{frontend_url}/reset-password?token={reset_token}"
 
     reset_body = (
@@ -240,7 +240,7 @@ async def signup(request: Request, payload: SignupRequest, background: Backgroun
     # Send verification email in background (non-blocking)
     if not is_admin:
         verify_token = create_email_verification_token(user.email)
-        frontend_url = os.getenv("FRONTEND_URL", "https://bookkeepro.net")
+        frontend_url = os.getenv("FRONTEND_URL", "https://aiindiacpa.duckdns.org")
         verify_link = f"{frontend_url}/verify-email?token={verify_token}"
         verify_body = (
             f"Hi {user.name},<br><br>"
@@ -335,7 +335,9 @@ def verify_email(token: str, db: Session = Depends(get_db)):
 
 
 @router.post("/resend-verification")
+@limiter.limit("3/hour")
 async def resend_verification(
+    request: Request,
     payload: ResendVerificationRequest,
     background: BackgroundTasks,
     db: Session = Depends(get_db),
@@ -347,7 +349,7 @@ async def resend_verification(
         return {"message": "If the email exists and is unverified, a new link has been sent"}
 
     verify_token = create_email_verification_token(user.email)
-    frontend_url = os.getenv("FRONTEND_URL", "https://bookkeepro.net")
+    frontend_url = os.getenv("FRONTEND_URL", "https://aiindiacpa.duckdns.org")
     verify_link = f"{frontend_url}/verify-email?token={verify_token}"
 
     resend_body = (
@@ -383,7 +385,7 @@ def me(current_user=Depends(get_current_user)):
         "phone": current_user.phone,
         "role":  role,
         "engagement_acknowledged_at": (
-            current_user.engagement_acknowledged_at.isoformat()
+            current_user.engagement_acknowledged_at.isoformat() + "Z"
             if current_user.engagement_acknowledged_at else None
         ),
     }
@@ -405,7 +407,7 @@ def acknowledge_engagement(
         crud.log_action(db, "engagement_acknowledged", user_id=current_user.id)
     return {
         "acknowledged": True,
-        "acknowledged_at": current_user.engagement_acknowledged_at.isoformat(),
+        "acknowledged_at": current_user.engagement_acknowledged_at.isoformat() + "Z",
     }
 
 
@@ -539,7 +541,7 @@ def get_audit_logs(
             "target": l.target,
             "detail": l.detail,
             "ip_address": l.ip_address,
-            "created_at": l.created_at.isoformat() if l.created_at else None,
+            "created_at": l.created_at.isoformat() + "Z" if l.created_at else None,
         }
         for l in logs
     ]

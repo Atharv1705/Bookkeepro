@@ -63,6 +63,7 @@ class PersonalDocument(Base):
     review_note   = Column(String(500), nullable=True)
     tax_year      = Column(Integer, default=2025, nullable=False)
     extracted_data = Column(JSON, nullable=True)
+    file_hash      = Column(String(64), nullable=True, index=True)  # SHA-256 for dedup
 
     user = relationship("User")
 
@@ -90,6 +91,7 @@ class BusinessDocument(Base):
     review_note   = Column(String(500), nullable=True)
     tax_year      = Column(Integer, default=2025, nullable=False)
     extracted_data = Column(JSON, nullable=True)
+    file_hash      = Column(String(64), nullable=True, index=True)  # SHA-256 for dedup
 
     user = relationship("User")
 

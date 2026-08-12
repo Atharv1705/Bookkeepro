@@ -19,6 +19,21 @@ export default function AdminDashboard() {
   const [tplFile, setTplFile] = useState(null);
   const [tplLoading, setTplLoading] = useState(false);
 
+  const [digestHtml, setDigestHtml]   = useState(null);
+  const [digestLoading, setDigestLoading] = useState(false);
+
+  const fetchDigest = useCallback(async () => {
+    setDigestLoading(true);
+    try {
+      const res = await authFetch('/api/chatbot/daily-digest');
+      if (res.ok) {
+        const data = await res.json();
+        setDigestHtml(data.digest);
+      }
+    } catch (err) { console.error(err); }
+    finally { setDigestLoading(false); }
+  }, [authFetch]);
+
   const fetchAdminData = useCallback(async () => {
     setLoading(true);
     try {
@@ -156,6 +171,26 @@ export default function AdminDashboard() {
       {/* Users Tab */}
       {tab === 'users' && (
         <>
+          {/* Daily Digest */}
+          <div className="card" style={{ marginBottom: '20px', background: 'var(--emerald-light)', border: '1px solid rgba(31,93,70,0.2)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span className="material-symbols-outlined" style={{ color: 'var(--emerald)', fontSize: '22px' }}>auto_awesome</span>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--navy)' }}>AI Daily Digest</div>
+                  <div style={{ fontSize: '12px', color: 'var(--muted)' }}>Plain-English summary of today's activity</div>
+                </div>
+              </div>
+              <button className="btn btn-secondary btn-sm" onClick={fetchDigest} disabled={digestLoading} style={{ borderRadius: 'var(--radius-sm)' }}>
+                {digestLoading ? 'Generating…' : '✨ Generate Digest'}
+              </button>
+            </div>
+            {digestHtml && (
+              <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(31,93,70,0.2)', fontSize: '13px', color: 'var(--navy)', lineHeight: '1.7' }}
+                dangerouslySetInnerHTML={{ __html: digestHtml }} />
+            )}
+          </div>
+
           {/* Stats Bar */}
           <div className="admin-stats">
             <div className="stat-card accent-blue">

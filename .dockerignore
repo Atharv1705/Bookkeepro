@@ -25,6 +25,10 @@ frontend/.vite
 .ruff_cache
 services/api/temp
 
+# Database files — production uses MySQL via Docker service
+*.db
+*.sqlite3
+
 # User uploads — stored in a named Docker volume, not in the image
 uploads
 

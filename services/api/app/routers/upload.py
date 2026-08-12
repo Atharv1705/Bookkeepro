@@ -8,9 +8,6 @@ from fastapi import APIRouter, BackgroundTasks, UploadFile, File, HTTPException,
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-import boto3
-from botocore.client import Config
-from botocore.exceptions import ClientError
 from jose import jwt, JWTError
 from datetime import timedelta
 
@@ -39,20 +36,61 @@ UPLOAD_DIR = BASE_DIR / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 def process_ai_extraction(table: str, doc_id: int, file_path: str, doc_type: str):
-    extracted = extract_document_data(file_path, doc_type)
-    if extracted is None:
-        return
-        
+    import hashlib
+
+    # Compute SHA-256 hash of the file for deduplication (Item 3)
+    try:
+        with open(file_path, "rb") as f:
+            file_hash = hashlib.sha256(f.read()).hexdigest()
+    except Exception as e:
+        logger.warning(f"[AI] Could not hash file {file_path}: {e}. Proceeding without dedup.")
+        file_hash = None
+
     db = SessionLocal()
     try:
-        if table == "personal":
-            doc = db.query(PersonalDocument).filter_by(id=doc_id).first()
-        else:
-            doc = db.query(BusinessDocument).filter_by(id=doc_id).first()
-            
+        model_class = PersonalDocument if table == "personal" else BusinessDocument
+
+        # Check if another doc with the same file hash already has extracted data
+        if file_hash:
+            cached = (
+                db.query(model_class)
+                .filter(
+                    model_class.file_hash      == file_hash,
+                    model_class.extracted_data != None,
+                    model_class.id             != doc_id,
+                    model_class.deleted_at     == None,
+                )
+                .first()
+            )
+            if cached:
+                logger.info(
+                    f"[AI] Cache hit for hash {file_hash[:12]}… — "
+                    f"copying extracted_data from doc id={cached.id} (skipping API call)"
+                )
+                doc = db.query(model_class).filter_by(id=doc_id).first()
+                if doc:
+                    doc.extracted_data = cached.extracted_data
+                    doc.file_hash      = file_hash
+                    db.commit()
+                return
+
+        # No cache — run full extraction
+        extracted = extract_document_data(file_path, doc_type)
+        if extracted is None:
+            # Still save the hash so we don't keep retrying a file that always fails
+            if file_hash:
+                doc = db.query(model_class).filter_by(id=doc_id).first()
+                if doc:
+                    doc.file_hash = file_hash
+                    db.commit()
+            return
+
+        doc = db.query(model_class).filter_by(id=doc_id).first()
         if doc:
             doc.extracted_data = extracted
+            doc.file_hash      = file_hash
             db.commit()
+
     except Exception as e:
         logger.error(f"Failed to update DB with AI extraction: {e}")
     finally:
@@ -291,7 +329,7 @@ def list_admin_documents(
             "doc_label":   d.doc_label,
             "filename":    d.filename,
             "storage_key": d.storage_key,
-            "created_at":  d.uploaded_at.isoformat() if d.uploaded_at else None,
+            "created_at":  d.uploaded_at.isoformat() + "Z" if d.uploaded_at else None,
         }
         for d in docs
     ]
@@ -670,7 +708,7 @@ def get_user_all_documents(
             "doc_type":      d.doc_type,
             "filename":      d.filename,
             "storage_key":   d.storage_key,
-            "uploaded_at":   d.uploaded_at.isoformat() if d.uploaded_at else None,
+            "uploaded_at":   d.uploaded_at.isoformat() + "Z" if d.uploaded_at else None,
             "tax_year":      d.tax_year,
             "review_status": d.review_status,
             "review_note":   d.review_note,
@@ -684,7 +722,7 @@ def get_user_all_documents(
             "doc_type":      d.business_type,
             "filename":      d.filename,
             "storage_key":   d.storage_key,
-            "uploaded_at":   d.uploaded_at.isoformat() if d.uploaded_at else None,
+            "uploaded_at":   d.uploaded_at.isoformat() + "Z" if d.uploaded_at else None,
             "tax_year":      d.tax_year,
             "review_status": d.review_status,
             "review_note":   d.review_note,
@@ -758,13 +796,13 @@ def delete_user_completely(
             delete_from_storage(doc.storage_key)
             db.delete(doc)
 
-        # Clean up legacy uploaded_files rows and audit logs to avoid FK constraint errors on db.delete(user)
-        from app.models import UploadedFile, AuditLog
+        # Clean up legacy uploaded_files rows to avoid FK constraint errors on db.delete(user)
+        from app.models import UploadedFile
         db.query(UploadedFile).filter(UploadedFile.owner_id == user_id).delete()
-        db.query(AuditLog).filter(AuditLog.user_id == user_id).delete()
 
-        db.commit()
-        crud.log_action(db, "delete_user", user_id=current_user.id, target=f"user:{user_id}")
+        # Log before deleting the user (audit_logs.user_id FK is SET NULL, so logs survive)
+        crud.log_action(db, "delete_user", user_id=current_user.id, target=f"user:{user_id}", detail=f"{user.email}")
+
         db.delete(user)
         db.commit()
     except Exception as e:
@@ -895,7 +933,7 @@ def list_templates(
         {
             "id": t.id,
             "name": t.name,
-            "download": t.file_url,
+            "download": get_presigned_url(t.file_url) if t.file_url else None,
         }
         for t in templates
     ]
@@ -917,7 +955,7 @@ async def upload_template(
     file_url = None
     if file and file.filename:
         storage_key = await upload_to_storage(file)
-        file_url = get_presigned_url(storage_key)
+        file_url = storage_key  # Store raw key; presigned URLs are generated on-demand in GET
 
     record = RequiredDocumentTemplate(
         category=category,
@@ -937,7 +975,7 @@ async def upload_template(
     return {
         "id": record.id,
         "name": record.name,
-        "download": record.file_url,
+        "download": get_presigned_url(record.file_url) if record.file_url else None,
     }
 
 @router.delete("/admin/templates/{template_id}")
@@ -954,9 +992,8 @@ def delete_template(
     if not record:
         raise HTTPException(status_code=404, detail="Template not found")
 
-    if record.file_url and record.file_url.startswith("/uploads/"):
-        storage_key = record.file_url.split("/uploads/")[1]
-        delete_from_storage(storage_key)
+    if record.file_url:
+        delete_from_storage(record.file_url)
 
     db.delete(record)
     db.commit()

@@ -17,3 +17,12 @@ oauth_token.json
 # User Uploads & Temp Data
 uploads/
 services/temp/
+
+# Blog / temporary files
+*.md
+*.docx
+*.patch
+*.msi
+blog_images/
+check_docs.py
+openrouter_error.log
