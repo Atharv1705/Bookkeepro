@@ -18,10 +18,11 @@ MIN_TESS_WORDS = 30    # Stage 2: Tesseract must return at least this many words
 RENDER_DPI     = 2.5   # PyMuPDF render scale (2.5x ≈ 212 DPI)
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Models
+# Models — configurable via .env, hardcoded values are defaults
 # ─────────────────────────────────────────────────────────────────────────────
-MODEL_TEXT   = "meta-llama/llama-3.3-70b-instruct"  # Stage 1 & 2 — FREE tier
-MODEL_VISION = "qwen/qwen2.5-vl-72b-instruct"       # Stage 3 — best document OCR
+MODEL_TEXT     = os.getenv("OCR_TEXT_MODEL",     "meta-llama/llama-3.3-70b-instruct")
+MODEL_VISION   = os.getenv("OCR_VISION_MODEL",   "qwen/qwen2.5-vl-72b-instruct")
+MODEL_FALLBACK = os.getenv("OCR_FALLBACK_MODEL", "google/gemma-3-27b-it")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Prompts
@@ -42,23 +43,51 @@ BLANK_FORM_PROMPT = (
     "Return ONLY valid JSON, no markdown."
 )
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Confidence tier definitions (Item 1)
+# ─────────────────────────────────────────────────────────────────────────────
+_CONFIDENCE_TIERS = {
+    1: {
+        "stage":      1,
+        "tier":       "high",
+        "label":      "Native PDF text",
+        "description": "Extracted directly from the PDF text layer — highly reliable.",
+        "color":      "green",
+    },
+    2: {
+        "stage":      2,
+        "tier":       "medium",
+        "label":      "OCR (Tesseract)",
+        "description": "Read from a scanned/image page via local OCR — review key numbers.",
+        "color":      "yellow",
+    },
+    3: {
+        "stage":      3,
+        "tier":       "low",
+        "label":      "Vision model",
+        "description": "Read from image by AI vision model — verify carefully.",
+        "color":      "orange",
+    },
+}
 
-def _build_user_prompt(doc_type: str) -> str:
-    return (
-        f"Document type hint: {doc_type}\n\n"
-        "You are a precise data extraction AI. Read this document and extract its key information.\n\n"
-        "STRICT RULES:\n"
-        "1. Use field names exactly as they appear in the document "
-        "(e.g. 'PAN Number', 'Date of Birth', 'Employer Name', 'Tax Year').\n"
-        "2. For LEGAL DOCUMENTS, LETTERS, or CONTRACTS: extract key terms — "
-        "services included, responsibilities, fees, tax forms mentioned, deadlines, party names.\n"
-        "3. Extract ONLY fields that have actual content — do NOT add null or empty fields.\n"
-        "4. Dates: format as DD/MM/YYYY. A run-together date like '27082022' → '27/08/2022'.\n"
-        "5. For list fields (services, items, fees) use JSON arrays.\n"
-        "6. Ignore bilingual label noise (Hindi/Devanagari text) — extract English values only.\n"
-        "7. If the document is truly a blank unfilled form with zero data, return {}.\n"
-        "8. Return ONLY a valid JSON object — no markdown, no explanation."
-    )
+def _add_confidence(result: dict | None, stage: int, word_count: int = 0) -> dict | None:
+    """
+    Attach a _meta block to an extraction result indicating which pipeline
+    stage produced it and how reliable the output is likely to be.
+    Returns None unchanged so callers can still check `if result is None`.
+    """
+    if result is None:
+        return None
+    meta = dict(_CONFIDENCE_TIERS.get(stage, {"stage": stage, "tier": "unknown",
+                                               "label": "Unknown", "color": "gray"}))
+    if stage == 2 and word_count:
+        meta["label"] = f"OCR ({word_count} words)"
+        meta["description"] = (
+            f"Tesseract OCR found {word_count} words. "
+            + ("Reasonable confidence." if word_count >= 60 else "Low word count — check key fields manually.")
+        )
+    result["_meta"] = meta
+    return result
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -119,11 +148,14 @@ def _tesseract_text(pil_image: Image.Image) -> str:
                     break
 
         config = "--psm 6 --oem 3"
+        # Tesseract language pack — configurable via TESSERACT_LANG env var
+        # Default: eng+hin for bilingual Indian documents
+        tess_lang = os.getenv("TESSERACT_LANG", "eng+hin")
         try:
-            text = pytesseract.image_to_string(pil_image, lang="eng+hin", config=config).strip()
-            logger.debug(f"[Tesseract] eng+hin produced {len(text.split())} words")
+            text = pytesseract.image_to_string(pil_image, lang=tess_lang, config=config).strip()
+            logger.debug(f"[Tesseract] {tess_lang} produced {len(text.split())} words")
         except Exception:
-            logger.debug("[Tesseract] eng+hin unavailable, using eng only")
+            logger.debug(f"[Tesseract] {tess_lang} unavailable, using eng only")
             text = pytesseract.image_to_string(pil_image, lang="eng", config=config).strip()
 
         return text
@@ -144,10 +176,16 @@ def _call_openrouter(
 ) -> dict | None:
     """
     POST to OpenRouter and return parsed JSON dict, or None on failure.
-    If the model returns {} (blank/unfilled doc), retries with a metadata
-    prompt so the admin always sees form_type / purpose / tax_year.
+
+    Fallback chain (Item 4):
+      1. Try requested model.
+      2. If that fails AND it isn't already the fallback model, retry with MODEL_FALLBACK.
+
+    Blank template handling:
+      If the model returns {} (unfilled form), retries with a metadata prompt
+      so the admin always sees form_type / purpose / tax_year instead of nothing.
     """
-    def _post(content):
+    def _post(m: str, content: list) -> dict | None:
         try:
             response = requests.post(
                 url="https://openrouter.ai/api/v1/chat/completions",
@@ -156,7 +194,7 @@ def _call_openrouter(
                     "Content-Type": "application/json",
                 },
                 json={
-                    "model": model,
+                    "model": m,
                     "messages": [
                         {"role": "system", "content": SYSTEM_PROMPT},
                         {"role": "user",   "content": content},
@@ -174,19 +212,25 @@ def _call_openrouter(
                 raw = raw[:-3]
             return json.loads(raw.strip())
         except Exception as e:
-            logger.error(f"[OpenRouter] {model} call failed: {e}")
+            logger.error(f"[OpenRouter] {m} call failed: {e}")
             return None
 
-    result = _post(user_content)
+    # Primary attempt
+    result = _post(model, user_content)
 
-    # If model returned {} (blank template), retry with metadata-only prompt
+    # Fallback to secondary model if primary failed (Item 4)
+    if result is None and model != MODEL_FALLBACK:
+        logger.warning(f"[AI] {model} failed — retrying with fallback {MODEL_FALLBACK}")
+        result = _post(MODEL_FALLBACK, user_content)
+
+    # Blank template fallback — retry with metadata prompt if result is {}
     if result == {} and original_text:
         logger.info("[AI] Empty result — retrying with blank-form metadata prompt")
         fallback_content = [{
             "type": "text",
             "text": f"{BLANK_FORM_PROMPT}\n\nDocument text:\n{original_text[:3000]}"
         }]
-        result = _post(fallback_content) or {}
+        result = _post(model, fallback_content) or {}
 
     return result
 
@@ -195,21 +239,50 @@ def _call_openrouter(
 # Main extraction entry point
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _build_user_prompt(doc_type: str) -> str:
+    return (
+        f"Document type hint: {doc_type}\n\n"
+        "You are a precise data extraction AI. Read this document and extract its key information.\n\n"
+        "STRICT RULES:\n"
+        "1. Use field names exactly as they appear in the document "
+        "(e.g. 'PAN Number', 'Date of Birth', 'Employer Name', 'Tax Year').\n"
+        "2. For LEGAL DOCUMENTS, LETTERS, or CONTRACTS: extract key terms — "
+        "services included, responsibilities, fees, tax forms mentioned, deadlines, party names.\n"
+        "3. Extract ONLY fields that have actual content — do NOT add null or empty fields.\n"
+        "4. Dates: format as DD/MM/YYYY. A run-together date like '27082022' → '27/08/2022'.\n"
+        "5. For list fields (services, items, fees) use JSON arrays.\n"
+        "6. Ignore bilingual label noise (Hindi/Devanagari text) — extract English values only.\n"
+        "7. If the document is truly a blank unfilled form with zero data, return {}.\n"
+        "8. Return ONLY a valid JSON object — no markdown, no explanation."
+    )
+
+
 def extract_document_data(file_path: str, doc_type: str) -> dict | None:
     """
-    3-stage extraction pipeline:
+    3-stage extraction pipeline with confidence scoring.
 
     Stage 1 — Native text (FREE)
-      pypdf + PyMuPDF pull embedded text from the PDF.
-      >= MIN_TEXT_CHARS → llama-3.3-70b (free tier)
+      pypdf + PyMuPDF pull embedded text from PDF.
+      >= MIN_TEXT_CHARS → MODEL_TEXT.
+      If MODEL_TEXT fails, falls through to Stage 2 (Item 2 fix — was silent None before).
 
     Stage 2 — Tesseract OCR (FREE, local CPU)
       PyMuPDF renders page at 2.5x DPI.
       Tesseract reads with eng+hin for bilingual docs.
-      >= MIN_TESS_WORDS → llama-3.3-70b (free tier)
+      >= MIN_TESS_WORDS → MODEL_TEXT.
+      If MODEL_TEXT fails, falls through to Stage 3.
 
-    Stage 3 — Qwen2.5-VL-72B vision (paid, minimal cost)
-      Sends rendered page image to Qwen via OpenRouter.
+    Stage 3 — Vision model (paid, minimal cost)
+      Sends rendered page image to MODEL_VISION via OpenRouter.
+
+    Confidence scoring (Item 1):
+      Every successful result gets a _meta block:
+        {"stage": 1|2|3, "tier": "high"|"medium"|"low",
+         "label": "...", "description": "...", "color": "..."}
+
+    Model fallback (Item 4):
+      Each _call_openrouter call tries MODEL_TEXT/MODEL_VISION first,
+      then MODEL_FALLBACK if the primary fails.
 
     Blank template fallback:
       If any stage returns {}, a second call extracts
@@ -227,7 +300,12 @@ def extract_document_data(file_path: str, doc_type: str) -> dict | None:
         logger.info(f"[AI] Unsupported file type, skipping: {file_path}")
         return None
 
-    user_prompt = _build_user_prompt(doc_type)
+    # Item 5: For other_* uploads, detect actual doc type from text content
+    # Required-slot uploads already carry the real template name — skip classifier for those
+    effective_doc_type = doc_type
+    # Classifier runs after text is available (done inline below per stage)
+
+    user_prompt = _build_user_prompt(effective_doc_type)
 
     try:
         # ── PDF ───────────────────────────────────────────────────────────────
@@ -256,9 +334,20 @@ def extract_document_data(file_path: str, doc_type: str) -> dict | None:
                     logger.warning(f"[Stage1] PyMuPDF text failed: {e}")
 
             if len(text.strip()) >= MIN_TEXT_CHARS:
-                logger.info(f"[Stage1] Text PDF ({len(text.strip())} chars) → {MODEL_TEXT}")
+                # Item 5: classify other_* using actual extracted text
+                if doc_type.startswith("other_"):
+                    from app.utils.doc_classifier import get_doc_type_for_prompt
+                    effective_doc_type = get_doc_type_for_prompt(
+                        doc_type, text.strip(), os.path.basename(file_path)
+                    )
+                    user_prompt = _build_user_prompt(effective_doc_type)
+                logger.info(f"[Stage1] Text PDF ({len(text.strip())} chars) → {MODEL_TEXT} [{effective_doc_type}]")
                 content = [{"type": "text", "text": f"{user_prompt}\n\nDocument text:\n{text.strip()}"}]
-                return _call_openrouter(api_key, MODEL_TEXT, content, original_text=text.strip())
+                result = _call_openrouter(api_key, MODEL_TEXT, content, original_text=text.strip())
+                if result is not None:
+                    return _add_confidence(result, stage=1)  # ← Item 1: confidence
+                # Item 2 fix: Stage 1 failure now falls through to Stage 2/3
+                logger.warning("[Stage1] Text model failed — falling through to Stage 2")
 
             # Stage 2 & 3 need rendered image
             rendered = _render_pdf_page(file_path)
@@ -270,11 +359,18 @@ def extract_document_data(file_path: str, doc_type: str) -> dict | None:
             word_count = len(tess_text.split())
 
             if word_count >= MIN_TESS_WORDS:
-                logger.info(f"[Stage2] Tesseract {word_count} words → {MODEL_TEXT} (free)")
+                # Item 5: classify other_* using Tesseract text if Stage 1 text was too short
+                if doc_type.startswith("other_"):
+                    from app.utils.doc_classifier import get_doc_type_for_prompt
+                    effective_doc_type = get_doc_type_for_prompt(
+                        doc_type, tess_text, os.path.basename(file_path)
+                    )
+                    user_prompt = _build_user_prompt(effective_doc_type)
+                logger.info(f"[Stage2] Tesseract {word_count} words → {MODEL_TEXT} (free) [{effective_doc_type}]")
                 content = [{"type": "text", "text": f"{user_prompt}\n\nDocument text (OCR):\n{tess_text}"}]
                 result = _call_openrouter(api_key, MODEL_TEXT, content, original_text=tess_text)
                 if result is not None:
-                    return result
+                    return _add_confidence(result, stage=2, word_count=word_count)  # ← Item 1
                 logger.warning("[Stage2] Text model failed — falling through to Stage 3")
             else:
                 logger.info(f"[Stage2] Tesseract only {word_count} words (threshold {MIN_TESS_WORDS}) → Stage 3")
@@ -285,7 +381,8 @@ def extract_document_data(file_path: str, doc_type: str) -> dict | None:
                 {"type": "text",      "text": user_prompt},
                 {"type": "image_url", "image_url": {"url": image_to_base64(rendered)}},
             ]
-            return _call_openrouter(api_key, MODEL_VISION, content)
+            result = _call_openrouter(api_key, MODEL_VISION, content)
+            return _add_confidence(result, stage=3)  # ← Item 1 (None stays None)
 
         # ── Image ─────────────────────────────────────────────────────────────
         elif is_image:
@@ -295,11 +392,18 @@ def extract_document_data(file_path: str, doc_type: str) -> dict | None:
             word_count = len(tess_text.split())
 
             if word_count >= MIN_TESS_WORDS:
-                logger.info(f"[Stage2-img] Tesseract {word_count} words → {MODEL_TEXT} (free)")
+                # Item 5: classify other_* from Tesseract text on image files
+                if doc_type.startswith("other_"):
+                    from app.utils.doc_classifier import get_doc_type_for_prompt
+                    effective_doc_type = get_doc_type_for_prompt(
+                        doc_type, tess_text, os.path.basename(file_path)
+                    )
+                    user_prompt = _build_user_prompt(effective_doc_type)
+                logger.info(f"[Stage2-img] Tesseract {word_count} words → {MODEL_TEXT} (free) [{effective_doc_type}]")
                 content = [{"type": "text", "text": f"{user_prompt}\n\nDocument text (OCR):\n{tess_text}"}]
                 result = _call_openrouter(api_key, MODEL_TEXT, content, original_text=tess_text)
                 if result is not None:
-                    return result
+                    return _add_confidence(result, stage=2, word_count=word_count)  # ← Item 1
                 logger.warning("[Stage2-img] Text model failed — Stage 3")
             else:
                 logger.info(f"[Stage2-img] Tesseract only {word_count} words → Stage 3")
@@ -309,7 +413,8 @@ def extract_document_data(file_path: str, doc_type: str) -> dict | None:
                 {"type": "text",      "text": user_prompt},
                 {"type": "image_url", "image_url": {"url": image_to_base64(img)}},
             ]
-            return _call_openrouter(api_key, MODEL_VISION, content)
+            result = _call_openrouter(api_key, MODEL_VISION, content)
+            return _add_confidence(result, stage=3)  # ← Item 1
 
     except Exception as e:
         logger.error(f"[AI] Extraction pipeline failed for {file_path}: {e}")

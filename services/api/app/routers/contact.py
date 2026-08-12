@@ -1,7 +1,7 @@
 import os
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from app.limiter import limiter
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from app.utils.emailer import send_email
 
 router = APIRouter(prefix="/api", tags=["contact"])
@@ -15,6 +15,13 @@ class ContactForm(BaseModel):
     email: EmailStr
     phone: str
     message: str = ""
+
+    @field_validator("message")
+    @classmethod
+    def cap_message(cls, v: str) -> str:
+        if len(v) > 2000:
+            raise ValueError("Message must be 2000 characters or fewer")
+        return v
 
 @router.post("/contact")
 @limiter.limit("5/minute")
