@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /admin-dashboard
+Disallow: /admin-user-detail
+Disallow: /upload-personal
+Disallow: /upload-business
+Disallow: /profile
+Disallow: /login
+Disallow: /signup
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /verify-email
+Disallow: /resend-verification
+
+Sitemap: https://aiindiacpa.duckdns.org/sitemap.xml

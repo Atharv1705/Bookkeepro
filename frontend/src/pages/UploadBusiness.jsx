@@ -57,7 +57,7 @@ export default function UploadBusiness() {
         const data = await res.json().catch(() => ({}));
         showToast(data.detail || "Upload failed", "error");
       }
-    } catch (err) {
+    } catch (err) { console.error(err);
       showToast("Upload failed due to network error", "error");
     }
   };
@@ -72,7 +72,7 @@ export default function UploadBusiness() {
       } else {
         showToast("Delete failed", "error");
       }
-    } catch (err) {
+    } catch (err) { console.error(err);
       showToast("Delete failed", "error");
     }
   };
@@ -86,7 +86,7 @@ export default function UploadBusiness() {
       } else {
         showToast("Could not generate view link", "error");
       }
-    } catch (err) {
+    } catch (err) { console.error(err);
       showToast("Could not generate view link", "error");
     }
   };
@@ -123,7 +123,7 @@ export default function UploadBusiness() {
       } else {
         showToast("Failed to notify admin", "error");
       }
-    } catch (err) {
+    } catch (err) { console.error(err);
       showToast("Error notifying admin", "error");
     }
   };
@@ -169,6 +169,8 @@ export default function UploadBusiness() {
                   <div className="doc-slot-status">
                     {uploaded.length ? (
                       <span className="pill-pending"><span className="material-symbols-outlined">pending</span> Pending Review</span>
+                    ) : dt.download ? (
+                      <a href={dt.download} target="_blank" rel="noopener noreferrer" className="btn-link" style={{ fontSize: '14px', color: 'var(--brand)', textDecoration: 'underline' }}>View Template</a>
                     ) : (
                       "Missing"
                     )}

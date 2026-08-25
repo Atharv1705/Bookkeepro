@@ -2,8 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 
-const STORAGE_KEY = 'user_chat_history';
-const MAX_HISTORY = 30;
+const STORAGE_KEY = 'user_chat_session_id';
 
 const FAQ_DATA = {
   "Account": [
@@ -48,23 +47,39 @@ export default function Chatbot() {
   const [isTyping, setIsTyping]     = useState(false);
   const chatEndRef = useRef(null);
 
-  // ── Conversation memory via localStorage ──────────────────────────────────
-  const [messages, setMessages] = useState(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
-  });
+  const [messages, setMessages] = useState([]);
+  const [sessionId, setSessionId] = useState(null);
 
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(messages.slice(-MAX_HISTORY))); }
-    catch { /* storage full */ }
-  }, [messages]);
+    if (!user) return;
+    async function loadHistory() {
+      const savedSession = localStorage.getItem(STORAGE_KEY);
+      const url = savedSession ? `/api/chatbot/history?session_id=${savedSession}` : '/api/chatbot/history';
+      try {
+        const res = await authFetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          setSessionId(data.session_id);
+          localStorage.setItem(STORAGE_KEY, data.session_id);
+          const loaded = data.messages.map(m => ({
+            type: m.role === 'user' ? 'user' : 'bot',
+            role: m.role,
+            text: m.content || '',
+            ...m
+          })).filter(m => m.role === 'user' || m.role === 'assistant');
+          setMessages(loaded);
+        }
+      } catch (e) {
+        console.error("Failed to load chat history", e);
+      }
+    }
+    loadHistory();
+  }, [authFetch, user]);
 
   useEffect(() => { setIsOpen(false); }, [location.pathname]);
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, view]);
 
-  const clearHistory = () => { setMessages([]); localStorage.removeItem(STORAGE_KEY); };
+  const clearHistory = () => { setMessages([]); setSessionId(null); localStorage.removeItem(STORAGE_KEY); };
 
   // ── Document status quick-check ────────────────────────────────────────────
   const handleDocStatusCheck = async () => {
@@ -127,11 +142,8 @@ export default function Chatbot() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           stream: false,
-          messages: allMessages.map(m => ({
-            role: m.role || (m.type === 'bot' ? 'assistant' : 'user'),
-            content: m.text,
-            reasoning_details: null,
-          })),
+          session_id: sessionId,
+          message: text,
         }),
       });
       if (res.ok) {

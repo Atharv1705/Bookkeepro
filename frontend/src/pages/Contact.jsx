@@ -29,7 +29,7 @@ export default function Contact() {
         phone: '',
         message: ''
       });
-    } catch (err) {
+    } catch (err) { console.error(err);
       alert("Failed to send message");
     } finally {
       setLoading(false);
@@ -42,7 +42,7 @@ export default function Contact() {
 
   return (
     <>
-      <div className="page-hero" style={{ '--hero-img': 'url("/images/home-background.jpg")' }}>
+      <div className="page-hero" style={{ '--hero-img': 'url("/images/home-background.webp")' }}>
         <div className="page-hero-inner">
           <span className="eyebrow">Get in touch</span>
           <h1>Let's talk about your books</h1>

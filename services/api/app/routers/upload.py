@@ -16,8 +16,8 @@ from app.db import get_db, SessionLocal
 import app.crud as crud
 from app.auth.security import get_current_user, require_admin, SECRET_KEY, ALGORITHM
 from app.utils.emailer import send_email
-from app.utils.ai import extract_document_data
-from app.schemas import UploadCompleteNotify, ReviewStatusUpdate
+from app.utils.ai import extract_document_data, summarize_admin_document
+from app.schemas import UploadCompleteNotify, ReviewStatusUpdate, ExtractedDataUpdate
 from app.limiter import limiter
 from fastapi import Request
 
@@ -277,6 +277,28 @@ async def upload_admin_document(
 
     crud.log_action(db, "upload_admin_doc", user_id=current_user.id, target=f"admin_doc:{record.id}", detail=f"for user {user_id}")
 
+    # Background task 1: AI summary generation
+    def _generate_summary(doc_id: int, file_path: str, label: str):
+        summary = summarize_admin_document(str(file_path), label)
+        if summary:
+            _db = SessionLocal()
+            try:
+                doc = _db.query(AdminDocument).filter_by(id=doc_id).first()
+                if doc:
+                    doc.ai_summary = summary
+                    _db.commit()
+                    logger.info(f"[Summary] Saved summary for admin_doc:{doc_id}")
+            finally:
+                _db.close()
+
+    background.add_task(
+        _generate_summary,
+        record.id,
+        str(UPLOAD_DIR / storage_key),
+        doc_label,
+    )
+
+    # Background task 2: Notify client by email
     background.add_task(
         send_email,
         to=target_user.email,
@@ -330,6 +352,8 @@ def list_admin_documents(
             "filename":    d.filename,
             "storage_key": d.storage_key,
             "created_at":  d.uploaded_at.isoformat() + "Z" if d.uploaded_at else None,
+            # None = AI still processing; string = ready to show
+            "ai_summary":  d.ai_summary,
         }
         for d in docs
     ]
@@ -663,6 +687,46 @@ def set_business_review_status(
     return {"id": doc_id, "review_status": payload.status}
 
 
+@router.patch("/personal-documents/{doc_id}/extracted-data")
+def update_personal_extracted_data(
+    doc_id: int,
+    payload: ExtractedDataUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+    _=Depends(require_admin),
+):
+    """Admin updates the AI extracted data (JSON) for a personal document."""
+    doc = db.query(PersonalDocument).filter_by(id=doc_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    doc.extracted_data = payload.extracted_data
+    db.commit()
+
+    crud.log_action(db, "update_extracted_data", user_id=current_user.id, target=f"personal_doc:{doc_id}")
+    return {"id": doc_id, "extracted_data": doc.extracted_data}
+
+
+@router.patch("/business-documents/{doc_id}/extracted-data")
+def update_business_extracted_data(
+    doc_id: int,
+    payload: ExtractedDataUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+    _=Depends(require_admin),
+):
+    """Admin updates the AI extracted data (JSON) for a business document."""
+    doc = db.query(BusinessDocument).filter_by(id=doc_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    doc.extracted_data = payload.extracted_data
+    db.commit()
+
+    crud.log_action(db, "update_extracted_data", user_id=current_user.id, target=f"business_doc:{doc_id}")
+    return {"id": doc_id, "extracted_data": doc.extracted_data}
+
+
 # ─────────────────────────────────────────────
 # Admin — all documents for one user
 # ─────────────────────────────────────────────
@@ -929,14 +993,31 @@ def list_templates(
         .order_by(RequiredDocumentTemplate.id.asc())
         .all()
     )
-    return [
-        {
+
+    results = []
+    for t in templates:
+        # Resolve the raw storage key, self-healing old rows that stored a
+        # pre-baked presigned URL in file_url instead of a bare filename.
+        raw_key = t.storage_key
+        if not raw_key and t.file_url:
+            # Legacy row: extract the filename from a URL like
+            # "/api/upload/file/abc123.pdf?token=..."
+            try:
+                raw_key = t.file_url.split("/api/upload/file/")[1].split("?")[0]
+                # Persist the self-healed key so next read skips this path
+                t.storage_key = raw_key
+                db.commit()
+            except (IndexError, AttributeError):
+                raw_key = None
+
+        results.append({
             "id": t.id,
             "name": t.name,
-            "download": get_presigned_url(t.file_url) if t.file_url else None,
-        }
-        for t in templates
-    ]
+            # Fresh presigned URL generated on every read — never stale
+            # Fallback to legacy file_url for static paths like /images/...
+            "download": get_presigned_url(raw_key) if raw_key else t.file_url,
+        })
+    return results
 
 @router.post("/admin/templates")
 async def upload_template(
@@ -952,18 +1033,18 @@ async def upload_template(
     if current_user.role != UserRole.super_admin:
         raise HTTPException(status_code=403, detail="Only super admins can manage templates")
 
-    file_url = None
+    raw_key = None
     if file and file.filename:
-        storage_key = await upload_to_storage(file)
-        file_url = storage_key  # Store raw key; presigned URLs are generated on-demand in GET
+        raw_key = await upload_to_storage(file)  # raw filename, e.g. "abc123.pdf"
 
     record = RequiredDocumentTemplate(
         category=category,
         tax_year=tax_year,
         name=name,
-        file_url=file_url,
+        storage_key=raw_key,   # store raw key; fresh URLs generated on every read
+        file_url=None,         # no longer used for new rows
     )
-    
+
     try:
         db.add(record)
         db.commit()
@@ -975,7 +1056,7 @@ async def upload_template(
     return {
         "id": record.id,
         "name": record.name,
-        "download": get_presigned_url(record.file_url) if record.file_url else None,
+        "download": get_presigned_url(record.storage_key) if record.storage_key else None,
     }
 
 @router.delete("/admin/templates/{template_id}")
@@ -992,8 +1073,16 @@ def delete_template(
     if not record:
         raise HTTPException(status_code=404, detail="Template not found")
 
-    if record.file_url:
-        delete_from_storage(record.file_url)
+    # Delete the physical file — prefer storage_key, fall back to legacy file_url path
+    key_to_delete = record.storage_key
+    if not key_to_delete and record.file_url:
+        try:
+            key_to_delete = record.file_url.split("/api/upload/file/")[1].split("?")[0]
+        except (IndexError, AttributeError):
+            key_to_delete = None
+
+    if key_to_delete:
+        delete_from_storage(key_to_delete)
 
     db.delete(record)
     db.commit()

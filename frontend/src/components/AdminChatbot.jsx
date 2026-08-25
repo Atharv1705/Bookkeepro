@@ -2,8 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
 
-const STORAGE_KEY = 'admin_chat_history';
-const MAX_HISTORY = 40; // messages to persist
+const STORAGE_KEY = 'admin_chat_session_id';
 
 const FAQ_DATA = {
   "Document Review": [
@@ -43,26 +42,41 @@ export default function AdminChatbot() {
   const [pendingBulk, setPendingBulk] = useState(null); // bulk action awaiting confirmation
   const chatEndRef = useRef(null);
 
-  // ── Conversation memory via localStorage ──────────────────────────────────
-  const [messages, setMessages] = useState(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
-  });
+  const [messages, setMessages] = useState([]);
+  const [sessionId, setSessionId] = useState(null);
 
-  // Persist messages to localStorage whenever they change
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(messages.slice(-MAX_HISTORY)));
-    } catch { /* storage full — ignore */ }
-  }, [messages]);
+    if (!user) return;
+    async function loadHistory() {
+      const savedSession = localStorage.getItem(STORAGE_KEY);
+      const url = savedSession ? `/api/chatbot/history?session_id=${savedSession}` : '/api/chatbot/history';
+      try {
+        const res = await authFetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          setSessionId(data.session_id);
+          localStorage.setItem(STORAGE_KEY, data.session_id);
+          const loaded = data.messages.map(m => ({
+            type: m.role === 'user' ? 'user' : 'bot',
+            role: m.role,
+            text: m.content || '',
+            ...m
+          })).filter(m => m.role === 'user' || m.role === 'assistant');
+          setMessages(loaded);
+        }
+      } catch (e) {
+        console.error("Failed to load admin chat history", e);
+      }
+    }
+    loadHistory();
+  }, [authFetch, user]);
 
   useEffect(() => { setIsOpen(false); }, [location.pathname]);
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, view]);
 
   const clearHistory = () => {
     setMessages([]);
+    setSessionId(null);
     localStorage.removeItem(STORAGE_KEY);
   };
 
@@ -121,11 +135,8 @@ export default function AdminChatbot() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           stream: false,
-          messages: allMessages.map(m => ({
-            role: m.role || (m.type === 'bot' ? 'assistant' : 'user'),
-            content: m.text,
-            reasoning_details: null,
-          })),
+          session_id: sessionId,
+          message: text,
         }),
       });
 
