@@ -12,6 +12,8 @@ export default function UserDashboard() {
   const [adminDocs, setAdminDocs] = useState([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [docLoading, setDocLoading] = useState(false);
+  // Track which doc rows have the AI summary panel open
+  const [expandedSummary, setExpandedSummary] = useState({});
 
   // ── declare callbacks BEFORE the effects that reference them ──
 
@@ -49,6 +51,14 @@ export default function UserDashboard() {
     loadAdminDocs();
   }, [checkEngagement, loadAdminDocs]);
 
+  // Poll every 15s while any doc still has ai_summary === null (backend still processing)
+  useEffect(() => {
+    const hasPending = adminDocs.some(d => d.ai_summary === null);
+    if (!hasPending) return;
+    const timer = setInterval(loadAdminDocs, 15000);
+    return () => clearInterval(timer);
+  }, [adminDocs, loadAdminDocs]);
+
   const handleEngagementChange = async (e) => {
     const isChecked = e.target.checked;
     if (!isChecked) {
@@ -64,7 +74,7 @@ export default function UserDashboard() {
       } else {
         setEngagementChecked(false);
       }
-    } catch (err) {
+    } catch (err) { console.error(err);
       setEngagementChecked(false);
     }
   };
@@ -78,7 +88,7 @@ export default function UserDashboard() {
       } else {
         showToast("Could not generate view link", "error");
       }
-    } catch (err) {
+    } catch (err) { console.error(err);
       showToast("Could not generate view link", "error");
     }
   };
@@ -102,11 +112,15 @@ export default function UserDashboard() {
       } else {
         showToast("Failed to submit response", "error");
       }
-    } catch (err) {
+    } catch (err) { console.error(err);
       showToast("Network error", "error");
     } finally {
       setDocLoading(false);
     }
+  };
+
+  const toggleSummary = (docId) => {
+    setExpandedSummary(prev => ({ ...prev, [docId]: !prev[docId] }));
   };
 
   return (
@@ -192,20 +206,139 @@ export default function UserDashboard() {
               </thead>
               <tbody>
                 {adminDocs.map(doc => (
-                  <tr key={doc.id}>
-                    <td>
-                      <div style={{fontWeight: 500, color: 'var(--navy)'}}>{doc.doc_label}</div>
-                      <div className="text-sm text-muted">{doc.filename}</div>
-                    </td>
-                    <td>{new Date(doc.created_at).toLocaleDateString()}</td>
-                    <td>
-                      <div style={{display:'flex', gap:'8px'}}>
-                        <button className="btn btn-secondary btn-sm" onClick={() => viewDoc(doc.storage_key)}>View</button>
-                        <button className="btn btn-primary btn-sm" onClick={() => respondDoc(doc.id, true)} disabled={docLoading}>Approve</button>
-                        <button className="btn btn-danger btn-sm" onClick={() => respondDoc(doc.id, false)} disabled={docLoading}>Reject</button>
-                      </div>
-                    </td>
-                  </tr>
+                  <>
+                    <tr key={doc.id}>
+                      <td>
+                        <div style={{fontWeight: 500, color: 'var(--navy)'}}>{doc.doc_label}</div>
+                        <div className="text-sm text-muted">{doc.filename}</div>
+                      </td>
+                      <td>{new Date(doc.created_at).toLocaleDateString()}</td>
+                      <td>
+                        <div style={{display:'flex', gap:'8px', flexWrap:'wrap', alignItems:'center'}}>
+                          <button className="btn btn-secondary btn-sm" onClick={() => viewDoc(doc.storage_key)}>View</button>
+                          <button className="btn btn-primary btn-sm" onClick={() => respondDoc(doc.id, true)} disabled={docLoading}>Approve</button>
+                          <button className="btn btn-danger btn-sm" onClick={() => respondDoc(doc.id, false)} disabled={docLoading}>Reject</button>
+
+                          {/* AI Summary badge / button */}
+                          {doc.ai_summary === null ? (
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: '6px',
+                              fontSize: '11.5px', fontWeight: 500,
+                              color: 'var(--brass-dark)',
+                              padding: '5px 12px', borderRadius: 'var(--radius-pill)',
+                              background: 'var(--brass-light)',
+                              border: '1px solid rgba(176,128,61,0.25)',
+                              letterSpacing: '0.01em',
+                            }}>
+                              <span style={{display:'inline-block', animation:'spin 1.5s linear infinite', fontSize:'13px'}}>✦</span>
+                              Analyzing…
+                            </span>
+                          ) : doc.ai_summary ? (
+                            <button
+                              onClick={() => toggleSummary(doc.id)}
+                              style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                                fontSize: '11.5px', fontWeight: 600,
+                                padding: '5px 14px', borderRadius: 'var(--radius-pill)',
+                                border: expandedSummary[doc.id]
+                                  ? '1px solid var(--accent)'
+                                  : '1px solid rgba(44,122,91,0.35)',
+                                cursor: 'pointer',
+                                background: expandedSummary[doc.id]
+                                  ? 'var(--accent)'
+                                  : 'linear-gradient(135deg, rgba(44,122,91,0.10) 0%, rgba(31,93,70,0.06) 100%)',
+                                color: expandedSummary[doc.id] ? '#fff' : 'var(--accent)',
+                                boxShadow: expandedSummary[doc.id] ? 'var(--shadow-sm)' : 'none',
+                                transition: 'all 0.22s ease',
+                                letterSpacing: '0.01em',
+                              }}
+                            >
+                              <span style={{fontSize:'13px'}}>✨</span>
+                              {expandedSummary[doc.id] ? 'Hide Summary' : 'AI Summary'}
+                            </button>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+
+                    {/* Expanded AI Summary panel — spans full row width */}
+                    {expandedSummary[doc.id] && doc.ai_summary && (
+                      <tr key={`${doc.id}-summary`}>
+                        <td colSpan={3} style={{padding: '0 0 14px'}}>
+                          <div style={{
+                            display: 'flex',
+                            borderRadius: 'var(--radius-md)',
+                            overflow: 'hidden',
+                            border: '1px solid rgba(44,122,91,0.20)',
+                            boxShadow: '0 4px 20px -6px rgba(44,122,91,0.18)',
+                            background: 'linear-gradient(135deg, rgba(44,122,91,0.07) 0%, rgba(31,93,70,0.03) 100%)',
+                            backdropFilter: 'blur(8px)',
+                            animation: 'fadeUp 0.2s ease',
+                          }}>
+                            {/* Left accent strip */}
+                            <div style={{
+                              width: '4px', flexShrink: 0,
+                              background: 'linear-gradient(180deg, var(--accent) 0%, var(--brass) 100%)',
+                            }} />
+
+                            <div style={{padding: '16px 20px', flex: 1}}>
+                              {/* Header row */}
+                              <div style={{
+                                display: 'flex', alignItems: 'center', gap: '8px',
+                                marginBottom: '10px'
+                              }}>
+                                <div style={{
+                                  width: '28px', height: '28px', borderRadius: 'var(--radius-xs)',
+                                  background: 'linear-gradient(135deg, var(--accent) 0%, var(--emerald-dark) 100%)',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  fontSize: '14px', flexShrink: 0,
+                                  boxShadow: '0 2px 8px rgba(44,122,91,0.30)',
+                                }}>
+                                  ✨
+                                </div>
+                                <div>
+                                  <div style={{
+                                    fontSize: '10px', fontWeight: 700,
+                                    letterSpacing: '0.08em', textTransform: 'uppercase',
+                                    color: 'var(--accent)',
+                                  }}>AI Document Summary</div>
+                                  <div style={{
+                                    fontSize: '11px', color: 'var(--muted)', marginTop: '1px'
+                                  }}>Generated by BookKeepPro AI</div>
+                                </div>
+                              </div>
+
+                              {/* Summary text */}
+                              <p style={{
+                                fontSize: '13.5px', lineHeight: '1.7',
+                                color: 'var(--ink)',
+                                margin: 0,
+                                fontFamily: 'var(--font-body)',
+                              }}>
+                                {doc.ai_summary}
+                              </p>
+
+                              {/* Footer disclaimer */}
+                              <div style={{
+                                display: 'flex', alignItems: 'center', gap: '6px',
+                                marginTop: '12px',
+                                paddingTop: '10px',
+                                borderTop: '1px solid rgba(44,122,91,0.12)',
+                              }}>
+                                <span style={{fontSize:'11px', color:'var(--muted)'}}>⚠</span>
+                                <span style={{
+                                  fontSize: '11px', color: 'var(--muted)',
+                                  fontStyle: 'italic',
+                                }}>
+                                  AI-generated summary — always review the original document for authoritative information.
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 ))}
               </tbody>
             </table>

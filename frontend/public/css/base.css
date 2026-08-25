@@ -1,6 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,1,0');
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
-@import "tailwindcss";
 
 /* ============================================================
    base.css — BookKeepPro Design System · "Ledger"
@@ -295,34 +294,8 @@ textarea:focus {
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* ── Dark Mode Overrides ─────────────────────────────────── */
-.dark-theme {
-  --bg:           #10160F;
-  --card:         #1A2119;
-  --navy:         #F2EFE4;
-  --ink:          #F2EFE4;
-  --muted:        #A6AC9F;
-  --border:       #2B3529;
-
-  --header-bg:    #182018;
-  --footer-bot:   #10160F;
-
-  --blue-light:   rgba(90, 168, 138, 0.16);
-  --orange-light: rgba(196, 150, 82, 0.16);
-  --emerald-light:rgba(90, 168, 138, 0.16);
-  --brass-light:  rgba(196, 150, 82, 0.16);
-
-  --success-bg:   rgba(90, 168, 138, 0.14);
-  --error-bg:     rgba(214, 110, 110, 0.14);
-  --warn-bg:      rgba(196, 150, 82, 0.16);
-
-  --shadow-xs: 0 1px 4px rgba(0,0,0,0.35);
-  --shadow-sm: 0 2px 10px rgba(0,0,0,0.4);
-  --shadow-md: 0 6px 24px rgba(0,0,0,0.5);
-  --shadow-lg: 0 16px 48px rgba(0,0,0,0.6);
+/* AI Summary — analyzing spinner */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
-body.dark-theme {
-  background-color: var(--bg);
-  color: var(--ink);
-}
-.dark-theme .input, .dark-theme .select-input { background: var(--card); color: var(--ink); border-color: var(--border); }

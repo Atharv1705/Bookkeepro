@@ -26,7 +26,7 @@ export default function VerifyEmail() {
           setStatus('failed');
           setMessage(data.detail || "This link is invalid or has expired.");
         }
-      } catch (err) {
+      } catch (err) { console.error(err);
         setStatus('failed');
         setMessage("Could not connect to the server. Please try again later.");
       }

@@ -50,23 +50,7 @@
   --green: #10b981;
 }
 
-.dark-theme, body.dark-theme {
-  --color-brand-ink: #F2EFE4;
-  --color-brand-ink-soft: #D5D1C3;
-  
-  --color-brand-paper: #10160F;
-  --color-brand-card: #1A2119;
-  
-  --color-brand-muted: #A6AC9F;
-  --color-brand-border: #2B3529;
-  
-  --color-brand-emerald-light: rgba(90, 168, 138, 0.16);
-  --color-brand-brass-light: rgba(196, 150, 82, 0.16);
-  
-  --color-status-success-bg: rgba(90, 168, 138, 0.14);
-  --color-status-error-bg: rgba(214, 110, 110, 0.14);
-  --color-status-warn-bg: rgba(196, 150, 82, 0.16);
-}
+
 
 /* -------------------------------- */
 /* Global and Base Elements         */

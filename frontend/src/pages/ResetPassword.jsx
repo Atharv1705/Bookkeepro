@@ -33,7 +33,17 @@ export default function ResetPassword() {
       const data = await res.json();
       
       if (!res.ok) {
-        throw new Error(data.detail || "Password reset failed");
+        let errorMsg = "Password reset failed";
+        if (data.detail) {
+          if (typeof data.detail === 'string') {
+            errorMsg = data.detail;
+          } else if (Array.isArray(data.detail)) {
+            errorMsg = data.detail.map(err => err.msg).join(", ");
+          } else {
+            errorMsg = JSON.stringify(data.detail);
+          }
+        }
+        throw new Error(errorMsg);
       }
       
       setMessage("Password reset! Redirecting to sign in...");

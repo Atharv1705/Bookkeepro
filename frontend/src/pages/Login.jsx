@@ -29,7 +29,17 @@ export default function Login() {
           setError("EMAIL_NOT_VERIFIED");
           return;
         }
-        throw new Error(errData.detail || "Invalid credentials");
+        let errorMsg = "Invalid credentials";
+        if (errData.detail) {
+          if (typeof errData.detail === 'string') {
+            errorMsg = errData.detail;
+          } else if (Array.isArray(errData.detail)) {
+            errorMsg = errData.detail.map(err => err.msg).join(", ");
+          } else {
+            errorMsg = JSON.stringify(errData.detail);
+          }
+        }
+        throw new Error(errorMsg);
       }
 
       const data = await res.json();

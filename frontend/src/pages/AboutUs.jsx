@@ -50,7 +50,7 @@ export default function AboutUs() {
               operations support.
             </p>
           </div>
-          <img className="about-img" src="/images/young-business-people-using-computer-in-office.jpg" alt="About BookKeepPro" />
+          <img className="about-img" src="/images/young-business-people-using-computer-in-office.webp" alt="About BookKeepPro" width="800" height="533" loading="lazy" />
         </div>
       </div>
 
