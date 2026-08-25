@@ -4,17 +4,17 @@ const SERVICES = [
   {
     label: 'Bookkeeping',
     title: 'Monthly books, closed clean and on time',
-    img: '/images/services-1.jpg',
+    img: '/images/services-1.webp',
   },
   {
     label: 'Payroll',
     title: 'Payroll runs your team can set a clock by',
-    img: '/images/services-2.jpg',
+    img: '/images/services-2.webp',
   },
   {
     label: 'Tax',
     title: 'Tax planning and prep built around your entity',
-    img: '/images/services-3.jpg',
+    img: '/images/services-3.webp',
   },
 ];
 
@@ -71,7 +71,7 @@ export default function Home() {
           <p className="note">— Our people are passionate about what we do</p>
         </div>
         <div className="about-media">
-          <img src="/images/home-about.jpg" alt="BookKeepPro team at work" />
+          <img src="/images/home-about.webp" alt="BookKeepPro team at work" width="800" height="533" loading="lazy" />
         </div>
       </section>
 
@@ -85,7 +85,7 @@ export default function Home() {
           {SERVICES.map((s) => (
             <div className="service-card fade-up" key={s.label}>
               <div className="service-media">
-                <img src={s.img} alt={s.title} />
+                <img src={s.img} alt={s.title} width="600" height="400" loading="lazy" />
               </div>
               <div className="service-body">
                 <span className="service-label">{s.label}</span>

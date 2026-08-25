@@ -186,13 +186,4 @@
   .chatbot-fab { bottom: 16px; right: 16px; width: 50px; height: 50px; font-size: 22px; }
 }
 
-.dark-theme .chatbot-window { background: var(--card); }
-.dark-theme .chatbot-messages { background: var(--bg); }
-.dark-theme .chat-msg.bot { background: var(--card); border-color: var(--border); color: var(--navy); }
-.dark-theme .quick-reply-btn { background: var(--card); border-color: var(--border); color: var(--navy); }
-.dark-theme .quick-reply-btn:hover { background: var(--blue-light); border-color: var(--blue); }
-.dark-theme .doc-status-card { background: var(--card); border-color: var(--border); }
-.dark-theme .doc-status-card .doc-name { color: var(--navy); }
-.dark-theme .faq-question { background: var(--card); border-color: var(--border); color: var(--navy); }
-.dark-theme .faq-question:hover { background: var(--blue-light); border-color: var(--blue); }
-.dark-theme .summary-item { background: var(--card); }
+

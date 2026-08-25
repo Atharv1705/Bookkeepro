@@ -146,6 +146,11 @@ class ReviewStatusUpdate(BaseModel):
         return v
 
 
+class ExtractedDataUpdate(BaseModel):
+    """Body for PATCH /api/upload/{personal,business}-documents/{id}/extracted-data"""
+    extracted_data: dict
+
+
 
 
 class PersonalDocumentOut(BaseModel):

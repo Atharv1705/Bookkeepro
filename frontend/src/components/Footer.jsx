@@ -5,12 +5,12 @@ export default function Footer() {
     <footer className="footer">
       <div className="footer-top">
         <div className="footer-left">
-          <img src="/images/bookkeeppro-logo.webp" className="footer-logo" alt="BookKeepPro" />
+          <img src="/images/bookkeeppro-logo.webp" className="footer-logo" alt="BookKeepPro" width="190" height="64" />
           <p>Bookkeeping, payroll and tax preparation for growing businesses — kept precise, kept compliant.</p>
         </div>
 
         <div className="footer-links">
-          <h4>Navigate</h4>
+          <h3>Navigate</h3>
           <Link to="/">Home</Link>
           <Link to="/about-us">About Us</Link>
           <Link to="/services">Services</Link>
@@ -18,7 +18,7 @@ export default function Footer() {
         </div>
 
         <div className="footer-contact">
-          <h4>Reach us</h4>
+          <h3>Reach us</h3>
           <p>USA · 2520 Indigo Dr, McKinney, TX 75072</p>
           <p>India · 508 White Square, Hinjewadi Road, Pune 411057</p>
           <p>atharvg.aiindia@gmail.com</p>

@@ -75,6 +75,10 @@ def upgrade():
                     else:
                         print(f"  [WARN] Index {table}: {e}")
 
+            # ── v5: Required Document Templates ───────────────────────────────
+            _add_column(conn, "required_document_templates", "storage_key",
+                        "VARCHAR(500) NULL DEFAULT NULL")
+
         print("\nAll migrations complete.")
     except Exception as e:
         print(f"Migration error: {e}")

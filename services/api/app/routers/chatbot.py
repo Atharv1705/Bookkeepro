@@ -1,5 +1,6 @@
 import logging
 import json
+import uuid
 from datetime import datetime, date
 from fastapi import APIRouter, Depends, Request, Query
 from fastapi.responses import StreamingResponse
@@ -10,7 +11,7 @@ import os
 import requests
 from pydantic import BaseModel, field_validator
 from fastapi import HTTPException
-from app.models import PersonalDocument, BusinessDocument, User, AuditLog
+from app.models import PersonalDocument, BusinessDocument, User, AuditLog, ChatSession, ChatMessage as DBChatMessage
 from app.db import get_db
 from app.auth.security import get_current_user, require_admin
 
@@ -19,7 +20,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/chatbot", tags=["chatbot"])
 
 CHAT_MODEL = os.getenv("CHAT_MODEL", "meta-llama/llama-3.3-70b-instruct")
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # User: doc status (also includes extracted data so user can ask about fields)
@@ -45,7 +45,6 @@ def get_doc_status(
     personal_list = [
         {"doc_type": d.doc_type, "status": d.review_status, "note": d.review_note,
          "tax_year": d.tax_year, "filename": d.filename,
-         # Include extracted data summary so chatbot can answer field-level questions
          "extracted_summary": _summarize_extracted(d.extracted_data)}
         for d in personal
     ]
@@ -81,7 +80,6 @@ def get_doc_status(
 
 
 def _summarize_extracted(extracted_data: dict | None) -> str:
-    """Convert extracted_data dict to a compact string for chatbot context."""
     if not extracted_data:
         return ""
     skip = {"_meta", "status"}
@@ -93,7 +91,7 @@ def _summarize_extracted(extracted_data: dict | None) -> str:
             parts.append(f"{k}: {', '.join(str(i) for i in v[:3])}")
         else:
             parts.append(f"{k}: {v}")
-    return " | ".join(parts[:8])  # cap at 8 fields to keep context small
+    return " | ".join(parts[:8])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -132,7 +130,7 @@ def get_admin_status(
           "uploaded_at": d.uploaded_at, "status": d.review_status} for d in recent_personal] +
         [{"user_id": d.user_id, "doc": d.business_type,  "type": "business",
           "uploaded_at": d.uploaded_at, "status": d.review_status} for d in recent_business],
-        key=lambda x: x["uploaded_at"], reverse=True
+        key=lambda x: x["uploaded_at"].isoformat() if x["uploaded_at"] else "", reverse=True
     )[:10]
 
     user_map = {u.id: u for u in db.query(User).filter(User.id.in_([r["user_id"] for r in recent_uploads])).all()}
@@ -163,25 +161,18 @@ def get_admin_status(
     }
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Admin: daily digest (new)
-# ─────────────────────────────────────────────────────────────────────────────
 @router.get("/daily-digest")
 def get_daily_digest(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
     _=Depends(require_admin),
 ):
-    """Generate an AI plain-English summary of today's activity."""
     from app.utils.doc_intelligence import build_daily_digest
     stats = get_admin_status(db=db, current_user=current_user, _=None)
     digest_html = build_daily_digest(stats)
     return {"digest": digest_html, "generated_at": datetime.now().isoformat()}
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Admin: user context lookup
-# ─────────────────────────────────────────────────────────────────────────────
 @router.get("/admin-user-context")
 def get_admin_user_context(
     query: str = Query(...),
@@ -224,14 +215,10 @@ def get_admin_user_context(
     }
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Admin: bulk action executor (approve/reject all docs for a user)
-# Requires explicit confirm=true to execute — safety gate
-# ─────────────────────────────────────────────────────────────────────────────
 class BulkActionRequest(BaseModel):
     user_id: int
-    action:  str   # "approve_personal" | "approve_business" | "reject_personal" | "reject_business"
-    confirm: bool  # must be True to execute — prevents accidental execution
+    action:  str
+    confirm: bool
 
 @router.post("/admin-bulk-action")
 def admin_bulk_action(
@@ -240,10 +227,6 @@ def admin_bulk_action(
     current_user=Depends(get_current_user),
     _=Depends(require_admin),
 ):
-    """
-    Execute a bulk approve/reject action on all pending docs for a user.
-    Requires confirm=true — the frontend must show a confirmation dialog first.
-    """
     if not payload.confirm:
         return {"status": "pending_confirm",
                 "message": "Action not executed. Set confirm=true to proceed."}
@@ -252,10 +235,10 @@ def admin_bulk_action(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    action_parts = payload.action.split("_")  # e.g. ["approve", "personal"]
+    action_parts = payload.action.split("_")
     if len(action_parts) != 2 or action_parts[0] not in ("approve", "reject") \
             or action_parts[1] not in ("personal", "business"):
-        raise HTTPException(status_code=400, detail="Invalid action. Use approve_personal, reject_personal, approve_business, or reject_business.")
+        raise HTTPException(status_code=400, detail="Invalid action.")
 
     verb, doc_type = action_parts
     new_status = "approved" if verb == "approve" else "rejected"
@@ -284,24 +267,27 @@ def admin_bulk_action(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Shared chat — streaming (new) + conversation memory via messages[]
+# Shared chat — streaming (new) + conversation memory via DB
 # ─────────────────────────────────────────────────────────────────────────────
-class ChatMessage(BaseModel):
+class ChatMessageInput(BaseModel):
     role: str
-    content: str
-    reasoning_details: list | None = None
+    content: str | None = None
+    tool_calls: list | None = None
+    tool_call_id: str | None = None
+    name: str | None = None
 
     @field_validator("content")
     @classmethod
-    def cap_content(cls, v: str) -> str:
-        if len(v) > 4000:
+    def cap_content(cls, v: str | None) -> str | None:
+        if v and len(v) > 4000:
             raise ValueError("Message must be 4000 characters or fewer")
         return v
 
 class ChatRequest(BaseModel):
-    messages: list[ChatMessage]
-    stream: bool = False  # client opts into streaming
-
+    message: str | None = None
+    messages: list[ChatMessageInput] | None = None
+    stream: bool = False
+    session_id: str | None = None
 
 def _build_admin_context(db: Session, current_user) -> str:
     status = get_admin_status(db=db, current_user=current_user, _=None)
@@ -318,6 +304,37 @@ def _build_admin_context(db: Session, current_user) -> str:
                     f"'{r['doc']}' on {r['uploaded_at']} [{r['status']}]\n")
     return ctx
 
+@router.get("/history")
+def get_chat_history(
+    session_id: str | None = None,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    if not session_id:
+        return {"session_id": str(uuid.uuid4()), "messages": []}
+        
+    session = db.query(ChatSession).filter(
+        ChatSession.session_id == session_id,
+        ChatSession.user_id == current_user.id
+    ).first()
+    
+    if not session:
+        return {"session_id": session_id, "messages": []}
+        
+    msgs = []
+    for m in session.messages:
+        if m.role == "system":
+            continue
+        msg = {"role": m.role, "content": m.content}
+        if m.tool_calls:
+            msg["tool_calls"] = m.tool_calls
+        if m.tool_call_id:
+            msg["tool_call_id"] = m.tool_call_id
+        if m.name:
+            msg["name"] = m.name
+        msgs.append(msg)
+        
+    return {"session_id": session_id, "messages": msgs}
 
 @router.post("/ask")
 @limiter.limit("10/minute")
@@ -335,40 +352,15 @@ def ask_chatbot(
 
     if is_admin:
         context = _build_admin_context(db, current_user)
-
-        last_user_msg = next((m.content for m in reversed(req.messages) if m.role == "user"), "")
-        user_context_addon = ""
-        if any(kw in last_user_msg.lower() for kw in ["user", "who", "activity", "uploaded", "registered", "recent"]):
-            words = last_user_msg.replace(",", " ").replace("?", " ").split()
-            for word in words:
-                if "@" in word or len(word) > 4:
-                    result = get_admin_user_context(query=word, db=db, current_user=current_user, _=None)
-                    if result.get("found"):
-                        u = result["user"]
-                        docs = result["documents"]
-                        audit = result["audit_log"]
-                        user_context_addon = f"\n\n=== USER DETAIL: {u['name']} ({u['email']}) ===\n"
-                        user_context_addon += f"Role: {u['role']} | Joined: {u['joined']} | Engagement: {u['engagement_acknowledged']}\n"
-                        if docs["personal"]:
-                            user_context_addon += "Personal: " + "; ".join(
-                                f"{d['doc_type']} ({d['tax_year']}) [{d['status']}]" for d in docs["personal"]) + "\n"
-                        if docs["business"]:
-                            user_context_addon += "Business: " + "; ".join(
-                                f"{d['business_type']} ({d['tax_year']}) [{d['status']}]" for d in docs["business"]) + "\n"
-                        if audit:
-                            user_context_addon += "Activity:\n" + "\n".join(
-                                f"  [{a['at']}] {a['action']} — {a['detail'] or ''}"
-                                for a in audit[:8]) + "\n"
-                        break
-
         system_prompt = (
             "You are the BookKeepPro Admin Assistant with live access to system data.\n\n"
             "CAPABILITIES: Answer questions about uploads, user activity, pending docs, registration counts.\n"
             "BULK ACTIONS: When asked to approve/reject all docs for a user, respond with a structured "
             "JSON action block like: {\"bulk_action\": {\"user_id\": N, \"action\": \"approve_personal\", \"confirm\": false}} "
             "— the frontend will show a confirmation dialog before executing.\n"
+            "TOOLS: Use the lookup_user tool to fetch details about a specific user if their name or email is mentioned.\n"
             "RULES: Only answer BookKeepPro, accounting, or tax questions. Use live data. Be concise.\n\n"
-            f"{context}{user_context_addon}"
+            f"{context}"
         )
     else:
         doc_status = get_doc_status(db=db, current_user=current_user)
@@ -400,24 +392,124 @@ def ask_chatbot(
             f"=== LIVE DATA for {current_user.name or current_user.email} ===\n{context}"
         )
 
-    # Conversation memory: messages[] from request already contains full history
-    # The frontend persists this in localStorage and replays it on each call
-    messages = [{"role": "system", "content": system_prompt}]
-    for m in req.messages:
-        messages.append({"role": m.role, "content": m.content})
+    # DB Persistence setup
+    session_id = req.session_id or str(uuid.uuid4())
+    chat_session = db.query(ChatSession).filter(ChatSession.session_id == session_id).first()
+    
+    if not chat_session:
+        chat_session = ChatSession(session_id=session_id, user_id=current_user.id)
+        db.add(chat_session)
+        sys_msg = DBChatMessage(role="system", content=system_prompt)
+        chat_session.messages.append(sys_msg)
+        db.commit()
 
-    # ── Streaming path ────────────────────────────────────────────────────────
+    # Determine incoming user messages
+    incoming_messages = []
+    if req.message:
+        incoming_messages.append({"role": "user", "content": req.message})
+    elif req.messages:
+        # Backward compatibility for old frontend: just grab the last message
+        last_msg = req.messages[-1]
+        incoming_messages.append({"role": last_msg.role, "content": last_msg.content})
+        
+    for m in incoming_messages:
+        db.add(DBChatMessage(
+            session_id=chat_session.id,
+            role=m["role"],
+            content=m.get("content")
+        ))
+    db.commit()
+
+    # Load full conversation history from DB for the LLM
+    messages = []
+    for m in chat_session.messages:
+        msg = {"role": m.role, "content": m.content}
+        if m.tool_calls:
+            msg["tool_calls"] = m.tool_calls
+        if m.tool_call_id:
+            msg["tool_call_id"] = m.tool_call_id
+        if m.name:
+            msg["name"] = m.name
+        messages.append(msg)
+
+    def _get_payload(current_messages, stream=False):
+        payload = {"model": CHAT_MODEL, "messages": current_messages, "stream": stream}
+        if is_admin:
+            payload["tools"] = [{
+                "type": "function",
+                "function": {
+                    "name": "lookup_user",
+                    "description": "Lookup a specific user's details, recent activity, and document uploads using their name or email.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {
+                                "type": "string",
+                                "description": "The name or email of the user to search for."
+                            }
+                        },
+                        "required": ["query"],
+                        "additionalProperties": False
+                    }
+                }
+            }]
+        return payload
+
+    def _execute_tools(tool_calls, current_messages):
+        for tc in tool_calls:
+            if tc.get("function", {}).get("name") == "lookup_user":
+                try:
+                    args = json.loads(tc["function"]["arguments"])
+                except:
+                    args = {}
+                result = get_admin_user_context(query=args.get("query", ""), db=db, current_user=current_user, _=None)
+                
+                tool_result_str = ""
+                if result.get("found"):
+                    u = result["user"]
+                    docs = result["documents"]
+                    audit = result["audit_log"]
+                    tool_result_str = f"USER DETAIL: {u['name']} ({u['email']})\nRole: {u['role']} | Joined: {u['joined']}\n"
+                    if docs["personal"]:
+                        tool_result_str += "Personal: " + "; ".join(f"{d['doc_type']} ({d['tax_year']}) [{d['status']}]" for d in docs["personal"]) + "\n"
+                    if docs["business"]:
+                        tool_result_str += "Business: " + "; ".join(f"{d['business_type']} ({d['tax_year']}) [{d['status']}]" for d in docs["business"]) + "\n"
+                    if audit:
+                        tool_result_str += "Activity:\n" + "\n".join(f"[{a['at']}] {a['action']} - {a['detail'] or ''}" for a in audit[:5])
+                else:
+                    tool_result_str = "User not found."
+                    
+                tool_msg = {
+                    "role": "tool",
+                    "tool_call_id": tc["id"],
+                    "name": tc["function"]["name"],
+                    "content": tool_result_str
+                }
+                current_messages.append(tool_msg)
+                
+                db.add(DBChatMessage(
+                    session_id=chat_session.id,
+                    role="tool",
+                    tool_call_id=tc["id"],
+                    name=tc["function"]["name"],
+                    content=tool_result_str
+                ))
+        db.commit()
+
     if req.stream:
-        def _stream():
+        def _stream(current_messages):
             try:
                 resp = requests.post(
                     url="https://openrouter.ai/api/v1/chat/completions",
                     headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                    json={"model": CHAT_MODEL, "messages": messages, "stream": True},
+                    json=_get_payload(current_messages, stream=True),
                     stream=True,
                     timeout=60,
                 )
                 resp.raise_for_status()
+                tool_calls_buffer = {}
+                is_tool_call = False
+
                 for line in resp.iter_lines():
                     if line and line != b"data: [DONE]":
                         raw = line.decode("utf-8")
@@ -426,25 +518,67 @@ def ask_chatbot(
                         try:
                             chunk = json.loads(raw)
                             delta = chunk["choices"][0].get("delta", {})
+                            
+                            if "tool_calls" in delta:
+                                is_tool_call = True
+                                for tc in delta["tool_calls"]:
+                                    idx = tc["index"]
+                                    if idx not in tool_calls_buffer:
+                                        tool_calls_buffer[idx] = tc
+                                    else:
+                                        if "function" in tc and "arguments" in tc["function"]:
+                                            if "arguments" not in tool_calls_buffer[idx]["function"]:
+                                                tool_calls_buffer[idx]["function"]["arguments"] = ""
+                                            tool_calls_buffer[idx]["function"]["arguments"] += tc["function"]["arguments"]
+                                            
                             token = delta.get("content", "")
                             if token:
-                                # Send SSE event
+                                if not hasattr(_stream, "full_content"):
+                                    _stream.full_content = ""
+                                _stream.full_content += token
                                 yield f"data: {json.dumps({'token': token})}\n\n"
                         except Exception:
                             pass
-                yield "data: [DONE]\n\n"
+                            
+                if is_tool_call:
+                    tool_calls = list(tool_calls_buffer.values())
+                    tool_msg = {
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": tool_calls
+                    }
+                    current_messages.append(tool_msg)
+                    db.add(DBChatMessage(
+                        session_id=chat_session.id,
+                        role="assistant",
+                        content=None,
+                        tool_calls=tool_calls
+                    ))
+                    db.commit()
+                    
+                    _execute_tools(tool_calls, current_messages)
+                    yield from _stream(current_messages)
+                else:
+                    if hasattr(_stream, "full_content") and _stream.full_content:
+                        db.add(DBChatMessage(
+                            session_id=chat_session.id,
+                            role="assistant",
+                            content=_stream.full_content
+                        ))
+                        db.commit()
+                        _stream.full_content = ""
+                    yield "data: [DONE]\n\n"
             except Exception as e:
                 logger.error(f"Streaming error: {e}")
                 yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
-        return StreamingResponse(_stream(), media_type="text/event-stream")
+        return StreamingResponse(_stream(messages), media_type="text/event-stream")
 
-    # ── Non-streaming path (default) ─────────────────────────────────────────
-    try:
+    def _non_stream(current_messages):
         response = requests.post(
             url="https://openrouter.ai/api/v1/chat/completions",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={"model": CHAT_MODEL, "messages": messages},
+            json=_get_payload(current_messages, stream=False),
             timeout=30,
         )
         response.raise_for_status()
@@ -455,8 +589,25 @@ def ask_chatbot(
         if "choices" not in data:
             raise HTTPException(status_code=502, detail="Unexpected AI response.")
 
-        return data["choices"][0]["message"]
+        message = data["choices"][0]["message"]
+        current_messages.append(message)
+        
+        db.add(DBChatMessage(
+            session_id=chat_session.id,
+            role=message["role"],
+            content=message.get("content"),
+            tool_calls=message.get("tool_calls")
+        ))
+        db.commit()
+        
+        if "tool_calls" in message:
+            _execute_tools(message["tool_calls"], current_messages)
+            return _non_stream(current_messages)
+            
+        return message
 
+    try:
+        return _non_stream(messages)
     except HTTPException:
         raise
     except Exception as e:

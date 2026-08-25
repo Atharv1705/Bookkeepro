@@ -25,7 +25,7 @@ export default function Services() {
               benefits to global accounting firms and businesses.
             </p>
           </div>
-          <img className="service-img" src="/images/services-3.jpg" alt="Accounting Outsourcing" />
+          <img className="service-img" src="/images/services-3.webp" alt="Accounting Outsourcing" width="600" height="400" loading="lazy" />
         </div>
 
         <div className="service-block reverse reveal">
@@ -43,7 +43,7 @@ export default function Services() {
               background so yours doesn't have to.
             </p>
           </div>
-          <img className="service-img-bl-3" src="/images/services-2.jpg" alt="Outsourced Accounting Team" />
+          <img className="service-img-bl-3" src="/images/services-2.webp" alt="Outsourced Accounting Team" width="600" height="400" loading="lazy" />
         </div>
 
         <div className="service-block reveal">
@@ -68,7 +68,7 @@ export default function Services() {
               cash flow — the foundation of a proactive, confident tax plan.
             </p>
           </div>
-          <img className="service-img" src="/images/services-1.jpg" alt="Tax Services" />
+          <img className="service-img" src="/images/services-1.webp" alt="Tax Services" width="600" height="400" loading="lazy" />
         </div>
       </div>
     </>

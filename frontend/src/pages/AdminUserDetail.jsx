@@ -108,7 +108,7 @@ export default function AdminUserDetail() {
       } else {
         alert("Failed to delete user");
       }
-    } catch (err) {
+    } catch (err) { console.error(err);
       console.error("Error deleting user", err);
     }
   };
@@ -128,7 +128,7 @@ export default function AdminUserDetail() {
         const data = await res.json();
         showToast(data.detail || "Failed to change role", "error");
       }
-    } catch (err) {
+    } catch (err) { console.error(err);
       showToast("Network error", "error");
     }
   };
@@ -147,7 +147,7 @@ export default function AdminUserDetail() {
       } else {
         showToast("Failed to save review status", "error");
       }
-    } catch (err) {
+    } catch (err) { console.error(err);
       console.error("Approval error", err);
       showToast("Approval error", "error");
     }
@@ -185,7 +185,7 @@ export default function AdminUserDetail() {
       } else {
         showToast("Failed to upload admin document", "error");
       }
-    } catch(err) {
+    } catch (err) { console.error(err);
       showToast("Upload failed", "error");
     }
   };
@@ -199,8 +199,29 @@ export default function AdminUserDetail() {
       } else {
         showToast("Could not generate view link", "error");
       }
-    } catch (err) {
+    } catch (err) { console.error(err);
       showToast("Could not generate view link", "error");
+    }
+  };
+
+  const handleUpdateExtractedData = async (docId, type, newData) => {
+    try {
+      const res = await authFetch(`/api/upload/${type}-documents/${docId}/extracted-data`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ extracted_data: newData })
+      });
+      if (res.ok) {
+        showToast("AI Summary updated successfully", "success");
+        fetchUserDetails();
+      } else {
+        showToast("Failed to update AI Summary", "error");
+        throw new Error("Failed to update");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Network error while updating", "error");
+      throw err;
     }
   };
 
@@ -232,7 +253,7 @@ export default function AdminUserDetail() {
       } else {
         showToast("Failed to send email", "error");
       }
-    } catch(err) {
+    } catch (err) { console.error(err);
       showToast("Error sending email", "error");
     }
   };
@@ -250,7 +271,7 @@ export default function AdminUserDetail() {
       } else {
         showToast("Failed to submit", "error");
       }
-    } catch (err) {
+    } catch (err) { console.error(err);
       showToast("Error submitting documents", "error");
     }
   };
@@ -390,7 +411,10 @@ export default function AdminUserDetail() {
                             <span className="material-symbols-outlined" style={{ fontSize: '14px', verticalAlign: 'middle', marginRight: '4px' }}>auto_awesome</span>
                             AI Summary
                           </div>
-                          <ExpandableSummaryBlock extractedData={doc.extracted_data} />
+                          <ExpandableSummaryBlock 
+                            extractedData={doc.extracted_data} 
+                            onSave={(newData) => handleUpdateExtractedData(doc.id, doc.type, newData)}
+                          />
                         </div>
                       ) : doc.extracted_data === null ? (
                         <div className="ai-summary-block" style={{ opacity: 0.6 }}>
@@ -465,7 +489,10 @@ export default function AdminUserDetail() {
                             <span className="material-symbols-outlined" style={{ fontSize: '14px', verticalAlign: 'middle', marginRight: '4px' }}>auto_awesome</span>
                             AI Summary
                           </div>
-                          <ExpandableSummaryBlock extractedData={doc.extracted_data} />
+                          <ExpandableSummaryBlock 
+                            extractedData={doc.extracted_data}
+                            onSave={(newData) => handleUpdateExtractedData(doc.id, doc.type, newData)}
+                          />
                         </div>
                       ) : doc.extracted_data === null ? (
                         <div className="ai-summary-block" style={{ opacity: 0.6 }}>

@@ -419,3 +419,114 @@ def extract_document_data(file_path: str, doc_type: str) -> dict | None:
     except Exception as e:
         logger.error(f"[AI] Extraction pipeline failed for {file_path}: {e}")
         return None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Admin document summarizer
+# ─────────────────────────────────────────────────────────────────────────────
+
+_SUMMARY_SYSTEM_PROMPT = (
+    "You are a professional CPA's assistant. "
+    "Your job is to write a short, plain-English summary of a tax or financial document "
+    "that will be shown to the client on their secure online portal. "
+    "Be professional, friendly, and concise. "
+    "Never include sensitive numbers or personally identifiable information in the summary. "
+    "Respond with ONLY the summary text — no headers, no bullet points, no markdown."
+)
+
+
+def _extract_text_from_file(file_path: str) -> str:
+    """Extract raw text from a PDF or image file. Returns empty string on failure."""
+    try:
+        if file_path.lower().endswith(".pdf"):
+            text = ""
+            try:
+                reader = PdfReader(file_path)
+                for page in reader.pages[:5]:
+                    t = page.extract_text()
+                    if t:
+                        text += t + "\n"
+            except Exception:
+                pass
+
+            if len(text.strip()) < MIN_TEXT_CHARS:
+                try:
+                    doc = fitz.open(file_path)
+                    mu = "".join(doc[i].get_text() for i in range(min(5, len(doc))))
+                    doc.close()
+                    if len(mu.strip()) > len(text.strip()):
+                        text = mu
+                except Exception:
+                    pass
+
+            if len(text.strip()) < MIN_TEXT_CHARS:
+                rendered = _render_pdf_page(file_path)
+                if rendered:
+                    text = _tesseract_text(rendered)
+
+            return text.strip()
+
+        elif file_path.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
+            img = Image.open(file_path)
+            return _tesseract_text(img).strip()
+
+    except Exception as e:
+        logger.warning(f"[Summary] Text extraction failed for {file_path}: {e}")
+
+    return ""
+
+
+def summarize_admin_document(file_path: str, doc_label: str) -> str | None:
+    """
+    Generate a 2-3 sentence plain-English summary of an admin-uploaded document.
+
+    Reuses the existing text extraction pipeline (native PDF text → Tesseract OCR).
+    Calls the LLM with a client-facing summary prompt instead of a JSON extraction prompt.
+
+    Returns:
+        str  — summary text if successful
+        None — if OPENROUTER_API_KEY not set, file unreadable, or LLM call fails
+    """
+    api_key = os.getenv("OPENROUTER_API_KEY")
+    if not api_key:
+        logger.warning("[Summary] OPENROUTER_API_KEY not set — skipping summary")
+        return None
+
+    text = _extract_text_from_file(file_path)
+
+    if not text:
+        logger.info(f"[Summary] No extractable text from {file_path} — skipping")
+        return "Summary not available for this document type."
+
+    prompt = (
+        f"Document name: {doc_label}\n\n"
+        f"Document content (first 4000 characters):\n{text[:4000]}\n\n"
+        "Write a 2-3 sentence plain-English summary of this document for the client. "
+        "Explain what it is and what they should know about it. "
+        "Do NOT include any specific dollar amounts, SSNs, EINs, or other sensitive numbers."
+    )
+
+    try:
+        response = requests.post(
+            url="https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": MODEL_TEXT,
+                "messages": [
+                    {"role": "system", "content": _SUMMARY_SYSTEM_PROMPT},
+                    {"role": "user",   "content": prompt},
+                ],
+            },
+            timeout=60,
+        )
+        response.raise_for_status()
+        summary = response.json()["choices"][0]["message"]["content"].strip()
+        logger.info(f"[Summary] Generated {len(summary)} char summary for {doc_label}")
+        return summary
+    except Exception as e:
+        logger.error(f"[Summary] LLM call failed for {doc_label}: {e}")
+        return None
+

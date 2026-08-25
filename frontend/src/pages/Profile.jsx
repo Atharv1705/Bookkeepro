@@ -37,7 +37,17 @@ export default function Profile() {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.detail || "Failed to update profile");
+        let errorMsg = "Failed to update profile";
+        if (data.detail) {
+          if (typeof data.detail === 'string') {
+            errorMsg = data.detail;
+          } else if (Array.isArray(data.detail)) {
+            errorMsg = data.detail.map(err => err.msg).join(", ");
+          } else {
+            errorMsg = JSON.stringify(data.detail);
+          }
+        }
+        throw new Error(errorMsg);
       }
 
       alert("Profile updated successfully. Please log in again if you changed your password.");

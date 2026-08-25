@@ -198,7 +198,7 @@ export default function AdminDashboard() {
               <div className="stat-value">{stats.total_users}</div>
               <div className="stat-label">Total Users</div>
             </div>
-            <div className="stat-card">
+            <div className="stat-card accent-green">
               <div className="stat-icon"><span className="material-symbols-outlined">security</span></div>
               <div className="stat-value">{stats.admins}</div>
               <div className="stat-label">Admin Accounts</div>

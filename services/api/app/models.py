@@ -7,6 +7,7 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    Text,
     JSON,
     UniqueConstraint,
     func,
@@ -121,6 +122,9 @@ class AdminDocument(Base):
     uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=False)   # admin user
     user_id     = Column(Integer, ForeignKey("users.id"), nullable=False)   # target client
     deleted_at  = Column(DateTime(timezone=True), nullable=True, default=None)
+    # AI-generated plain-English summary — populated by background task after upload
+    # None = still processing, non-null = ready to display
+    ai_summary  = Column(Text, nullable=True)
 
     admin = relationship("User", foreign_keys=[uploaded_by])
     user  = relationship("User", foreign_keys=[user_id])
@@ -177,9 +181,44 @@ class RequiredDocumentTemplate(Base):
     category    = Column(String(50), nullable=False) # 'personal' or 'business'
     tax_year    = Column(Integer, nullable=False)
     name        = Column(String(200), nullable=False)
-    file_url    = Column(String(500), nullable=True) # Null if there is no template file to download
+    # storage_key: raw filename on disk (e.g. "abc123.pdf"). Fresh presigned URLs
+    # are generated on every read from this key. Replaces the old file_url pattern
+    # that baked an expiring JWT into the stored value.
+    storage_key = Column(String(500), nullable=True)
+    # file_url kept for backward-compat; self-healed at read time if storage_key is missing
+    file_url    = Column(String(500), nullable=True)
     created_at  = Column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
         UniqueConstraint("category", "tax_year", "name", name="uq_template_cat_year_name"),
     )
+
+# ─────────────────────────────────────────────
+# Chat Models
+# ─────────────────────────────────────────────
+
+class ChatSession(Base):
+    __tablename__ = "chat_sessions"
+
+    id         = Column(Integer, primary_key=True, index=True)
+    user_id    = Column(Integer, ForeignKey("users.id"), nullable=False)
+    session_id = Column(String(100), unique=True, index=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    messages = relationship("ChatMessage", back_populates="session", cascade="all, delete-orphan", order_by="ChatMessage.created_at")
+
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id           = Column(Integer, primary_key=True, index=True)
+    session_id   = Column(Integer, ForeignKey("chat_sessions.id"), nullable=False)
+    role         = Column(String(50), nullable=False) # 'user', 'assistant', 'system', 'tool'
+    content      = Column(Text, nullable=True)
+    tool_calls   = Column(JSON, nullable=True)
+    tool_call_id = Column(String(200), nullable=True)
+    name         = Column(String(200), nullable=True)
+    created_at   = Column(DateTime(timezone=True), server_default=func.now())
+
+    session = relationship("ChatSession", back_populates="messages")
