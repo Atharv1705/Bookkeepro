@@ -435,7 +435,7 @@ _SUMMARY_SYSTEM_PROMPT = (
 )
 
 
-def _extract_text_from_file(file_path: str) -> str:
+def extract_raw_text(file_path: str) -> str:
     """Extract raw text from a PDF or image file. Returns empty string on failure."""
     try:
         if file_path.lower().endswith(".pdf"):
@@ -492,7 +492,7 @@ def summarize_admin_document(file_path: str, doc_label: str) -> str | None:
         logger.warning("[Summary] OPENROUTER_API_KEY not set — skipping summary")
         return None
 
-    text = _extract_text_from_file(file_path)
+    text = extract_raw_text(file_path)
 
     if not text:
         logger.info(f"[Summary] No extractable text from {file_path} — skipping")

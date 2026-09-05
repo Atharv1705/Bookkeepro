@@ -1,6 +1,7 @@
 from sqlalchemy import (
     Boolean,
     Column,
+    Date,
     DateTime,
     Enum,
     ForeignKey,
@@ -222,3 +223,28 @@ class ChatMessage(Base):
     created_at   = Column(DateTime(timezone=True), server_default=func.now())
 
     session = relationship("ChatSession", back_populates="messages")
+
+
+# ─────────────────────────────────────────────
+# Filing Deadlines — set by admin when sending review email
+# ─────────────────────────────────────────────
+
+class FilingDeadline(Base):
+    __tablename__ = "filing_deadlines"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    user_id       = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    doc_type      = Column(String(20), nullable=False)    # "personal" or "business"
+    deadline_date = Column(Date, nullable=False)
+    days_given    = Column(Integer, nullable=False)
+    notified_7d   = Column(Boolean, default=False, nullable=False)
+    notified_1d   = Column(Boolean, default=False, nullable=False)
+    created_at    = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at    = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    user = relationship("User")
+
+    __table_args__ = (
+        Index("ix_filing_deadlines_user_id", "user_id"),
+        Index("ix_filing_deadlines_deadline_date", "deadline_date"),
+    )

@@ -23,9 +23,35 @@ export default function AdminUserDetail() {
   const [personalTimeline, setPersonalTimeline] = useState(0);
   const [businessTimeline, setBusinessTimeline] = useState(0);
 
+  // Export Excel Function
+  const exportToExcel = async () => {
+    try {
+      showToast("Preparing Excel export...", "info");
+      const res = await authFetch(`/api/upload/admin/users/${userId}/export`);
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `user_${userId}_documents.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        showToast("Excel export ready!", "success");
+      } else {
+        showToast("Failed to export Excel file", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Error exporting Excel file", "error");
+    }
+  };
+
   // States for Audit Log
   const [auditLog, setAuditLog] = useState([]);
   const [auditLoaded, setAuditLoaded] = useState(false);
+  const [deadlines, setDeadlines] = useState([]);
 
   const adminDocInputRef = useRef(null);
 
@@ -54,6 +80,12 @@ export default function AdminUserDetail() {
       
       const allDocs = [...userDocs, ...adminDocs];
       setDocuments(allDocs);
+
+      // Fetch filing deadlines
+      try {
+        const dlRes = await authFetch(`/api/review/deadlines/${userId}`);
+        if (dlRes.ok) setDeadlines(await dlRes.json());
+      } catch {}
 
 
     } catch (err) {
@@ -432,6 +464,25 @@ export default function AdminUserDetail() {
             <div className="doc-review-sidebar">
               <div className="card-flat" style={{display:'flex', flexDirection:'column', gap:'16px'}}>
                 <h3>Filing Timeline</h3>
+                {deadlines.filter(d => d.doc_type === 'personal').map(d => (
+                  <div key="personal-dl" style={{
+                    margin: '0 0 16px', padding: '12px 16px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: d.is_overdue ? 'rgba(220,53,69,0.08)' : d.days_left <= 1 ? 'rgba(255,140,0,0.10)' : 'rgba(44,122,91,0.08)',
+                    border: `1px solid ${d.is_overdue ? 'rgba(220,53,69,0.3)' : d.days_left <= 1 ? 'rgba(255,140,0,0.35)' : 'rgba(44,122,91,0.20)'}`,
+                    display: 'flex', alignItems: 'center', gap: '10px'
+                  }}>
+                    <span className="material-symbols-outlined" style={{fontSize:'20px', color: d.is_overdue ? '#dc3545' : d.days_left <= 1 ? '#ff8c00' : 'var(--accent)'}}>
+                      {d.is_overdue ? 'warning' : 'schedule'}
+                    </span>
+                    <div>
+                      <div style={{fontWeight: 600, fontSize: '13px', color: d.is_overdue ? '#dc3545' : d.days_left <= 1 ? '#ff8c00' : 'var(--navy)'}}>
+                        {d.is_overdue ? `OVERDUE by ${Math.abs(d.days_left)} day${Math.abs(d.days_left) !== 1 ? 's' : ''}` : `${d.days_left} day${d.days_left !== 1 ? 's' : ''} remaining`}
+                      </div>
+                      <div style={{fontSize: '11px', color: 'var(--muted)'}}>Deadline: {new Date(d.deadline_date).toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'})}</div>
+                    </div>
+                  </div>
+                ))}
                 <div className="timeline-control">
                   <button className="tl-btn" onClick={() => setPersonalTimeline(Math.max(0, personalTimeline - 1))}>−</button>
                   <div>
@@ -510,6 +561,25 @@ export default function AdminUserDetail() {
             <div className="doc-review-sidebar">
               <div className="card-flat" style={{display:'flex', flexDirection:'column', gap:'16px'}}>
                 <h3>Filing Timeline</h3>
+                {deadlines.filter(d => d.doc_type === 'business').map(d => (
+                  <div key="business-dl" style={{
+                    margin: '0 0 16px', padding: '12px 16px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: d.is_overdue ? 'rgba(220,53,69,0.08)' : d.days_left <= 1 ? 'rgba(255,140,0,0.10)' : 'rgba(44,122,91,0.08)',
+                    border: `1px solid ${d.is_overdue ? 'rgba(220,53,69,0.3)' : d.days_left <= 1 ? 'rgba(255,140,0,0.35)' : 'rgba(44,122,91,0.20)'}`,
+                    display: 'flex', alignItems: 'center', gap: '10px'
+                  }}>
+                    <span className="material-symbols-outlined" style={{fontSize:'20px', color: d.is_overdue ? '#dc3545' : d.days_left <= 1 ? '#ff8c00' : 'var(--accent)'}}>
+                      {d.is_overdue ? 'warning' : 'schedule'}
+                    </span>
+                    <div>
+                      <div style={{fontWeight: 600, fontSize: '13px', color: d.is_overdue ? '#dc3545' : d.days_left <= 1 ? '#ff8c00' : 'var(--navy)'}}>
+                        {d.is_overdue ? `OVERDUE by ${Math.abs(d.days_left)} day${Math.abs(d.days_left) !== 1 ? 's' : ''}` : `${d.days_left} day${d.days_left !== 1 ? 's' : ''} remaining`}
+                      </div>
+                      <div style={{fontSize: '11px', color: 'var(--muted)'}}>Deadline: {new Date(d.deadline_date).toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'})}</div>
+                    </div>
+                  </div>
+                ))}
                 <div className="timeline-control">
                   <button className="tl-btn" onClick={() => setBusinessTimeline(Math.max(0, businessTimeline - 1))}>−</button>
                   <div>
