@@ -5,18 +5,19 @@ import logging
 from datetime import datetime
 import filetype
 from fastapi import APIRouter, BackgroundTasks, UploadFile, File, HTTPException, Depends, Form, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from jose import jwt, JWTError
 from datetime import timedelta
 
-from app.models import AdminDocument, PersonalDocument, BusinessDocument, User, UserRole
+from app.models import AdminDocument, PersonalDocument, BusinessDocument, User, UserRole, ChatSession, ChatMessage
 from app.db import get_db, SessionLocal
 import app.crud as crud
 from app.auth.security import get_current_user, require_admin, SECRET_KEY, ALGORITHM
 from app.utils.emailer import send_email
-from app.utils.ai import extract_document_data, summarize_admin_document
+from app.utils.ai import extract_document_data, summarize_admin_document, extract_raw_text
+from app.utils.vector_store import add_document_embedding, delete_document_embeddings, delete_user_embeddings
 from app.schemas import UploadCompleteNotify, ReviewStatusUpdate, ExtractedDataUpdate
 from app.limiter import limiter
 from fastapi import Request
@@ -72,6 +73,12 @@ def process_ai_extraction(table: str, doc_id: int, file_path: str, doc_type: str
                     doc.extracted_data = cached.extracted_data
                     doc.file_hash      = file_hash
                     db.commit()
+                    try:
+                        raw_text = extract_raw_text(file_path)
+                        if raw_text:
+                            add_document_embedding(doc.id, table, doc.user_id, raw_text)
+                    except Exception as ve:
+                        logger.error(f"VectorStore Failed to embed {file_path}: {ve}")
                 return
 
         # No cache — run full extraction
@@ -90,6 +97,12 @@ def process_ai_extraction(table: str, doc_id: int, file_path: str, doc_type: str
             doc.extracted_data = extracted
             doc.file_hash      = file_hash
             db.commit()
+            try:
+                raw_text = extract_raw_text(file_path)
+                if raw_text:
+                    add_document_embedding(doc.id, table, doc.user_id, raw_text)
+            except Exception as ve:
+                logger.error(f"VectorStore Failed to embed {file_path}: {ve}")
 
     except Exception as e:
         logger.error(f"Failed to update DB with AI extraction: {e}")
@@ -1087,3 +1100,142 @@ def delete_template(
     db.delete(record)
     db.commit()
     return {"deleted": True}
+
+from fastapi.responses import StreamingResponse
+import csv
+import io
+import json
+
+@router.get("/admin/users/{user_id}/export")
+def export_user_documents_excel(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+    _=Depends(require_admin),
+):
+    """Export all documents for a user as a formatted Excel (.xlsx) workbook."""
+    import io
+    import json as _json
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if current_user.role == UserRole.admin and user.role != UserRole.user:
+        raise HTTPException(status_code=403, detail="Admins can only export documents for regular user accounts")
+
+    personal_docs = db.query(PersonalDocument).filter(
+        PersonalDocument.user_id == user_id, PersonalDocument.deleted_at == None
+    ).all()
+    business_docs = db.query(BusinessDocument).filter(
+        BusinessDocument.user_id == user_id, BusinessDocument.deleted_at == None
+    ).all()
+
+    # Collect all extracted_data keys to build dynamic columns
+    extracted_keys = set()
+    all_docs = []
+
+    for d in personal_docs:
+        row = {
+            "ID": f"P-{d.id}",
+            "Table": "Personal",
+            "Doc Type": d.doc_type,
+            "Filename": d.filename,
+            "Uploaded At": d.uploaded_at.strftime("%Y-%m-%d %H:%M") if d.uploaded_at else "",
+            "Tax Year": d.tax_year or "",
+            "Review Status": (d.review_status or "").capitalize(),
+            "Review Note": d.review_note or "",
+        }
+        if d.extracted_data:
+            try:
+                data = _json.loads(d.extracted_data) if isinstance(d.extracted_data, str) else d.extracted_data
+                if isinstance(data, dict):
+                    for k, v in data.items():
+                        col = f"AI: {k}"
+                        extracted_keys.add(col)
+                        row[col] = str(v)
+            except Exception:
+                pass
+        all_docs.append(row)
+
+    for d in business_docs:
+        row = {
+            "ID": f"B-{d.id}",
+            "Table": "Business",
+            "Doc Type": d.business_type,
+            "Filename": d.filename,
+            "Uploaded At": d.uploaded_at.strftime("%Y-%m-%d %H:%M") if d.uploaded_at else "",
+            "Tax Year": d.tax_year or "",
+            "Review Status": (d.review_status or "").capitalize(),
+            "Review Note": d.review_note or "",
+        }
+        if d.extracted_data:
+            try:
+                data = _json.loads(d.extracted_data) if isinstance(d.extracted_data, str) else d.extracted_data
+                if isinstance(data, dict):
+                    for k, v in data.items():
+                        col = f"AI: {k}"
+                        extracted_keys.add(col)
+                        row[col] = str(v)
+            except Exception:
+                pass
+        all_docs.append(row)
+
+    base_cols = ["ID", "Table", "Doc Type", "Filename", "Uploaded At", "Tax Year", "Review Status", "Review Note"]
+    all_cols = base_cols + sorted(list(extracted_keys))
+
+    # ── Build workbook ────────────────────────────────────────────────────────
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Documents"
+
+    # Header style
+    header_fill  = PatternFill(fill_type="solid", fgColor="2C7A5B")
+    header_font  = Font(bold=True, color="FFFFFF", size=11)
+    center_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    thin_border  = Border(
+        left=Side(style="thin"), right=Side(style="thin"),
+        top=Side(style="thin"), bottom=Side(style="thin"),
+    )
+
+    # Write headers
+    for col_idx, col_name in enumerate(all_cols, 1):
+        cell = ws.cell(row=1, column=col_idx, value=col_name)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = center_align
+        cell.border = thin_border
+
+    ws.row_dimensions[1].height = 30
+    ws.freeze_panes = "A2"
+
+    # Alternate row fill
+    alt_fill = PatternFill(fill_type="solid", fgColor="EAF4EF")
+
+    # Write data
+    for row_idx, doc in enumerate(all_docs, 2):
+        fill = alt_fill if row_idx % 2 == 0 else None
+        for col_idx, col_name in enumerate(all_cols, 1):
+            cell = ws.cell(row=row_idx, column=col_idx, value=doc.get(col_name, ""))
+            cell.alignment = Alignment(vertical="center", wrap_text=False)
+            cell.border = thin_border
+            if fill:
+                cell.fill = fill
+
+    # Auto-fit column widths (capped at 40)
+    for col_idx, col_name in enumerate(all_cols, 1):
+        max_len = max(len(col_name), *(len(str(doc.get(col_name, ""))) for doc in all_docs)) if all_docs else len(col_name)
+        ws.column_dimensions[get_column_letter(col_idx)].width = min(max_len + 3, 40)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    headers = {
+        "Content-Disposition": f'attachment; filename="user_{user_id}_documents.xlsx"',
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }
+    return StreamingResponse(buf, headers=headers)
+
