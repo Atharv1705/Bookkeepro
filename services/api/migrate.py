@@ -79,6 +79,10 @@ def upgrade():
             _add_column(conn, "required_document_templates", "storage_key",
                         "VARCHAR(500) NULL DEFAULT NULL")
 
+            # ── v6: AI summary for admin documents ────────────────────────────────
+            _add_column(conn, "admin_documents", "ai_summary", "TEXT NULL DEFAULT NULL")
+
+
         print("\nAll migrations complete.")
     except Exception as e:
         print(f"Migration error: {e}")
