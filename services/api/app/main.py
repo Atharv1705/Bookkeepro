@@ -12,8 +12,28 @@ from app import models
 from app.db import engine
 
 log = logging.getLogger("uvicorn.error")
+from contextlib import asynccontextmanager
 
-app = FastAPI(title="BookKeepPro API", docs_url=None, redoc_url=None)  # hide docs in production
+@asynccontextmanager
+async def lifespan(app):
+    # Startup
+    try:
+        from app.utils.scheduler import start_scheduler
+        start_scheduler()
+        log.info("Scheduler started via lifespan.")
+    except Exception as exc:
+        log.exception("Failed to start scheduler: %s", exc)
+    yield
+    # Shutdown
+    try:
+        from app.utils.scheduler import stop_scheduler
+        stop_scheduler()
+    except Exception:
+        pass
+
+
+
+app = FastAPI(title="BookKeepPro API", docs_url=None, redoc_url=None, lifespan=lifespan)  # hide docs in production
 
 # Rate limiter
 app.state.limiter = limiter
@@ -36,6 +56,13 @@ try:
     app.include_router(upload.router)
 except Exception as exc:
     log.exception("Failed to load upload router: %s", exc)
+
+try:
+    from app.routers import search
+    app.include_router(search.router)
+except Exception as exc:
+    log.exception("Failed to load search router: %s", exc)
+
 
 try:
     from app.routers import contact   # type: ignore

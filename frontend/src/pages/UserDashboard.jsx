@@ -14,8 +14,31 @@ export default function UserDashboard() {
   const [docLoading, setDocLoading] = useState(false);
   // Track which doc rows have the AI summary panel open
   const [expandedSummary, setExpandedSummary] = useState({});
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   // ── declare callbacks BEFORE the effects that reference them ──
+
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+    
+    setIsSearching(true);
+    try {
+      const res = await authFetch(`/api/search/semantic?q=${encodeURIComponent(searchQuery)}`);
+      if (res.ok) {
+        setSearchResults(await res.json());
+      } else {
+        showToast("Search failed", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Search failed", "error");
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   const checkEngagement = useCallback(async () => {
     try {

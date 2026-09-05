@@ -1,8 +1,9 @@
 import os
+from datetime import date, timedelta
 import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app.models import AdminDocument, User, UserRole
+from app.models import AdminDocument, User, UserRole, FilingDeadline
 from app.db import get_db
 from app.utils.emailer import send_email
 from app import crud
@@ -92,6 +93,30 @@ async def notify_user_review(
 
     await send_email(to=user.email, subject="Document Review Update — BookKeepro", body=body)
     logger.info(f"Admin {current_user.id} sent review notification to user {payload.user_id}")
+
+    # Save / reset filing deadlines if timelines were provided
+    today = date.today()
+    for doc_type, days in [("personal", payload.personal_timeline), ("business", payload.business_timeline)]:
+        if days and days > 0:
+            existing = db.query(FilingDeadline).filter(
+                FilingDeadline.user_id == payload.user_id,
+                FilingDeadline.doc_type == doc_type,
+            ).first()
+            if existing:
+                # Reset the deadline and clear reminder flags
+                existing.deadline_date = today + timedelta(days=days)
+                existing.days_given = days
+                existing.notified_7d = False
+                existing.notified_1d = False
+            else:
+                db.add(FilingDeadline(
+                    user_id=payload.user_id,
+                    doc_type=doc_type,
+                    deadline_date=today + timedelta(days=days),
+                    days_given=days,
+                ))
+    db.commit()
+
     return {"status": "notified"}
 
 
@@ -143,3 +168,30 @@ async def admin_doc_response(
 
     logger.info(f"User {current_user.id} {payload.status} admin doc {payload.doc_id}")
     return {"status": "notified"}
+
+
+# ─────────────────────────────────────────────
+# Get filing deadlines for a user
+# ─────────────────────────────────────────────
+
+@router.get("/deadlines/{user_id}")
+def get_filing_deadlines(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+    _=Depends(require_admin),
+):
+    from app.models import FilingDeadline
+    deadlines = db.query(FilingDeadline).filter(FilingDeadline.user_id == user_id).all()
+    today = date.today()
+    result = []
+    for dl in deadlines:
+        days_left = (dl.deadline_date - today).days
+        result.append({
+            "doc_type": dl.doc_type,
+            "deadline_date": dl.deadline_date.isoformat(),
+            "days_given": dl.days_given,
+            "days_left": days_left,
+            "is_overdue": days_left < 0,
+        })
+    return result

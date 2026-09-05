@@ -1,3 +1,4 @@
+import * as XLSX from 'xlsx';
 import { useState } from 'react';
 import ExpandableValue from './ExpandableValue';
 
@@ -62,39 +63,34 @@ export default function ExpandableSummaryBlock({ extractedData, onSave }) {
   };
 
   const handleExport = () => {
-    // Convert extracted data into a 2-column CSV (Field, Value)
+    // Export extracted AI data as a proper .xlsx file using SheetJS
     const { _meta, ...dataFields } = extractedData || {};
-    
-    const escapeCsv = (str) => {
-      const s = String(str);
-      if (s.includes(',') || s.includes('"') || s.includes('\n')) {
-        return `"${s.replace(/"/g, '""')}"`;
-      }
-      return s;
-    };
 
-    const csvRows = ['Field,Value'];
+    const rows = [['Field', 'Value']];
     Object.entries(dataFields).forEach(([key, val]) => {
       let valStr = val;
-      if (Array.isArray(val)) {
-        valStr = val.join('; ');
-      } else if (typeof val === 'object' && val !== null) {
-        valStr = JSON.stringify(val);
-      }
-      csvRows.push(`${escapeCsv(key)},${escapeCsv(valStr)}`);
+      if (Array.isArray(val)) valStr = val.join('; ');
+      else if (typeof val === 'object' && val !== null) valStr = JSON.stringify(val);
+      rows.push([String(key), String(valStr ?? '')]);
     });
 
-    const csvContent = csvRows.join('\n');
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `extracted_data.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+
+    // Bold + green header
+    ['A1', 'B1'].forEach(ref => {
+      if (ws[ref]) ws[ref].s = { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '2C7A5B' } } };
+    });
+
+    // Column widths
+    ws['!cols'] = [
+      { wch: Math.max(10, ...Object.keys(dataFields).map(k => k.length + 2)) },
+      { wch: 45 },
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Extracted Data');
+    XLSX.writeFile(wb, 'extracted_data.xlsx');
+  }
 
   const showToggle = entries.length > 3;
   const entriesToShow = expanded ? entries : entries.slice(0, 3);
@@ -160,8 +156,8 @@ export default function ExpandableSummaryBlock({ extractedData, onSave }) {
         ) : <div />}
 
         <div style={{ display: 'flex', gap: '6px' }}>
-          <button onClick={handleExport} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '11px', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '4px', padding: '2px' }} title="Export CSV">
-            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>download</span> Export CSV
+          <button onClick={handleExport} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '11px', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '4px', padding: '2px' }} title="Export Excel">
+            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>download</span> Export Excel
           </button>
           <button onClick={handleEditClick} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '11px', color: 'var(--emerald)', display: 'flex', alignItems: 'center', gap: '4px', padding: '2px', fontWeight: 600 }} title="Edit Summary">
             <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>edit</span> Edit

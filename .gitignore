@@ -26,3 +26,6 @@ services/temp/
 blog_images/
 check_docs.py
 openrouter_error.log
+# Vector Database
+chroma_db/
+services/api/chroma_db/
