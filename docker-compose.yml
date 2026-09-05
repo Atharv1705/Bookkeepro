@@ -76,4 +76,4 @@ services:
 
 volumes:
   mysql_data:
-  uploads_data:
+  uploads_data:  chroma_data:
