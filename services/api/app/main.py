@@ -89,7 +89,7 @@ _ALLOWED_ORIGINS = [
     o.strip()
     for o in os.getenv(
         "ALLOWED_ORIGINS",
-        "https://aiindiacpa.duckdns.org",
+        "https://aicpa.duckdns.org",
     ).split(",")
     if o.strip()
 ]
