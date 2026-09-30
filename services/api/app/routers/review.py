@@ -145,6 +145,26 @@ async def admin_doc_response(
             f"belonging to user {doc.user_id}"
         )
         raise HTTPException(status_code=403, detail="Not authorized")
+        
+    doc.review_status = payload.status
+    if payload.reason:
+        doc.review_note = payload.reason
+    db.commit()
+    
+    from app.models import DocumentReviewEvent
+    event = DocumentReviewEvent(
+        doc_kind="admin",
+        doc_id=doc.id,
+        owner_user_id=doc.user_id,
+        actor_id=current_user.id,
+        actor_role="user",
+        action=payload.status,
+        to_status=payload.status,
+        note=payload.reason,
+        tax_year=doc.tax_year
+    )
+    db.add(event)
+    db.commit()
 
     admin = db.query(User).filter_by(id=doc.uploaded_by).first()
     if not admin:
@@ -168,7 +188,92 @@ async def admin_doc_response(
 
     logger.info(f"User {current_user.id} {payload.status} admin doc {payload.doc_id}")
     return {"status": "notified"}
+    
+# ─────────────────────────────────────────────
+# Update Status and History
+# ─────────────────────────────────────────────
 
+@router.get("/history/{doc_kind}/{doc_id}")
+def get_document_review_history(
+    doc_kind: str,
+    doc_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    from app.models import DocumentReviewEvent
+    events = db.query(DocumentReviewEvent).filter_by(
+        doc_kind=doc_kind,
+        doc_id=doc_id
+    ).order_by(DocumentReviewEvent.created_at.asc()).all()
+    
+    # If standard user, verify ownership
+    if current_user.role == UserRole.user:
+        if not events or events[0].owner_user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Unauthorized")
+            
+    return {
+        "history": [
+            {
+                "id": e.id,
+                "actor_role": e.actor_role,
+                "action": e.action,
+                "to_status": e.to_status,
+                "note": e.note,
+                "created_at": e.created_at.isoformat() + "Z" if e.created_at else None
+            } for e in events
+        ]
+    }
+
+from pydantic import BaseModel
+class StatusUpdateRequest(BaseModel):
+    status: str
+    note: str | None = None
+
+@router.put("/status/{doc_kind}/{doc_id}")
+def update_document_status(
+    doc_kind: str,
+    doc_id: int,
+    payload: StatusUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_admin),
+):
+    from app.models import PersonalDocument, BusinessDocument, DocumentReviewEvent
+    model_map = {
+        'admin': AdminDocument,
+        'personal': PersonalDocument,
+        'business': BusinessDocument
+    }
+    if doc_kind not in model_map:
+        raise HTTPException(status_code=400, detail="Invalid doc_kind")
+        
+    doc = db.query(model_map[doc_kind]).filter_by(id=doc_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+        
+    doc.review_status = payload.status
+    if payload.note is not None:
+        doc.review_note = payload.note
+    if payload.status == 'approved':
+        from datetime import datetime
+        doc.reviewed_at = datetime.utcnow()
+        
+    db.commit()
+    
+    event = DocumentReviewEvent(
+        doc_kind=doc_kind,
+        doc_id=doc.id,
+        owner_user_id=doc.user_id,
+        actor_id=current_user.id,
+        actor_role="admin",
+        action="status_updated",
+        to_status=payload.status,
+        note=payload.note,
+        tax_year=doc.tax_year
+    )
+    db.add(event)
+    db.commit()
+    
+    return {"status": "ok", "review_status": doc.review_status}
 
 # ─────────────────────────────────────────────
 # Get filing deadlines for a user

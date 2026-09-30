@@ -21,12 +21,28 @@ const FAQ_DATA = {
 
 const CATEGORY_ICONS = { "Document Review": "📑", "User Management": "👥", "Notifications": "🔔" };
 
+const escapeHtml = (unsafe) => {
+  return unsafe
+       .replace(/&/g, "&amp;")
+       .replace(/</g, "&lt;")
+       .replace(/>/g, "&gt;")
+       .replace(/"/g, "&quot;")
+       .replace(/'/g, "&#039;");
+};
+
 const formatMessage = (text) => {
   if (!text) return '';
-  return text
+  let safeText = escapeHtml(text);
+  return safeText
     .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
     .replace(/\*(.*?)\*/g, '<i>$1</i>')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color:var(--blue);text-decoration:underline">$1</a>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, text, url) => {
+      let decodedUrl = url.replace(/&#039;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+      if (decodedUrl.toLowerCase().trim().startsWith('javascript:')) {
+         return escapeHtml(match);
+      }
+      return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:var(--blue);text-decoration:underline">${text}</a>`;
+    })
     .replace(/\n/g, '<br/>');
 };
 

@@ -119,12 +119,12 @@ export default function UploadBusiness() {
         body: JSON.stringify({ file_count: docs.length, doc_category: "Business" })
       });
       if (res.ok) {
-        showToast("Admin notified successfully", "success");
+        showToast("Documents sent for approval", "success");
       } else {
-        showToast("Failed to notify admin", "error");
+        showToast("Failed to send for approval", "error");
       }
     } catch (err) { console.error(err);
-      showToast("Error notifying admin", "error");
+      showToast("Error sending for approval", "error");
     }
   };
 
@@ -180,7 +180,7 @@ export default function UploadBusiness() {
                   <input 
                     type="file" 
                     hidden 
-                    accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"
+                    accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx,.zip"
                     ref={el => fileInputRefs.current[dt.name] = el}
                     onChange={(e) => {
                       if (e.target.files[0]) {
@@ -232,7 +232,7 @@ export default function UploadBusiness() {
             }}
           >
             + Choose Files
-            <input type="file" multiple hidden accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx" onChange={handleExtraUpload} />
+            <input type="file" multiple hidden accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx,.zip" onChange={handleExtraUpload} />
           </label>
         </div>
 
@@ -276,11 +276,11 @@ export default function UploadBusiness() {
         <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'16px'}}>
           <div>
             <h3 style={{marginBottom:'4px'}}>Finished Uploading?</h3>
-            <p className="text-sm" style={{margin:0}}>Notify your accountant that your business documents are ready for review.</p>
+            <p className="text-sm" style={{margin:0}}>Send your business documents for review.</p>
           </div>
           <button className="btn btn-primary" onClick={notifyComplete}>
             <span className="material-symbols-outlined">send</span>
-            Notify Admin: Uploads Complete
+            Send for Approval
           </button>
         </div>
       </div>

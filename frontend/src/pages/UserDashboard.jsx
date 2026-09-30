@@ -12,11 +12,15 @@ export default function UserDashboard() {
   const [adminDocs, setAdminDocs] = useState([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [docLoading, setDocLoading] = useState(false);
+  const [engagementLink, setEngagementLink] = useState(null);
   // Track which doc rows have the AI summary panel open
   const [expandedSummary, setExpandedSummary] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
+  // Reject comment panel for admin docs: { docId, note }
+  const [rejectPanel, setRejectPanel] = useState(null);
+
 
   // ── declare callbacks BEFORE the effects that reference them ──
 
@@ -50,8 +54,22 @@ export default function UserDashboard() {
           setEngagementDisabled(true);
         }
       }
+      
+      const tplRes = await authFetch("/api/upload/templates?category=engagement&tax_year=2025");
+      if (tplRes.ok) {
+        const tpls = await tplRes.json();
+        if (tpls && tpls.length > 0) {
+          setEngagementLink(tpls[0].download);
+        } else {
+          // Fallback static link if no template is defined
+          setEngagementLink("/Engagement_Letter_Template.pdf");
+        }
+      } else {
+        setEngagementLink("/Engagement_Letter_Template.pdf");
+      }
     } catch (err) {
       console.error(err);
+      setEngagementLink("/Engagement_Letter_Template.pdf");
     }
   }, [authFetch]);
 
@@ -116,13 +134,8 @@ export default function UserDashboard() {
     }
   };
 
-  const respondDoc = async (docId, approved) => {
+  const respondDoc = async (docId, approved, reason = "") => {
     if (docLoading) return;
-    let reason = "";
-    if (!approved) {
-      reason = window.prompt("Reason for rejection:");
-      if (reason === null) return;
-    }
     setDocLoading(true);
     try {
       const res = await authFetch("/api/review/admin-doc-response", {
@@ -131,7 +144,9 @@ export default function UserDashboard() {
         body: JSON.stringify({ doc_id: docId, status: approved ? "approved" : "rejected", reason })
       });
       if (res.ok) {
+        setRejectPanel(null);
         showToast(`Document ${approved ? 'approved' : 'rejected'} successfully`, "success");
+        loadAdminDocs();
       } else {
         showToast("Failed to submit response", "error");
       }
@@ -141,6 +156,11 @@ export default function UserDashboard() {
       setDocLoading(false);
     }
   };
+
+  const openUserRejectPanel = (docId) => {
+    setRejectPanel({ docId, note: '' });
+  };
+
 
   const toggleSummary = (docId) => {
     setExpandedSummary(prev => ({ ...prev, [docId]: !prev[docId] }));
@@ -156,8 +176,25 @@ export default function UserDashboard() {
       </div>
 
       <div className="card fade-up">
-        <h3 style={{marginBottom: '16px'}}>Engagement Letter</h3>
-        <p className="text-sm" style={{marginBottom: '16px'}}>Please acknowledge the engagement letter before uploading documents.</p>
+        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '16px'}}>
+          <div>
+            <h3 style={{margin: 0, marginBottom: '4px'}}>Engagement Letter</h3>
+            <p className="text-sm">Please review and acknowledge the engagement letter before uploading documents.</p>
+          </div>
+          {engagementLink && (
+            <a 
+              href={engagementLink} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="btn btn-secondary btn-sm"
+              style={{display: 'flex', alignItems: 'center', gap: '6px', borderRadius: 'var(--radius-pill)'}}
+            >
+              <span className="material-symbols-outlined" style={{fontSize: '18px'}}>download</span>
+              Download PDF
+            </a>
+          )}
+        </div>
+        
         <label style={{
           display: 'flex', alignItems: 'center', gap: '12px', padding: '16px',
           background: 'var(--bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)',
@@ -224,6 +261,7 @@ export default function UserDashboard() {
                 <tr>
                   <th>Document Name</th>
                   <th>Date Provided</th>
+                  <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -237,125 +275,80 @@ export default function UserDashboard() {
                       </td>
                       <td>{new Date(doc.created_at).toLocaleDateString()}</td>
                       <td>
+                        {doc.review_status ? (
+                          <div>
+                            <span className={`badge ${doc.review_status === 'approved' ? 'badge-green' : doc.review_status === 'rejected' ? 'badge-red' : 'badge-yellow'}`} style={{fontWeight:700}}>
+                              {doc.review_status.toUpperCase()}
+                            </span>
+                            {doc.review_status === 'rejected' && doc.review_note && (
+                              <div style={{fontSize:'12px', color:'#c0392b', fontStyle:'italic', marginTop:'4px'}}>
+                                Reason: "{doc.review_note}"
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="badge badge-yellow">PENDING</span>
+                        )}
+                      </td>
+                      <td>
                         <div style={{display:'flex', gap:'8px', flexWrap:'wrap', alignItems:'center'}}>
                           <button className="btn btn-secondary btn-sm" onClick={() => viewDoc(doc.storage_key)}>View</button>
                           <button className="btn btn-primary btn-sm" onClick={() => respondDoc(doc.id, true)} disabled={docLoading}>Approve</button>
-                          <button className="btn btn-danger btn-sm" onClick={() => respondDoc(doc.id, false)} disabled={docLoading}>Reject</button>
-
-                          {/* AI Summary badge / button */}
-                          {doc.ai_summary === null ? (
-                            <span style={{
-                              display: 'inline-flex', alignItems: 'center', gap: '6px',
-                              fontSize: '11.5px', fontWeight: 500,
-                              color: 'var(--brass-dark)',
-                              padding: '5px 12px', borderRadius: 'var(--radius-pill)',
-                              background: 'var(--brass-light)',
-                              border: '1px solid rgba(176,128,61,0.25)',
-                              letterSpacing: '0.01em',
-                            }}>
-                              <span style={{display:'inline-block', animation:'spin 1.5s linear infinite', fontSize:'13px'}}>✦</span>
-                              Analyzing…
-                            </span>
-                          ) : doc.ai_summary ? (
-                            <button
-                              onClick={() => toggleSummary(doc.id)}
-                              style={{
-                                display: 'inline-flex', alignItems: 'center', gap: '6px',
-                                fontSize: '11.5px', fontWeight: 600,
-                                padding: '5px 14px', borderRadius: 'var(--radius-pill)',
-                                border: expandedSummary[doc.id]
-                                  ? '1px solid var(--accent)'
-                                  : '1px solid rgba(44,122,91,0.35)',
-                                cursor: 'pointer',
-                                background: expandedSummary[doc.id]
-                                  ? 'var(--accent)'
-                                  : 'linear-gradient(135deg, rgba(44,122,91,0.10) 0%, rgba(31,93,70,0.06) 100%)',
-                                color: expandedSummary[doc.id] ? '#fff' : 'var(--accent)',
-                                boxShadow: expandedSummary[doc.id] ? 'var(--shadow-sm)' : 'none',
-                                transition: 'all 0.22s ease',
-                                letterSpacing: '0.01em',
-                              }}
-                            >
-                              <span style={{fontSize:'13px'}}>✨</span>
-                              {expandedSummary[doc.id] ? 'Hide Summary' : 'AI Summary'}
-                            </button>
-                          ) : null}
+                          <button className="btn btn-danger btn-sm" onClick={() => openUserRejectPanel(doc.id)} disabled={docLoading}>Reject</button>
                         </div>
                       </td>
                     </tr>
 
-                    {/* Expanded AI Summary panel — spans full row width */}
-                    {expandedSummary[doc.id] && doc.ai_summary && (
-                      <tr key={`${doc.id}-summary`}>
-                        <td colSpan={3} style={{padding: '0 0 14px'}}>
+                    {/* Inline Reject Panel */}
+                    {rejectPanel?.docId === doc.id && (
+                      <tr key={`reject-${doc.id}`}>
+                        <td colSpan={4} style={{padding:'0'}}>
                           <div style={{
+                            padding: '14px 16px',
+                            background: 'rgba(220,53,69,0.05)',
+                            border: '1px solid rgba(220,53,69,0.25)',
+                            borderTop: 'none',
                             display: 'flex',
-                            borderRadius: 'var(--radius-md)',
-                            overflow: 'hidden',
-                            border: '1px solid rgba(44,122,91,0.20)',
-                            boxShadow: '0 4px 20px -6px rgba(44,122,91,0.18)',
-                            background: 'linear-gradient(135deg, rgba(44,122,91,0.07) 0%, rgba(31,93,70,0.03) 100%)',
-                            backdropFilter: 'blur(8px)',
-                            animation: 'fadeUp 0.2s ease',
+                            flexDirection: 'column',
+                            gap: '10px'
                           }}>
-                            {/* Left accent strip */}
-                            <div style={{
-                              width: '4px', flexShrink: 0,
-                              background: 'linear-gradient(180deg, var(--accent) 0%, var(--brass) 100%)',
-                            }} />
-
-                            <div style={{padding: '16px 20px', flex: 1}}>
-                              {/* Header row */}
-                              <div style={{
-                                display: 'flex', alignItems: 'center', gap: '8px',
-                                marginBottom: '10px'
-                              }}>
-                                <div style={{
-                                  width: '28px', height: '28px', borderRadius: 'var(--radius-xs)',
-                                  background: 'linear-gradient(135deg, var(--accent) 0%, var(--emerald-dark) 100%)',
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  fontSize: '14px', flexShrink: 0,
-                                  boxShadow: '0 2px 8px rgba(44,122,91,0.30)',
-                                }}>
-                                  ✨
-                                </div>
-                                <div>
-                                  <div style={{
-                                    fontSize: '10px', fontWeight: 700,
-                                    letterSpacing: '0.08em', textTransform: 'uppercase',
-                                    color: 'var(--accent)',
-                                  }}>AI Document Summary</div>
-                                  <div style={{
-                                    fontSize: '11px', color: 'var(--muted)', marginTop: '1px'
-                                  }}>Generated by BookKeepPro AI</div>
-                                </div>
-                              </div>
-
-                              {/* Summary text */}
-                              <p style={{
-                                fontSize: '13.5px', lineHeight: '1.7',
-                                color: 'var(--ink)',
-                                margin: 0,
-                                fontFamily: 'var(--font-body)',
-                              }}>
-                                {doc.ai_summary}
-                              </p>
-
-                              {/* Footer disclaimer */}
-                              <div style={{
-                                display: 'flex', alignItems: 'center', gap: '6px',
-                                marginTop: '12px',
-                                paddingTop: '10px',
-                                borderTop: '1px solid rgba(44,122,91,0.12)',
-                              }}>
-                                <span style={{fontSize:'11px', color:'var(--muted)'}}>⚠</span>
-                                <span style={{
-                                  fontSize: '11px', color: 'var(--muted)',
-                                  fontStyle: 'italic',
-                                }}>
-                                  AI-generated summary — always review the original document for authoritative information.
-                                </span>
-                              </div>
+                            <div style={{fontWeight:600, fontSize:'13px', color:'#c0392b', display:'flex', alignItems:'center', gap:'6px'}}>
+                              <span className="material-symbols-outlined" style={{fontSize:'16px'}}>feedback</span>
+                              Reason for Rejection (optional)
+                            </div>
+                            <textarea
+                              rows={3}
+                              placeholder="Tell the admin why you are rejecting this document..."
+                              value={rejectPanel.note}
+                              onChange={e => setRejectPanel(prev => ({...prev, note: e.target.value}))}
+                              style={{
+                                width: '100%',
+                                padding: '10px 12px',
+                                border: '1px solid rgba(220,53,69,0.35)',
+                                borderRadius: 'var(--radius-sm)',
+                                fontSize: '13px',
+                                resize: 'vertical',
+                                outline: 'none',
+                                fontFamily: 'inherit',
+                                background: 'white',
+                                boxSizing: 'border-box'
+                              }}
+                            />
+                            <div style={{display:'flex', gap:'8px', justifyContent:'flex-end'}}>
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                style={{borderRadius:'var(--radius-sm)'}}
+                                onClick={() => setRejectPanel(null)}
+                              >Cancel</button>
+                              <button
+                                className="btn btn-danger btn-sm"
+                                style={{borderRadius:'var(--radius-sm)'}}
+                                disabled={docLoading}
+                                onClick={() => respondDoc(doc.id, false, rejectPanel.note)}
+                              >
+                                <span className="material-symbols-outlined" style={{fontSize:'15px', verticalAlign:'middle', marginRight:'4px'}}>block</span>
+                                Confirm Rejection
+                              </button>
                             </div>
                           </div>
                         </td>

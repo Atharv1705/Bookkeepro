@@ -14,6 +14,7 @@ export default function AdminUserDetail() {
   
   const [userDetail, setUserDetail] = useState(null);
   const [documents, setDocuments] = useState([]);
+  const [showAiSummary, setShowAiSummary] = useState({});
   const [activeTab, setActiveTab] = useState('personal');
   const [taxYear, setTaxYear] = useState("");
   const [loading, setLoading] = useState(true);
@@ -22,6 +23,9 @@ export default function AdminUserDetail() {
   // States for Review Emails
   const [personalTimeline, setPersonalTimeline] = useState(0);
   const [businessTimeline, setBusinessTimeline] = useState(0);
+
+  // Reject comment panel: { docId, type, note }
+  const [rejectPanel, setRejectPanel] = useState(null);
 
   // Export Excel Function
   const exportToExcel = async () => {
@@ -33,7 +37,7 @@ export default function AdminUserDetail() {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `user_${userId}_documents.xlsx`;
+        a.download = `user_${userId}_excel_summaries.zip`;
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -165,25 +169,30 @@ export default function AdminUserDetail() {
     }
   };
 
-  const handleDocApprove = async (docId, type, isApproved) => {
+  const handleDocApprove = async (docId, type, isApproved, note = '') => {
     try {
       const status = isApproved ? 'approved' : 'rejected';
       const ep = type === "personal" ? `/api/upload/personal-documents/${docId}/review-status` : `/api/upload/business-documents/${docId}/review-status`;
       const res = await authFetch(ep, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, note: "" })
+        body: JSON.stringify({ status, note })
       });
       if (res.ok) {
+        setRejectPanel(null);
         fetchUserDetails(); // reload docs
       } else {
         showToast("Failed to save review status", "error");
       }
     } catch (err) { console.error(err);
-      console.error("Approval error", err);
       showToast("Approval error", "error");
     }
   };
+
+  const openRejectPanel = (docId, type) => {
+    setRejectPanel({ docId, type, note: '' });
+  };
+
 
   const deleteAdminDoc = async (docId) => {
     if (!window.confirm("Delete this admin document?")) return;
@@ -309,12 +318,37 @@ export default function AdminUserDetail() {
   };
 
   if (loading && !userDetail) {
-    return <div className="page-main-wide page-enter"><div className="empty-state"><div className="empty-title">Loading user details...</div></div></div>;
+    return <div className=""><div className="empty-state"><div className="empty-title">Loading user details...</div></div></div>;
   }
 
   if (!userDetail) {
-    return <div className="page-main-wide page-enter"><div className="empty-state"><div className="empty-title">User not found</div></div></div>;
+    return <div className=""><div className="empty-state"><div className="empty-title">User not found</div></div></div>;
   }
+
+  const exportAllToZip = async () => {
+    try {
+      showToast("Preparing ZIP export... This may take a moment.", "info");
+      const url = taxYear ? `/api/upload/admin/users/${userId}/export-zip?tax_year=${taxYear}` : `/api/upload/admin/users/${userId}/export-zip`;
+      const res = await authFetch(url);
+      if (res.ok) {
+        const blob = await res.blob();
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = `user_${userId}_documents.zip`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(downloadUrl);
+        showToast("ZIP export ready!", "success");
+      } else {
+        showToast("Failed to export ZIP file", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Error exporting ZIP file", "error");
+    }
+  };
 
   const currentYear = new Date().getFullYear();
   const yearOptions = [currentYear - 1, currentYear, currentYear + 1];
@@ -324,7 +358,12 @@ export default function AdminUserDetail() {
   const returnDocs = documents.filter(d => d.type === "admin");
 
   return (
-    <div className="page-main-wide page-enter">
+    <div className="">
+      <button className="btn btn-secondary btn-sm" style={{ marginBottom: '16px', display: 'inline-flex', alignItems: 'center', gap: '4px', borderRadius: 'var(--radius-sm)' }} onClick={() => navigate('/admin-dashboard')}>
+        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>arrow_back</span>
+        Back to Dashboard
+      </button>
+      
       {/* User Info Bar */}
       <div className="card aud-user-bar" style={{marginBottom: '20px'}}>
         <div className="aud-bar-inner">
@@ -389,6 +428,7 @@ export default function AdminUserDetail() {
                 {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
               </select>
             </div>
+            <button className="btn btn-secondary btn-sm" onClick={exportAllToZip} style={{borderRadius:'var(--radius-sm)'}} title="Download All Docs (ZIP)"><span className="material-symbols-outlined" style={{fontSize: '18px'}}>archive</span></button>
             <button className="btn btn-danger btn-sm" onClick={deleteUser} style={{borderRadius:'var(--radius-sm)'}}>Delete User</button>
           </div>
         </div>
@@ -424,19 +464,87 @@ export default function AdminUserDetail() {
                           </div>
                           {doc.notes && <div style={{ fontSize:'12px', color:'var(--warn)', marginTop:'3px', fontWeight:500 }}>⚠ {doc.notes}</div>}
                           {doc.review_status && (
-                            <div style={{ marginTop:'5px' }}>
+                            <div style={{ marginTop:'5px', display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap' }}>
                               <span className={`badge ${doc.review_status === 'approved' ? 'badge-green' : doc.review_status === 'rejected' ? 'badge-red' : 'badge-yellow'}`} style={{fontWeight:700}}>
                                 {doc.review_status.toUpperCase()}
                               </span>
+                              {doc.review_status === 'rejected' && doc.review_note && (
+                                <span style={{fontSize:'12px', color:'#c0392b', fontStyle:'italic'}}>"{doc.review_note}"</span>
+                              )}
                             </div>
                           )}
                         </div>
                         <div className="doc-review-actions">
                           <button onClick={() => viewDoc(doc.storage_key)} className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)'}}>View</button>
                           <button className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)'}} onClick={() => handleDocApprove(doc.id, doc.type, true)}>Approve</button>
-                          <button className="btn btn-danger btn-sm" style={{borderRadius:'var(--radius-sm)'}} onClick={() => handleDocApprove(doc.id, doc.type, false)}>Reject</button>
+                          <button className="btn btn-danger btn-sm" style={{borderRadius:'var(--radius-sm)'}} onClick={() => openRejectPanel(doc.id, doc.type)}>Reject</button>
+                          <button 
+                            className="btn btn-secondary btn-sm" 
+                            style={{borderRadius:'var(--radius-sm)'}} 
+                            onClick={() => setShowAiSummary(prev => ({ ...prev, [doc.id]: !prev[doc.id] }))}
+                          >
+                            <span className="material-symbols-outlined" style={{fontSize: '16px', marginRight: '4px', verticalAlign: 'middle'}}>
+                              {showAiSummary[doc.id] ? 'visibility_off' : 'auto_awesome'}
+                            </span>
+                            {showAiSummary[doc.id] ? 'Hide AI Summary' : 'View AI Summary'}
+                          </button>
                         </div>
                       </div>
+
+                      {/* Inline Reject Comment Panel */}
+                      {rejectPanel?.docId === doc.id && rejectPanel?.type === doc.type && (
+                        <div style={{
+                          marginTop: '12px',
+                          padding: '14px 16px',
+                          background: 'rgba(220,53,69,0.05)',
+                          border: '1px solid rgba(220,53,69,0.25)',
+                          borderRadius: 'var(--radius-sm)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '10px'
+                        }}>
+                          <div style={{fontWeight:600, fontSize:'13px', color:'#c0392b', display:'flex', alignItems:'center', gap:'6px'}}>
+                            <span className="material-symbols-outlined" style={{fontSize:'16px'}}>feedback</span>
+                            Reason for Rejection (optional)
+                          </div>
+                          <textarea
+                            rows={3}
+                            placeholder="Explain why this document is being rejected..."
+                            value={rejectPanel.note}
+                            onChange={e => setRejectPanel(prev => ({...prev, note: e.target.value}))}
+                            style={{
+                              width: '100%',
+                              padding: '10px 12px',
+                              border: '1px solid rgba(220,53,69,0.35)',
+                              borderRadius: 'var(--radius-sm)',
+                              fontSize: '13px',
+                              resize: 'vertical',
+                              outline: 'none',
+                              fontFamily: 'inherit',
+                              background: 'white',
+                              boxSizing: 'border-box'
+                            }}
+                          />
+                          <div style={{display:'flex', gap:'8px', justifyContent:'flex-end'}}>
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              style={{borderRadius:'var(--radius-sm)'}}
+                              onClick={() => setRejectPanel(null)}
+                            >Cancel</button>
+                            <button
+                              className="btn btn-danger btn-sm"
+                              style={{borderRadius:'var(--radius-sm)'}}
+                              onClick={() => handleDocApprove(doc.id, doc.type, false, rejectPanel.note)}
+                            >
+                              <span className="material-symbols-outlined" style={{fontSize:'15px', verticalAlign:'middle', marginRight:'4px'}}>block</span>
+                              Confirm Rejection
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {showAiSummary[doc.id] && (
+                        <>
                       {doc.extracted_data && Object.keys(doc.extracted_data).length > 0 ? (
                         <div className="ai-summary-block">
                           <div className="ai-summary-label">
@@ -456,6 +564,8 @@ export default function AdminUserDetail() {
                           </div>
                         </div>
                       ) : null}
+                      </>
+                      )}
                     </div>
                   ))
                 )}
@@ -521,19 +631,87 @@ export default function AdminUserDetail() {
                           </div>
                           {doc.notes && <div style={{ fontSize:'12px', color:'var(--warn)', marginTop:'3px', fontWeight:500 }}>⚠ {doc.notes}</div>}
                           {doc.review_status && (
-                            <div style={{ marginTop:'5px' }}>
+                            <div style={{ marginTop:'5px', display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap' }}>
                               <span className={`badge ${doc.review_status === 'approved' ? 'badge-green' : doc.review_status === 'rejected' ? 'badge-red' : 'badge-yellow'}`} style={{fontWeight:700}}>
                                 {doc.review_status.toUpperCase()}
                               </span>
+                              {doc.review_status === 'rejected' && doc.review_note && (
+                                <span style={{fontSize:'12px', color:'#c0392b', fontStyle:'italic'}}>"{doc.review_note}"</span>
+                              )}
                             </div>
                           )}
                         </div>
                         <div className="doc-review-actions">
                           <button onClick={() => viewDoc(doc.storage_key)} className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)'}}>View</button>
                           <button className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)'}} onClick={() => handleDocApprove(doc.id, doc.type, true)}>Approve</button>
-                          <button className="btn btn-danger btn-sm" style={{borderRadius:'var(--radius-sm)'}} onClick={() => handleDocApprove(doc.id, doc.type, false)}>Reject</button>
+                          <button className="btn btn-danger btn-sm" style={{borderRadius:'var(--radius-sm)'}} onClick={() => openRejectPanel(doc.id, doc.type)}>Reject</button>
+                          <button 
+                            className="btn btn-secondary btn-sm" 
+                            style={{borderRadius:'var(--radius-sm)'}} 
+                            onClick={() => setShowAiSummary(prev => ({ ...prev, [doc.id]: !prev[doc.id] }))}
+                          >
+                            <span className="material-symbols-outlined" style={{fontSize: '16px', marginRight: '4px', verticalAlign: 'middle'}}>
+                              {showAiSummary[doc.id] ? 'visibility_off' : 'auto_awesome'}
+                            </span>
+                            {showAiSummary[doc.id] ? 'Hide AI Summary' : 'View AI Summary'}
+                          </button>
                         </div>
                       </div>
+
+                      {/* Inline Reject Comment Panel */}
+                      {rejectPanel?.docId === doc.id && rejectPanel?.type === doc.type && (
+                        <div style={{
+                          marginTop: '12px',
+                          padding: '14px 16px',
+                          background: 'rgba(220,53,69,0.05)',
+                          border: '1px solid rgba(220,53,69,0.25)',
+                          borderRadius: 'var(--radius-sm)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '10px'
+                        }}>
+                          <div style={{fontWeight:600, fontSize:'13px', color:'#c0392b', display:'flex', alignItems:'center', gap:'6px'}}>
+                            <span className="material-symbols-outlined" style={{fontSize:'16px'}}>feedback</span>
+                            Reason for Rejection (optional)
+                          </div>
+                          <textarea
+                            rows={3}
+                            placeholder="Explain why this document is being rejected..."
+                            value={rejectPanel.note}
+                            onChange={e => setRejectPanel(prev => ({...prev, note: e.target.value}))}
+                            style={{
+                              width: '100%',
+                              padding: '10px 12px',
+                              border: '1px solid rgba(220,53,69,0.35)',
+                              borderRadius: 'var(--radius-sm)',
+                              fontSize: '13px',
+                              resize: 'vertical',
+                              outline: 'none',
+                              fontFamily: 'inherit',
+                              background: 'white',
+                              boxSizing: 'border-box'
+                            }}
+                          />
+                          <div style={{display:'flex', gap:'8px', justifyContent:'flex-end'}}>
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              style={{borderRadius:'var(--radius-sm)'}}
+                              onClick={() => setRejectPanel(null)}
+                            >Cancel</button>
+                            <button
+                              className="btn btn-danger btn-sm"
+                              style={{borderRadius:'var(--radius-sm)'}}
+                              onClick={() => handleDocApprove(doc.id, doc.type, false, rejectPanel.note)}
+                            >
+                              <span className="material-symbols-outlined" style={{fontSize:'15px', verticalAlign:'middle', marginRight:'4px'}}>block</span>
+                              Confirm Rejection
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {showAiSummary[doc.id] && (
+                        <>
                       {doc.extracted_data && Object.keys(doc.extracted_data).length > 0 ? (
                         <div className="ai-summary-block">
                           <div className="ai-summary-label">
@@ -541,7 +719,7 @@ export default function AdminUserDetail() {
                             AI Summary
                           </div>
                           <ExpandableSummaryBlock 
-                            extractedData={doc.extracted_data}
+                            extractedData={doc.extracted_data} 
                             onSave={(newData) => handleUpdateExtractedData(doc.id, doc.type, newData)}
                           />
                         </div>
@@ -553,6 +731,8 @@ export default function AdminUserDetail() {
                           </div>
                         </div>
                       ) : null}
+                      </>
+                      )}
                     </div>
                   ))
                 )}

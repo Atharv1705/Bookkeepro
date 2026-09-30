@@ -81,7 +81,69 @@ def upgrade():
 
             # ── v6: AI summary for admin documents ────────────────────────────────
             _add_column(conn, "admin_documents", "ai_summary", "TEXT NULL DEFAULT NULL")
+            # ── v005: Workflow Improvements ─────────────────────────────────────
+            _add_column(conn, "admin_documents", "tax_year", "INT NULL DEFAULT NULL")
+            _add_column(conn, "admin_documents", "review_status", "VARCHAR(20) NOT NULL DEFAULT 'pending'")
+            _add_column(conn, "admin_documents", "review_note", "VARCHAR(500) NULL DEFAULT NULL")
+            _add_column(conn, "admin_documents", "reviewed_at", "DATETIME NULL DEFAULT NULL")
+            
+            # Set existing docs to pending
+            conn.execute(text("UPDATE admin_documents SET review_status = 'pending' WHERE review_status IS NULL OR review_status = '';"))
+            
+            # Create document_review_events table
+            try:
+                conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS document_review_events (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    doc_kind VARCHAR(50) NOT NULL,
+                    doc_id INT NOT NULL,
+                    owner_user_id INT NOT NULL,
+                    actor_id INT NULL,
+                    actor_role VARCHAR(20) NOT NULL,
+                    action VARCHAR(50) NOT NULL,
+                    from_status VARCHAR(20) NULL,
+                    to_status VARCHAR(20) NULL,
+                    tax_year INT NULL,
+                    comment TEXT NULL,
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE,
+                    FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE SET NULL,
+                    INDEX ix_document_review_events_composite (doc_kind, doc_id, created_at),
+                    INDEX ix_document_review_events_owner (owner_user_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+                """))
+                print("  [OK] Table document_review_events created or exists")
+            except Exception as e:
+                print(f"  [WARN] Table document_review_events: {e}")
 
+            # Create admin_document_bookmarks table
+            try:
+                conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS admin_document_bookmarks (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    admin_id INT NOT NULL,
+                    doc_kind VARCHAR(50) NOT NULL,
+                    doc_id INT NOT NULL,
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE CASCADE,
+                    UNIQUE KEY uq_admin_bookmark (admin_id, doc_kind, doc_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+                """))
+                print("  [OK] Table admin_document_bookmarks created or exists")
+            except Exception as e:
+                print(f"  [WARN] Table admin_document_bookmarks: {e}")
+                
+            # Backfill one uploaded event per admin_document
+            try:
+                conn.execute(text("""
+                INSERT INTO document_review_events (doc_kind, doc_id, owner_user_id, actor_id, actor_role, action, from_status, to_status, tax_year, created_at)
+                SELECT 'admin', id, user_id, uploaded_by, 'admin', 'uploaded', NULL, 'pending', tax_year, uploaded_at
+                FROM admin_documents
+                WHERE id NOT IN (SELECT doc_id FROM document_review_events WHERE doc_kind = 'admin' AND action = 'uploaded');
+                """))
+                print("  [OK] Backfilled uploaded events for admin_documents")
+            except Exception as e:
+                print(f"  [WARN] Backfill uploaded events: {e}")
 
         print("\nAll migrations complete.")
     except Exception as e:
