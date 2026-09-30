@@ -1203,6 +1203,10 @@ def export_user_documents_excel(
             return "'" + s
         return s
 
+    import re
+    raw_name = user.name or user.email.split('@')[0]
+    safe_user_name = re.sub(r'[^a-zA-Z0-9_\- ]', '_', raw_name).strip()
+
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
         for docs, prefix in [(personal_docs, "Personal"), (business_docs, "Business")]:
@@ -1249,12 +1253,12 @@ def export_user_documents_excel(
                 excel_buffer.seek(0)
                 
                 safe_filename = d.filename.replace("/", "_").replace("\\", "_")
-                file_name = f"{prefix}_{d.id}_{safe_filename}.xlsx"
+                file_name = f"{safe_user_name}/{prefix}_{d.id}_{safe_filename}.xlsx"
                 zip_file.writestr(file_name, excel_buffer.read())
 
     zip_buffer.seek(0)
     headers = {
-        "Content-Disposition": f'attachment; filename="user_{user_id}_excel_summaries.zip"',
+        "Content-Disposition": f'attachment; filename="{safe_user_name}_excel_summaries.zip"',
         "Content-Type": "application/zip",
     }
     return StreamingResponse(zip_buffer, headers=headers)
@@ -1295,6 +1299,10 @@ def export_user_documents_zip(
 
     import zipfile
     import io
+    import re
+
+    raw_name = target_user.name or target_user.email.split('@')[0]
+    safe_user_name = re.sub(r'[^a-zA-Z0-9_\- ]', '_', raw_name).strip()
 
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
@@ -1308,11 +1316,11 @@ def export_user_documents_zip(
                     if file_path.exists():
                         # Make sure filename is safe and unique
                         filename = doc.filename or "document"
-                        zip_file.write(file_path, f"{prefix}/{doc.id}_{filename}")
+                        zip_file.write(file_path, f"{safe_user_name}/{prefix}/{doc.id}_{filename}")
 
     zip_buffer.seek(0)
 
-    filename = f"user_{user_id}_documents_{tax_year if tax_year else 'all'}.zip"
+    filename = f"{safe_user_name}_documents_{tax_year if tax_year else 'all'}.zip"
 
     return StreamingResponse(
         zip_buffer,

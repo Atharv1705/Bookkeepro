@@ -335,7 +335,10 @@ export default function AdminUserDetail() {
         const downloadUrl = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = downloadUrl;
-        a.download = `user_${userId}_documents.zip`;
+        
+        const safeName = (userDetail?.name || userDetail?.email?.split('@')[0] || `user_${userId}`).replace(/[^a-zA-Z0-9_\- ]/g, '_').trim();
+        a.download = `${safeName}_documents_${taxYear ? taxYear : 'all'}.zip`;
+        
         document.body.appendChild(a);
         a.click();
         a.remove();
