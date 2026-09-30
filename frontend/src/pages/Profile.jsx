@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 export default function Profile() {
   const { user, authFetch } = useAuth();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({ name: '', phone: '' });
   const [pwData, setPwData] = useState({ currentPw: '', newPw: '', confirmPw: '' });
   const [showPwSection, setShowPwSection] = useState(false);
@@ -63,6 +65,14 @@ export default function Profile() {
 
   return (
     <div style={{ maxWidth: '680px', margin: '0 auto' }}>
+      <button 
+        className="btn btn-secondary btn-sm" 
+        style={{ marginBottom: '16px', display: 'inline-flex', alignItems: 'center', gap: '4px', borderRadius: 'var(--radius-sm)' }} 
+        onClick={() => navigate((user?.role === 'admin' || user?.role === 'super_admin') ? '/admin-dashboard' : '/dashboard')}
+      >
+        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>arrow_back</span>
+        Back to Dashboard
+      </button>
       <div className="page-heading">
         <div>
           <h1>My Profile</h1>

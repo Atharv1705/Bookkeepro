@@ -47,6 +47,7 @@ def create_access_token(
     payload = {
         "sub": subject,
         "role": role.lower(),
+        "type": "access",
         "exp": expire,
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
@@ -169,8 +170,12 @@ def get_current_user(
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str | None = payload.get("sub")
-
-        if not email:
+        # Old access tokens omitted 'type', so we default to 'access'.
+        # Reset and verification tokens explicitly set their type, so they will fail this check.
+        token_type = payload.get("type", "access")
+        
+        # We must explicitly check type claim to prevent reset tokens from acting as access tokens
+        if not email or token_type != "access":
             raise credentials_exception
 
     except JWTError:
@@ -207,8 +212,29 @@ def require_super_admin(current_user=Depends(get_current_user)):
     return current_user
 
 
+def assert_admin_can_access(current_user, target_user):
+    """
+    Enforces that:
+    1. The current user is actually an admin/super_admin.
+    2. The target user exists (throws 404).
+    3. The target user has a 'user' role (throws 403).
+    """
+    if not target_user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        
+    if current_user.role not in [UserRole.admin, UserRole.super_admin]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+        
+    if target_user.role != UserRole.user:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admins can only interact with regular user accounts"
+        )
+
+
 # =========================
 # Auth Routes
+
 # =========================
 
 @router.post("/signup", response_model=TokenResponse)
@@ -469,6 +495,7 @@ def update_me(
 def list_users_for_admin(
     skip:  int = Query(0,   ge=0),
     limit: int = Query(100, ge=1, le=500),
+    tax_year: int = Query(None),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
     _=Depends(require_admin),
@@ -482,16 +509,22 @@ def list_users_for_admin(
     from sqlalchemy import func as sqlfunc
 
     def _pending_count(uid: int) -> dict:
-        p = db.query(sqlfunc.count(PersonalDocument.id)).filter(
+        p_q = db.query(sqlfunc.count(PersonalDocument.id)).filter(
             PersonalDocument.user_id       == uid,
             PersonalDocument.review_status == "pending",
             PersonalDocument.deleted_at    == None,
-        ).scalar() or 0
-        b = db.query(sqlfunc.count(BusinessDocument.id)).filter(
+        )
+        b_q = db.query(sqlfunc.count(BusinessDocument.id)).filter(
             BusinessDocument.user_id       == uid,
             BusinessDocument.review_status == "pending",
             BusinessDocument.deleted_at    == None,
-        ).scalar() or 0
+        )
+        if tax_year is not None:
+            p_q = p_q.filter(PersonalDocument.tax_year == tax_year)
+            b_q = b_q.filter(BusinessDocument.tax_year == tax_year)
+            
+        p = p_q.scalar() or 0
+        b = b_q.scalar() or 0
         return {"pending_personal": p, "pending_business": b, "pending_docs": p + b}
 
     if current_user.role == UserRole.super_admin:

@@ -1,12 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import DOMPurify from 'dompurify';
 
 export default function AdminDashboard() {
   const { authFetch } = useAuth();
   const [stats, setStats] = useState({ total_users: 0, pending_personal: 0, pending_business: 0, admins: 0 });
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState("");
+  const [userFilter, setUserFilter] = useState("all");
+  const [userSort, setUserSort] = useState("newest");
+  const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
   const [tab, setTab] = useState("users");
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -37,7 +41,7 @@ export default function AdminDashboard() {
   const fetchAdminData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await authFetch("/api/auth/admin/users");
+      const res = await authFetch(`/api/auth/admin/users?tax_year=${filterYear}`);
       
       if (res.ok) {
         const payload = await res.json();
@@ -78,7 +82,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchAdminData();
-  }, [authFetch, fetchAdminData]);
+  }, [authFetch, fetchAdminData, filterYear]);
 
   useEffect(() => {
     if (tab === "templates") {
@@ -133,28 +137,76 @@ export default function AdminDashboard() {
   const yearOptions = [currentYear - 1, currentYear, currentYear + 1];
 
   const filteredUsers = users.filter(u => {
+    // Stat Card Filters
+    if (userFilter === 'pending_personal' && !(u.pending_personal > 0)) return false;
+    if (userFilter === 'pending_business' && !(u.pending_business > 0)) return false;
+
     if (!search) return true;
     const q = search.toLowerCase();
     return (u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q));
+  }).sort((a, b) => {
+    if (userSort === 'asc') return (a.name || '').localeCompare(b.name || '');
+    if (userSort === 'desc') return (b.name || '').localeCompare(a.name || '');
+    if (userSort === 'highest_pending') {
+      const aPending = (a.pending_personal || 0) + (a.pending_business || 0);
+      const bPending = (b.pending_personal || 0) + (b.pending_business || 0);
+      return bPending - aPending;
+    }
+    // Default fallback to ID if created_at is missing
+    if (userSort === 'newest') return (b.id || 0) - (a.id || 0);
+    if (userSort === 'oldest') return (a.id || 0) - (b.id || 0);
+    return 0;
   });
 
   return (
-    <div className="page-main-wide page-enter">
-      <div className="flex-between align-center" style={{ marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-        <h1 style={{ margin: 0, fontSize: '28px', color: 'var(--navy)' }}>
-          Users <span style={{ color: 'var(--muted)', fontWeight: 400 }}>{tab === 'templates' ? 'Templates' : ''}</span>
-        </h1>
+    <div className="">
+      <h1 style={{ 
+        margin: '0 0 32px 0', 
+        fontSize: '42px', 
+        fontFamily: 'var(--font-display)',
+        fontWeight: '800', 
+        color: 'var(--ink)', 
+        textAlign: 'center',
+        letterSpacing: '-0.5px'
+      }}>
+        Admin Dashboard <span style={{ color: 'var(--brass)', fontWeight: 600, fontSize: '32px' }}>{tab === 'templates' ? '| Templates' : ''}</span>
+      </h1>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
         {tab === 'users' && (
-          <div className="search-wrap" style={{ width: '100%', maxWidth: '300px' }}>
-            <span className="material-symbols-outlined search-icon" style={{position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', fontSize: '20px'}}>search</span>
-            <input 
-              type="text" 
-              className="search-input" 
-              style={{ width: '100%', padding: '10px 12px 10px 40px', border: '1px solid var(--border)', borderRadius: 'var(--radius-full)', outline: 'none' }}
-              placeholder="Search by name or email" 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+          <div style={{ display: 'flex', gap: '12px', width: '100%', maxWidth: '500px', flexWrap: 'wrap' }}>
+            <div className="search-wrap" style={{ flex: 1, minWidth: '200px', position: 'relative' }}>
+              <span className="material-symbols-outlined search-icon" style={{position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', fontSize: '20px'}}>search</span>
+              <input 
+                type="text" 
+                className="search-input" 
+                style={{ width: '100%', padding: '10px 12px 10px 40px', border: '1px solid var(--border)', borderRadius: 'var(--radius-full)', outline: 'none' }}
+                placeholder="Search by name or email" 
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <select 
+              className="select-input" 
+              style={{ width: 'auto', padding: '10px 16px', borderRadius: 'var(--radius-full)', border: '1px solid var(--border)', outline: 'none', background: 'white' }}
+              value={userSort}
+              onChange={(e) => setUserSort(e.target.value)}
+            >
+              <option value="newest">Newest First</option>
+              <option value="oldest">Oldest First</option>
+              <option value="highest_pending">Highest Pending</option>
+              <option value="asc">Name (A-Z)</option>
+              <option value="desc">Name (Z-A)</option>
+            </select>
+            <select
+              className="select-input"
+              style={{ width: 'auto', padding: '10px 16px', borderRadius: 'var(--radius-full)', border: '1px solid var(--border)', outline: 'none', background: 'white' }}
+              value={filterYear}
+              onChange={(e) => setFilterYear(e.target.value)}
+            >
+              <option value={currentYear - 1}>TY {currentYear - 1}</option>
+              <option value={currentYear}>TY {currentYear}</option>
+              <option value={currentYear + 1}>TY {currentYear + 1}</option>
+            </select>
           </div>
         )}
       </div>
@@ -187,13 +239,13 @@ export default function AdminDashboard() {
             </div>
             {digestHtml && (
               <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(31,93,70,0.2)', fontSize: '13px', color: 'var(--navy)', lineHeight: '1.7' }}
-                dangerouslySetInnerHTML={{ __html: digestHtml }} />
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(digestHtml) }} />
             )}
           </div>
 
           {/* Stats Bar */}
           <div className="admin-stats">
-            <div className="stat-card accent-blue">
+            <div className={`stat-card accent-blue ${userFilter === 'all' ? 'active-filter' : ''}`} onClick={() => setUserFilter('all')} style={{ cursor: 'pointer', border: userFilter === 'all' ? '2px solid var(--blue)' : 'none' }}>
               <div className="stat-icon"><span className="material-symbols-outlined">group</span></div>
               <div className="stat-value">{stats.total_users}</div>
               <div className="stat-label">Total Users</div>
@@ -203,12 +255,12 @@ export default function AdminDashboard() {
               <div className="stat-value">{stats.admins}</div>
               <div className="stat-label">Admin Accounts</div>
             </div>
-            <div className="stat-card accent-orange">
+            <div className={`stat-card accent-orange ${userFilter === 'pending_personal' ? 'active-filter' : ''}`} onClick={() => setUserFilter('pending_personal')} style={{ cursor: 'pointer', border: userFilter === 'pending_personal' ? '2px solid var(--orange)' : 'none' }}>
               <div className="stat-icon"><span className="material-symbols-outlined">description</span></div>
               <div className="stat-value">{stats.pending_personal}</div>
               <div className="stat-label">Pending Personal</div>
             </div>
-            <div className="stat-card accent-orange">
+            <div className={`stat-card accent-orange ${userFilter === 'pending_business' ? 'active-filter' : ''}`} onClick={() => setUserFilter('pending_business')} style={{ cursor: 'pointer', border: userFilter === 'pending_business' ? '2px solid var(--orange)' : 'none' }}>
               <div className="stat-icon"><span className="material-symbols-outlined">business</span></div>
               <div className="stat-value">{stats.pending_business}</div>
               <div className="stat-label">Pending Business</div>

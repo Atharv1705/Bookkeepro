@@ -200,3 +200,4 @@ def spa_fallback(full_path: str):
         status_code=404,
         detail="Frontend not built. Run 'npm run build' in /frontend.",
     )
+# reload

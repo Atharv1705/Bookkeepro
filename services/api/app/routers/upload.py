@@ -4,7 +4,7 @@ import uuid
 import logging
 from datetime import datetime
 import filetype
-from fastapi import APIRouter, BackgroundTasks, UploadFile, File, HTTPException, Depends, Form, Query
+from fastapi import APIRouter, BackgroundTasks, UploadFile, File, HTTPException, Depends, Form, Query, Response
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -14,7 +14,7 @@ from datetime import timedelta
 from app.models import AdminDocument, PersonalDocument, BusinessDocument, User, UserRole, ChatSession, ChatMessage
 from app.db import get_db, SessionLocal
 import app.crud as crud
-from app.auth.security import get_current_user, require_admin, SECRET_KEY, ALGORITHM
+from app.auth.security import get_current_user, require_admin, assert_admin_can_access, SECRET_KEY, ALGORITHM
 from app.utils.emailer import send_email
 from app.utils.ai import extract_document_data, summarize_admin_document, extract_raw_text
 from app.utils.vector_store import add_document_embedding, delete_document_embeddings, delete_user_embeddings
@@ -128,7 +128,9 @@ async def upload_to_storage(file: UploadFile) -> str:
         "application/msword",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "application/vnd.ms-excel",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/zip",
+        "application/x-zip-compressed"
     }
     
     kind = filetype.guess(contents)
@@ -137,8 +139,8 @@ async def upload_to_storage(file: UploadFile) -> str:
     ext = os.path.splitext(file.filename or "file")[1].lower()
     
     # Fallback for legacy .doc, .xls, and inconsistent .docx/.xlsx sniffing (which are just zip files)
-    if sniffed_mime is None or sniffed_mime == "application/zip":
-        if ext in [".doc", ".docx", ".xls", ".xlsx"] and file.content_type in ALLOWED_TYPES:
+    if sniffed_mime is None or sniffed_mime in ["application/zip", "application/x-zip-compressed"]:
+        if ext in [".doc", ".docx", ".xls", ".xlsx", ".zip"] and file.content_type in ALLOWED_TYPES:
             sniffed_mime = file.content_type
 
     if sniffed_mime not in ALLOWED_TYPES:
@@ -256,21 +258,14 @@ async def upload_admin_document(
     doc_key: str = Form(...),
     doc_label: str = Form(...),
     user_id: int = Form(...),
+    tax_year: int | None = Form(None),
     background: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
     _=Depends(require_admin),
 ):
     target_user = crud.get_user_by_id(db, user_id)
-    if not target_user:
-        raise HTTPException(status_code=404, detail="Target user not found")
-
-    # Regular admins can only upload documents for user-role accounts
-    if current_user.role == UserRole.admin and target_user.role != UserRole.user:
-        raise HTTPException(
-            status_code=403,
-            detail="Admins can only upload documents for regular user accounts"
-        )
+    assert_admin_can_access(current_user, target_user)
 
     logger.info(f"Admin {current_user.id} uploading document for user {user_id}")
     storage_key = await upload_to_storage(file)
@@ -283,33 +278,33 @@ async def upload_admin_document(
         content_type=file.content_type,
         uploaded_by=current_user.id,
         user_id=user_id,
+        ai_summary="",
+        tax_year=tax_year,
+        review_status="pending"
     )
     db.add(record)
     db.commit()
     db.refresh(record)
 
+    # Append uploaded event
+    from app.models import DocumentReviewEvent
+    event = DocumentReviewEvent(
+        doc_kind="admin",
+        doc_id=record.id,
+        owner_user_id=user_id,
+        actor_id=current_user.id,
+        actor_role="admin",
+        action="uploaded",
+        to_status="pending",
+        tax_year=tax_year
+    )
+    db.add(event)
+    db.commit()
+
     crud.log_action(db, "upload_admin_doc", user_id=current_user.id, target=f"admin_doc:{record.id}", detail=f"for user {user_id}")
 
-    # Background task 1: AI summary generation
-    def _generate_summary(doc_id: int, file_path: str, label: str):
-        summary = summarize_admin_document(str(file_path), label)
-        if summary:
-            _db = SessionLocal()
-            try:
-                doc = _db.query(AdminDocument).filter_by(id=doc_id).first()
-                if doc:
-                    doc.ai_summary = summary
-                    _db.commit()
-                    logger.info(f"[Summary] Saved summary for admin_doc:{doc_id}")
-            finally:
-                _db.close()
+    # AI extraction removed as per request
 
-    background.add_task(
-        _generate_summary,
-        record.id,
-        str(UPLOAD_DIR / storage_key),
-        doc_label,
-    )
 
     # Background task 2: Notify client by email
     background.add_task(
@@ -334,10 +329,14 @@ async def upload_admin_document(
 
 @router.get("/admin-documents")
 def list_admin_documents(
+    response: Response,
     user_id: int | None = None,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    response.headers["Cache-Control"] = "no-store"
+    bookmarked_doc_ids = set()
+
     if current_user.role in [UserRole.admin, UserRole.super_admin]:
         if not user_id:
             raise HTTPException(status_code=400, detail="user_id is required for admin")
@@ -347,6 +346,13 @@ def list_admin_documents(
             .order_by(AdminDocument.uploaded_at.desc())
             .all()
         )
+        from app.models import AdminDocumentBookmark
+        bookmarks = db.query(AdminDocumentBookmark).filter(
+            AdminDocumentBookmark.admin_id == current_user.id,
+            AdminDocumentBookmark.doc_kind == 'admin'
+        ).all()
+        bookmarked_doc_ids = {b.doc_id for b in bookmarks}
+
     elif current_user.role == UserRole.user:
         docs = (
             db.query(AdminDocument)
@@ -365,8 +371,11 @@ def list_admin_documents(
             "filename":    d.filename,
             "storage_key": d.storage_key,
             "created_at":  d.uploaded_at.isoformat() + "Z" if d.uploaded_at else None,
-            # None = AI still processing; string = ready to show
             "ai_summary":  d.ai_summary,
+            "tax_year":      d.tax_year,
+            "review_status": d.review_status,
+            "review_note":   d.review_note,
+            "bookmarked":    d.id in bookmarked_doc_ids
         }
         for d in docs
     ]
@@ -458,6 +467,7 @@ async def upload_personal_document(
         storage_key=storage_key,
         content_type=file.content_type,
         tax_year=tax_year,
+        review_status="pending"
     )
     db.add(record)
     try:
@@ -472,6 +482,22 @@ async def upload_personal_document(
                    "Delete the existing one to replace it."
         )
     db.refresh(record)
+    
+    # Append uploaded event
+    from app.models import DocumentReviewEvent
+    event = DocumentReviewEvent(
+        doc_kind="personal",
+        doc_id=record.id,
+        owner_user_id=current_user.id,
+        actor_id=current_user.id,
+        actor_role="user",
+        action="uploaded",
+        to_status="pending",
+        tax_year=tax_year
+    )
+    db.add(event)
+    db.commit()
+
     crud.log_action(db, "upload_personal", user_id=current_user.id, target=f"personal_doc:{record.id}", detail=file.filename)
 
     admins = db.query(User).filter(User.role.in_([UserRole.admin, UserRole.super_admin])).all()
@@ -482,7 +508,13 @@ async def upload_personal_document(
             subject="New Personal Document Uploaded — BookKeepro",
             body=f"<p><strong>{current_user.email}</strong> uploaded a personal document: <strong>{file.filename}</strong> ({doc_type}).</p>",
         )
-
+    
+    background.add_task(
+        send_email,
+        to=current_user.email,
+        subject="Personal Document Upload Confirmation — BookKeepro",
+        body=f"<p>We have successfully received your personal document: <strong>{file.filename}</strong> ({doc_type}).</p>",
+    )
     background.add_task(
         process_ai_extraction,
         "personal",
@@ -490,7 +522,6 @@ async def upload_personal_document(
         str(UPLOAD_DIR / storage_key),
         doc_type
     )
-
     return {
         "id":          record.id,
         "filename":    record.filename,
@@ -583,6 +614,7 @@ async def upload_business_document(
         storage_key=storage_key,
         content_type=file.content_type,
         tax_year=tax_year,
+        review_status="pending"
     )
     db.add(record)
     try:
@@ -596,6 +628,22 @@ async def upload_business_document(
                    "Delete the existing one to replace it."
         )
     db.refresh(record)
+
+    # Append uploaded event
+    from app.models import DocumentReviewEvent
+    event = DocumentReviewEvent(
+        doc_kind="business",
+        doc_id=record.id,
+        owner_user_id=current_user.id,
+        actor_id=current_user.id,
+        actor_role="user",
+        action="uploaded",
+        to_status="pending",
+        tax_year=tax_year
+    )
+    db.add(event)
+    db.commit()
+
     crud.log_action(db, "upload_business", user_id=current_user.id, target=f"business_doc:{record.id}", detail=file.filename)
 
     admins = db.query(User).filter(User.role.in_([UserRole.admin, UserRole.super_admin])).all()
@@ -608,13 +656,18 @@ async def upload_business_document(
         )
         
     background.add_task(
+        send_email,
+        to=current_user.email,
+        subject="Business Document Upload Confirmation — BookKeepro",
+        body=f"<p>We have successfully received your business document: <strong>{file.filename}</strong> ({doc_type}).</p>",
+    )
+    background.add_task(
         process_ai_extraction,
         "business",
         record.id,
         str(UPLOAD_DIR / storage_key),
         doc_type
     )
-
     return {
         "id":            record.id,
         "filename":      record.filename,
@@ -746,22 +799,18 @@ def update_business_extracted_data(
 
 @router.get("/admin/users/{user_id}/documents")
 def get_user_all_documents(
+    response: Response,
     user_id: int,
-    tax_year: int | None = None,
+    tax_year: int | None = Query(None),
+    status: str | None = Query(None),
+    bookmarked: bool | None = Query(None),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
     _=Depends(require_admin),
 ):
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    # Regular admins can only view documents for user-role accounts
-    if current_user.role == UserRole.admin and user.role != UserRole.user:
-        raise HTTPException(
-            status_code=403,
-            detail="Admins can only view documents for regular user accounts"
-        )
+    response.headers["Cache-Control"] = "no-store"
+    user = crud.get_user_by_id(db, user_id)
+    assert_admin_can_access(current_user, user)
 
     logger.info(f"Admin {current_user.id} retrieving all documents for user {user_id}")
 
@@ -771,15 +820,29 @@ def get_user_all_documents(
     bq = db.query(BusinessDocument).filter(
         BusinessDocument.user_id == user_id, BusinessDocument.deleted_at == None
     )
+
     if tax_year:
         pq = pq.filter(PersonalDocument.tax_year == tax_year)
         bq = bq.filter(BusinessDocument.tax_year == tax_year)
+    if status:
+        pq = pq.filter(PersonalDocument.review_status == status)
+        bq = bq.filter(BusinessDocument.review_status == status)
+
+    from app.models import AdminDocumentBookmark
+    bookmarks = db.query(AdminDocumentBookmark).filter(
+        AdminDocumentBookmark.admin_id == current_user.id
+    ).all()
+    bookmarked_personal = {b.doc_id for b in bookmarks if b.doc_kind == 'personal'}
+    bookmarked_business = {b.doc_id for b in bookmarks if b.doc_kind == 'business'}
 
     personal_docs = pq.order_by(PersonalDocument.uploaded_at.desc()).all()
     business_docs = bq.order_by(BusinessDocument.uploaded_at.desc()).all()
 
-    documents = [
-        {
+    documents = []
+    for d in personal_docs:
+        is_bm = d.id in bookmarked_personal
+        if bookmarked and not is_bm: continue
+        documents.append({
             "id":            d.id,
             "table":         "personal",
             "doc_type":      d.doc_type,
@@ -790,10 +853,12 @@ def get_user_all_documents(
             "review_status": d.review_status,
             "review_note":   d.review_note,
             "extracted_data": d.extracted_data,
-        }
-        for d in personal_docs
-    ] + [
-        {
+            "bookmarked":    is_bm,
+        })
+    for d in business_docs:
+        is_bm = d.id in bookmarked_business
+        if bookmarked and not is_bm: continue
+        documents.append({
             "id":            d.id,
             "table":         "business",
             "doc_type":      d.business_type,
@@ -804,9 +869,8 @@ def get_user_all_documents(
             "review_status": d.review_status,
             "review_note":   d.review_note,
             "extracted_data": d.extracted_data,
-        }
-        for d in business_docs
-    ]
+            "bookmarked":    is_bm,
+        })
 
     return {
         "user": {
@@ -1113,12 +1177,12 @@ def export_user_documents_excel(
     current_user=Depends(get_current_user),
     _=Depends(require_admin),
 ):
-    """Export all documents for a user as a formatted Excel (.xlsx) workbook."""
+    """Export all documents for a user as separate Excel files in a ZIP archive."""
     import io
+    import zipfile
     import json as _json
     from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import Font, PatternFill, Alignment
 
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -1133,109 +1197,199 @@ def export_user_documents_excel(
         BusinessDocument.user_id == user_id, BusinessDocument.deleted_at == None
     ).all()
 
-    # Collect all extracted_data keys to build dynamic columns
-    extracted_keys = set()
-    all_docs = []
+    def sanitize_val(v):
+        s = str(v)
+        if s.startswith(('=', '+', '-', '@')):
+            return "'" + s
+        return s
 
-    for d in personal_docs:
-        row = {
-            "ID": f"P-{d.id}",
-            "Table": "Personal",
-            "Doc Type": d.doc_type,
-            "Filename": d.filename,
-            "Uploaded At": d.uploaded_at.strftime("%Y-%m-%d %H:%M") if d.uploaded_at else "",
-            "Tax Year": d.tax_year or "",
-            "Review Status": (d.review_status or "").capitalize(),
-            "Review Note": d.review_note or "",
-        }
-        if d.extracted_data:
-            try:
-                data = _json.loads(d.extracted_data) if isinstance(d.extracted_data, str) else d.extracted_data
-                if isinstance(data, dict):
-                    for k, v in data.items():
-                        col = f"AI: {k}"
-                        extracted_keys.add(col)
-                        row[col] = str(v)
-            except Exception:
-                pass
-        all_docs.append(row)
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
+        for docs, prefix in [(personal_docs, "Personal"), (business_docs, "Business")]:
+            for d in docs:
+                wb = Workbook()
+                ws = wb.active
+                ws.title = "AI Summary"
+                ws.append(["Field", "Value"])
+                
+                header_font = Font(bold=True, color="FFFFFF")
+                header_fill = PatternFill(start_color="2C7A5B", end_color="2C7A5B", fill_type="solid")
+                for cell in ws[1]:
+                    cell.font = header_font
+                    cell.fill = header_fill
 
-    for d in business_docs:
-        row = {
-            "ID": f"B-{d.id}",
-            "Table": "Business",
-            "Doc Type": d.business_type,
-            "Filename": d.filename,
-            "Uploaded At": d.uploaded_at.strftime("%Y-%m-%d %H:%M") if d.uploaded_at else "",
-            "Tax Year": d.tax_year or "",
-            "Review Status": (d.review_status or "").capitalize(),
-            "Review Note": d.review_note or "",
-        }
-        if d.extracted_data:
-            try:
-                data = _json.loads(d.extracted_data) if isinstance(d.extracted_data, str) else d.extracted_data
-                if isinstance(data, dict):
-                    for k, v in data.items():
-                        col = f"AI: {k}"
-                        extracted_keys.add(col)
-                        row[col] = str(v)
-            except Exception:
-                pass
-        all_docs.append(row)
+                ws.append(["ID", f"{prefix[0]}-{d.id}"])
+                doc_type_val = getattr(d, 'doc_type', getattr(d, 'business_type', 'Unknown'))
+                ws.append(["Type", sanitize_val(doc_type_val)])
+                ws.append(["Filename", sanitize_val(d.filename)])
+                ws.append(["Tax Year", d.tax_year or ""])
+                ws.append(["Status", sanitize_val(d.review_status or "")])
 
-    base_cols = ["ID", "Table", "Doc Type", "Filename", "Uploaded At", "Tax Year", "Review Status", "Review Note"]
-    all_cols = base_cols + sorted(list(extracted_keys))
+                if d.extracted_data:
+                    ws.append([])
+                    ws.append(["--- Extracted AI Data ---", ""])
+                    try:
+                        data = _json.loads(d.extracted_data) if isinstance(d.extracted_data, str) else d.extracted_data
+                        if isinstance(data, dict):
+                            for k, v in data.items():
+                                val_str = str(v)
+                                if isinstance(v, list):
+                                    val_str = "; ".join(map(str, v))
+                                elif isinstance(v, dict):
+                                    val_str = _json.dumps(v)
+                                ws.append([sanitize_val(str(k)), sanitize_val(val_str)])
+                    except Exception:
+                        ws.append(["Error parsing data", ""])
 
-    # ── Build workbook ────────────────────────────────────────────────────────
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Documents"
+                ws.column_dimensions['A'].width = 30
+                ws.column_dimensions['B'].width = 60
 
-    # Header style
-    header_fill  = PatternFill(fill_type="solid", fgColor="2C7A5B")
-    header_font  = Font(bold=True, color="FFFFFF", size=11)
-    center_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
-    thin_border  = Border(
-        left=Side(style="thin"), right=Side(style="thin"),
-        top=Side(style="thin"), bottom=Side(style="thin"),
+                excel_buffer = io.BytesIO()
+                wb.save(excel_buffer)
+                excel_buffer.seek(0)
+                
+                safe_filename = d.filename.replace("/", "_").replace("\\", "_")
+                file_name = f"{prefix}_{d.id}_{safe_filename}.xlsx"
+                zip_file.writestr(file_name, excel_buffer.read())
+
+    zip_buffer.seek(0)
+    headers = {
+        "Content-Disposition": f'attachment; filename="user_{user_id}_excel_summaries.zip"',
+        "Content-Type": "application/zip",
+    }
+    return StreamingResponse(zip_buffer, headers=headers)
+
+
+@router.get("/admin/users/{user_id}/export-zip")
+def export_user_documents_zip(
+    user_id: int,
+    tax_year: int | None = None,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+    _=Depends(require_admin),
+):
+    target_user = db.query(User).filter(User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Target user not found")
+
+    if current_user.role == UserRole.admin and target_user.role != UserRole.user:
+        raise HTTPException(status_code=403, detail="Admins can only export documents for regular user accounts")
+
+    pq = db.query(PersonalDocument).filter(
+        PersonalDocument.user_id == user_id, PersonalDocument.deleted_at == None
+    )
+    bq = db.query(BusinessDocument).filter(
+        BusinessDocument.user_id == user_id, BusinessDocument.deleted_at == None
+    )
+    aq = db.query(AdminDocument).filter(
+        AdminDocument.user_id == user_id, AdminDocument.deleted_at == None
     )
 
-    # Write headers
-    for col_idx, col_name in enumerate(all_cols, 1):
-        cell = ws.cell(row=1, column=col_idx, value=col_name)
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = center_align
-        cell.border = thin_border
+    if tax_year:
+        pq = pq.filter(PersonalDocument.tax_year == tax_year)
+        bq = bq.filter(BusinessDocument.tax_year == tax_year)
 
-    ws.row_dimensions[1].height = 30
-    ws.freeze_panes = "A2"
+    p_docs = pq.all()
+    b_docs = bq.all()
+    a_docs = aq.all()
 
-    # Alternate row fill
-    alt_fill = PatternFill(fill_type="solid", fgColor="EAF4EF")
+    import zipfile
+    import io
 
-    # Write data
-    for row_idx, doc in enumerate(all_docs, 2):
-        fill = alt_fill if row_idx % 2 == 0 else None
-        for col_idx, col_name in enumerate(all_cols, 1):
-            cell = ws.cell(row=row_idx, column=col_idx, value=doc.get(col_name, ""))
-            cell.alignment = Alignment(vertical="center", wrap_text=False)
-            cell.border = thin_border
-            if fill:
-                cell.fill = fill
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for docs, prefix in [(p_docs, "Personal"), (b_docs, "Business"), (a_docs, "Admin")]:
+            for doc in docs:
+                if doc.storage_key:
+                    s_key = doc.storage_key
+                    if s_key.startswith("uploads/"):
+                        s_key = s_key.split("uploads/")[1]
+                    file_path = UPLOAD_DIR / s_key
+                    if file_path.exists():
+                        # Make sure filename is safe and unique
+                        filename = doc.filename or "document"
+                        zip_file.write(file_path, f"{prefix}/{doc.id}_{filename}")
 
-    # Auto-fit column widths (capped at 40)
-    for col_idx, col_name in enumerate(all_cols, 1):
-        max_len = max(len(col_name), *(len(str(doc.get(col_name, ""))) for doc in all_docs)) if all_docs else len(col_name)
-        ws.column_dimensions[get_column_letter(col_idx)].width = min(max_len + 3, 40)
+    zip_buffer.seek(0)
 
-    buf = io.BytesIO()
-    wb.save(buf)
-    buf.seek(0)
+    filename = f"user_{user_id}_documents_{tax_year if tax_year else 'all'}.zip"
 
-    headers = {
-        "Content-Disposition": f'attachment; filename="user_{user_id}_documents.xlsx"',
-        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+# ─────────────────────────────────────────────
+# Bookmarks
+# ─────────────────────────────────────────────
+
+@router.get("/bookmarks")
+def get_bookmarks(
+    db: Session = Depends(get_db),
+    current_user=Depends(require_admin),
+):
+    from app.models import AdminDocumentBookmark
+    bookmarks = db.query(AdminDocumentBookmark).filter_by(
+        admin_id=current_user.id
+    ).all()
+    return {
+        "bookmarks": [
+            {"doc_kind": b.doc_kind, "doc_id": b.doc_id}
+            for b in bookmarks
+        ]
     }
-    return StreamingResponse(buf, headers=headers)
 
+@router.put("/bookmarks/{doc_kind}/{doc_id}")
+def add_bookmark(
+    doc_kind: str,
+    doc_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_admin),
+):
+    if doc_kind not in ['admin', 'personal', 'business']:
+        raise HTTPException(status_code=400, detail="Invalid doc_kind")
+        
+    from app.models import AdminDocumentBookmark
+    existing = db.query(AdminDocumentBookmark).filter_by(
+        admin_id=current_user.id,
+        doc_kind=doc_kind,
+        doc_id=doc_id
+    ).first()
+    
+    if not existing:
+        bm = AdminDocumentBookmark(
+            admin_id=current_user.id,
+            doc_kind=doc_kind,
+            doc_id=doc_id
+        )
+        db.add(bm)
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(status_code=400, detail="Bookmark failed")
+            
+    return {"status": "ok", "bookmarked": True}
+
+
+@router.delete("/bookmarks/{doc_kind}/{doc_id}")
+def remove_bookmark(
+    doc_kind: str,
+    doc_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_admin),
+):
+    from app.models import AdminDocumentBookmark
+    existing = db.query(AdminDocumentBookmark).filter_by(
+        admin_id=current_user.id,
+        doc_kind=doc_kind,
+        doc_id=doc_id
+    ).first()
+    
+    if existing:
+        db.delete(existing)
+        db.commit()
+        
+    return {"status": "ok", "bookmarked": False}

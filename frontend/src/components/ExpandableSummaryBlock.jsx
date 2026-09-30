@@ -71,7 +71,15 @@ export default function ExpandableSummaryBlock({ extractedData, onSave }) {
       let valStr = val;
       if (Array.isArray(val)) valStr = val.join('; ');
       else if (typeof val === 'object' && val !== null) valStr = JSON.stringify(val);
-      rows.push([String(key), String(valStr ?? '')]);
+      
+      let finalKey = String(key);
+      let finalVal = String(valStr ?? '');
+      
+      // Sanitize CSV/Excel Formula Injection
+      if (/^[=+\-@]/.test(finalKey)) finalKey = "'" + finalKey;
+      if (/^[=+\-@]/.test(finalVal)) finalVal = "'" + finalVal;
+
+      rows.push([finalKey, finalVal]);
     });
 
     const ws = XLSX.utils.aoa_to_sheet(rows);

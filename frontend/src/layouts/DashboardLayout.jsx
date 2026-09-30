@@ -21,7 +21,7 @@ export default function DashboardLayout() {
         </div>
       </header>
 
-      <main className="page-main page-enter">
+      <main className={`${(user?.role === 'admin' || user?.role === 'super_admin') ? 'page-main-wide' : 'page-main'} page-enter`}>
         <Outlet />
       </main>
     </div>

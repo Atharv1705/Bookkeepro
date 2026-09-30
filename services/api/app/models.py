@@ -61,7 +61,7 @@ class PersonalDocument(Base):
     content_type = Column(String(100))
     uploaded_at  = Column(DateTime(timezone=True), server_default=func.now())
     deleted_at   = Column(DateTime(timezone=True), nullable=True, default=None)
-    review_status = Column(String(20), default="pending", nullable=False)
+    review_status = Column(String(20), default="draft", nullable=False)
     review_note   = Column(String(500), nullable=True)
     tax_year      = Column(Integer, default=2025, nullable=False)
     extracted_data = Column(JSON, nullable=True)
@@ -89,7 +89,7 @@ class BusinessDocument(Base):
     content_type  = Column(String(100))
     uploaded_at   = Column(DateTime(timezone=True), server_default=func.now())
     deleted_at    = Column(DateTime(timezone=True), nullable=True, default=None)
-    review_status = Column(String(20), default="pending", nullable=False)
+    review_status = Column(String(20), default="draft", nullable=False)
     review_note   = Column(String(500), nullable=True)
     tax_year      = Column(Integer, default=2025, nullable=False)
     extracted_data = Column(JSON, nullable=True)
@@ -126,6 +126,12 @@ class AdminDocument(Base):
     # AI-generated plain-English summary — populated by background task after upload
     # None = still processing, non-null = ready to display
     ai_summary  = Column(Text, nullable=True)
+
+    # Workflow additions
+    tax_year      = Column(Integer, nullable=True)
+    review_status = Column(String(20), default="pending", nullable=False)
+    review_note   = Column(String(500), nullable=True)
+    reviewed_at   = Column(DateTime(timezone=True), nullable=True)
 
     admin = relationship("User", foreign_keys=[uploaded_by])
     user  = relationship("User", foreign_keys=[user_id])
@@ -247,4 +253,47 @@ class FilingDeadline(Base):
     __table_args__ = (
         Index("ix_filing_deadlines_user_id", "user_id"),
         Index("ix_filing_deadlines_deadline_date", "deadline_date"),
+    )
+
+# ─────────────────────────────────────────────
+# Workflow & Review System
+# ─────────────────────────────────────────────
+
+class DocumentReviewEvent(Base):
+    __tablename__ = "document_review_events"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    doc_kind      = Column(String(50), nullable=False)  # 'admin' | 'personal' | 'business'
+    doc_id        = Column(Integer, nullable=False)
+    owner_user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    actor_id      = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    actor_role    = Column(String(20), nullable=False)  # 'user' | 'admin' | 'super_admin'
+    action        = Column(String(50), nullable=False)  # 'uploaded', 'returned_for_review', 'approved', 'rejected', 'resubmitted', 'admin_comment'
+    from_status   = Column(String(20), nullable=True)
+    to_status     = Column(String(20), nullable=True)
+    tax_year      = Column(Integer, nullable=True)
+    comment       = Column(Text, nullable=True)
+    created_at    = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    owner = relationship("User", foreign_keys=[owner_user_id])
+    actor = relationship("User", foreign_keys=[actor_id])
+
+    __table_args__ = (
+        Index("ix_document_review_events_composite", "doc_kind", "doc_id", "created_at"),
+        Index("ix_document_review_events_owner", "owner_user_id"),
+    )
+
+class AdminDocumentBookmark(Base):
+    __tablename__ = "admin_document_bookmarks"
+
+    id         = Column(Integer, primary_key=True, index=True)
+    admin_id   = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    doc_kind   = Column(String(50), nullable=False)
+    doc_id     = Column(Integer, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    admin = relationship("User")
+
+    __table_args__ = (
+        UniqueConstraint("admin_id", "doc_kind", "doc_id", name="uq_admin_bookmark"),
     )
