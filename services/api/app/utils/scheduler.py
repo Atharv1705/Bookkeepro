@@ -64,7 +64,7 @@ def _run_deadline_reminders():
                 <p>Please ensure all outstanding actions are completed before the deadline.</p>
                 <p>Kind regards,<br><strong>BookKeepro Team</strong></p>
                 """
-                asyncio.get_event_loop().run_until_complete(
+                asyncio.run(
                     send_email(
                         to=user.email,
                         subject=f"Reminder: {doc_label} Filing Deadline in {label} — BookKeepro",
@@ -82,7 +82,7 @@ def _run_deadline_reminders():
                 <p><strong>BookKeepro System</strong></p>
                 """
                 for admin_email in admin_emails:
-                    asyncio.get_event_loop().run_until_complete(
+                    asyncio.run(
                         send_email(
                             to=admin_email,
                             subject=f"Admin Reminder: {user.email} — {doc_label} Deadline in {label}",
