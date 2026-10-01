@@ -56,7 +56,8 @@ def seed_data():
                 name=user_data["name"],
                 email=user_data["email"],
                 hashed_password=crud.hash_password(password),
-                role=UserRole.user
+                role=UserRole.user,
+                is_verified=True
             )
             db.add(new_user)
             db.commit()

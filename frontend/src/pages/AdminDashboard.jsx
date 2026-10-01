@@ -50,8 +50,8 @@ export default function AdminDashboard() {
         
         // Compute stats locally
         const total    = usersArray.length;
-        const pendingP = usersArray.filter(u => u.pending_personal > 0).length;
-        const pendingB = usersArray.filter(u => u.pending_business > 0).length;
+        const pendingP = usersArray.reduce((acc, u) => acc + (u.pending_personal || 0), 0);
+        const pendingB = usersArray.reduce((acc, u) => acc + (u.pending_business || 0), 0);
         const admins   = usersArray.filter(u => u.role === "admin" || u.role === "super_admin").length;
         
         setStats({ total_users: total, pending_personal: pendingP, pending_business: pendingB, admins: admins });

@@ -1081,11 +1081,26 @@ def delete_user_completely(
             db.query(ChatMessage).filter(ChatMessage.session_id == session.id).delete()
         db.query(ChatSession).filter(ChatSession.user_id == user_id).delete()
 
+        # Collect IDs for bookmarks cleanup
+        p_doc_ids = [doc.id for doc in db.query(PersonalDocument).filter(PersonalDocument.user_id == user_id).all()]
+        b_doc_ids = [doc.id for doc in db.query(BusinessDocument).filter(BusinessDocument.user_id == user_id).all()]
+        a_doc_ids = [doc.id for doc in db.query(AdminDocument).filter(AdminDocument.user_id == user_id).all()]
+
         # Manual cleanup for other tables without reliable ON DELETE CASCADE in older SQLite schemas
         from app.models import FilingDeadline, DocumentReviewEvent, AdminDocumentBookmark
         db.query(FilingDeadline).filter(FilingDeadline.user_id == user_id).delete()
         db.query(DocumentReviewEvent).filter(DocumentReviewEvent.owner_user_id == user_id).delete()
+        
+        # Delete bookmarks created by this user
         db.query(AdminDocumentBookmark).filter(AdminDocumentBookmark.admin_id == user_id).delete()
+        
+        # Delete bookmarks pointing to this user's documents
+        if p_doc_ids:
+            db.query(AdminDocumentBookmark).filter(AdminDocumentBookmark.doc_kind == "personal", AdminDocumentBookmark.doc_id.in_(p_doc_ids)).delete(synchronize_session=False)
+        if b_doc_ids:
+            db.query(AdminDocumentBookmark).filter(AdminDocumentBookmark.doc_kind == "business", AdminDocumentBookmark.doc_id.in_(b_doc_ids)).delete(synchronize_session=False)
+        if a_doc_ids:
+            db.query(AdminDocumentBookmark).filter(AdminDocumentBookmark.doc_kind == "admin", AdminDocumentBookmark.doc_id.in_(a_doc_ids)).delete(synchronize_session=False)
 
         # Delete embeddings
         try:
