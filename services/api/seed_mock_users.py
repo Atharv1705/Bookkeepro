@@ -6,9 +6,9 @@ import sys
 
 
 from sqlalchemy.orm import Session
-from app.database import SessionLocal
+from app.db import SessionLocal
 from app.models import User, PersonalDocument, BusinessDocument, UserRole
-from app.auth.security import get_password_hash
+import app.crud as crud
 
 UPLOAD_DIR = "/app/uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -41,7 +41,7 @@ def seed_data():
             new_user = User(
                 name=user_data["name"],
                 email=user_data["email"],
-                hashed_password=get_password_hash("Password123!"),
+                hashed_password=crud.hash_password("Password123!"),
                 role=UserRole.user
             )
             db.add(new_user)
@@ -52,6 +52,7 @@ def seed_data():
         else:
             user_id = existing_user.id
             print(f"User already exists: {existing_user.email}")
+            continue
 
         # Add Personal Document
         p_filename = f"W2_{user_data['name'].replace(' ', '_')}_2024.pdf"
@@ -66,7 +67,7 @@ def seed_data():
             filename=p_filename,
             storage_key=p_storage_key,
             content_type="application/pdf",
-            file_hash=p_storage_key,  # dummy hash
+            file_hash=p_storage_key[:32],  # dummy hash
             review_status="pending",
             tax_year=2024
         )
@@ -81,11 +82,11 @@ def seed_data():
         
         b_doc = BusinessDocument(
             user_id=user_id,
-            doc_type="1099",
+            business_type="1099",
             filename=b_filename,
             storage_key=b_storage_key,
             content_type="application/pdf",
-            file_hash=b_storage_key,  # dummy hash
+            file_hash=b_storage_key[:32],  # dummy hash
             review_status="pending",
             tax_year=2024
         )
