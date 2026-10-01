@@ -169,7 +169,22 @@ export default function UploadPersonal() {
             const isApproved = latestDoc?.review_status === 'approved';
             const isFiled = latestDoc?.review_status === 'filed';
             return (
-              <div className="doc-slot fade-up" key={i} style={{ animationDelay: `${i * 0.04}s`, borderLeft: isRejected ? '3px solid #dc3545' : isApproved || isFiled ? '3px solid #2c7a5b' : 'none' }}>
+              <div 
+                className="doc-slot fade-up" 
+                key={i} 
+                style={{ animationDelay: `${i * 0.04}s`, borderLeft: isRejected ? '3px solid #dc3545' : isApproved || isFiled ? '3px solid #2c7a5b' : 'none' }}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    if (!uploaded.length || isRejected) {
+                      uploadFile(e.dataTransfer.files[0], dt.name);
+                    } else {
+                      showToast("Document already uploaded for this type and year.", "error");
+                    }
+                  }
+                }}
+              >
                 <div className="doc-slot-info">
                   <div className="doc-slot-name">{i+1}. {dt.name}</div>
                   <div className="doc-slot-status">
@@ -280,6 +295,14 @@ export default function UploadPersonal() {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
               extraFileRef.current?.click();
+            }
+          }}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+              const fakeEvent = { target: { files: e.dataTransfer.files } };
+              handleExtraUpload(fakeEvent);
             }
           }}
         >
