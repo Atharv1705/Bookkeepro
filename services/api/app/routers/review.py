@@ -160,7 +160,7 @@ async def admin_doc_response(
         actor_role="user",
         action=payload.status,
         to_status=payload.status,
-        note=payload.reason,
+        comment=payload.reason,
         tax_year=doc.tax_year
     )
     db.add(event)
@@ -267,7 +267,7 @@ def update_document_status(
         actor_role="admin",
         action="status_updated",
         to_status=payload.status,
-        note=payload.note,
+        comment=payload.note,
         tax_year=doc.tax_year
     )
     db.add(event)
