@@ -1,7 +1,7 @@
 import os
 from datetime import date, timedelta
 import logging
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.models import AdminDocument, User, UserRole, FilingDeadline
 from app.db import get_db
@@ -300,3 +300,153 @@ def get_filing_deadlines(
             "is_overdue": days_left < 0,
         })
     return result
+
+
+# ─────────────────────────────────────────────
+# Gap #1: Admin sends a return to client for approval
+# ─────────────────────────────────────────────
+
+class SendReturnRequest(BaseModel if False else object):
+    pass
+
+from pydantic import BaseModel as _BM
+
+class SendReturnPayload(_BM):
+    doc_id: int
+    note: str = ""
+
+
+@router.post("/send-return-for-approval")
+async def send_return_for_approval(
+    payload: SendReturnPayload,
+    background: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+    _=Depends(require_admin),
+):
+    """Admin marks an admin doc as 'sent_for_approval' and emails the client. Admin only."""
+    doc = db.query(AdminDocument).filter_by(id=payload.doc_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    doc.review_status = "sent_for_approval"
+    if payload.note:
+        doc.review_note = payload.note
+    db.commit()
+
+    crud.log_action(
+        db, "sent_return_for_approval",
+        user_id=current_user.id,
+        target=f"admin_doc:{doc.id}",
+        detail=f"client:{doc.user_id}",
+    )
+
+    from app.models import DocumentReviewEvent
+    event = DocumentReviewEvent(
+        doc_kind="admin",
+        doc_id=doc.id,
+        owner_user_id=doc.user_id,
+        actor_id=current_user.id,
+        actor_role="admin",
+        action="sent_for_approval",
+        from_status="pending",
+        to_status="sent_for_approval",
+        comment=payload.note or None,
+        tax_year=doc.tax_year,
+    )
+    db.add(event)
+    db.commit()
+
+    client = db.query(User).filter_by(id=doc.user_id).first()
+    if client:
+        note_html = f"<p><em>{payload.note}</em></p>" if payload.note else ""
+        background.add_task(
+            send_email,
+            to=client.email,
+            subject="Action Required: Please Review Your Tax Return — BookKeepro",
+            body=f"""
+            <p>Dear {client.name or 'Client'},</p>
+            <p>Your tax professional has prepared a document for your review:</p>
+            <p><strong>{doc.doc_label}</strong> (Tax Year {doc.tax_year or 'N/A'})</p>
+            {note_html}
+            <p>Please log in to your dashboard to review, approve, or request changes.</p>
+            <p><a href='{DASHBOARD_LINK}' style='color:#2c7a5b;font-weight:600;font-size:15px;'>Review Now →</a></p>
+            <p style='margin-top:20px;'>Kind regards,<br><strong>BookKeepro Team</strong></p>
+            """,
+        )
+
+    return {"status": "sent", "doc_id": doc.id, "review_status": doc.review_status}
+
+
+# ─────────────────────────────────────────────
+# Gap #5: Mark a user's filing as fully filed/locked
+# ─────────────────────────────────────────────
+
+class MarkFiledPayload(_BM):
+    user_id: int
+    tax_year: int
+    note: str = ""
+
+
+@router.post("/mark-filed")
+async def mark_filing_complete(
+    payload: MarkFiledPayload,
+    background: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+    _=Depends(require_admin),
+):
+    """Admin marks all approved docs for a user/year as 'filed'. Sends confirmation email."""
+    from app.models import PersonalDocument, BusinessDocument
+
+    personal_docs = db.query(PersonalDocument).filter(
+        PersonalDocument.user_id == payload.user_id,
+        PersonalDocument.tax_year == payload.tax_year,
+        PersonalDocument.deleted_at == None,
+        PersonalDocument.review_status == "approved",
+    ).all()
+    business_docs = db.query(BusinessDocument).filter(
+        BusinessDocument.user_id == payload.user_id,
+        BusinessDocument.tax_year == payload.tax_year,
+        BusinessDocument.deleted_at == None,
+        BusinessDocument.review_status == "approved",
+    ).all()
+
+    for doc in personal_docs:
+        doc.review_status = "filed"
+    for doc in business_docs:
+        doc.review_status = "filed"
+    db.commit()
+
+    crud.log_action(
+        db, "filing_complete",
+        user_id=current_user.id,
+        target=f"user:{payload.user_id}",
+        detail=f"tax_year:{payload.tax_year} personal:{len(personal_docs)} business:{len(business_docs)}",
+    )
+
+    client = crud.get_user_by_id(db, payload.user_id)
+    if client:
+        note_html = f"<p><em>{payload.note}</em></p>" if payload.note else ""
+        background.add_task(
+            send_email,
+            to=client.email,
+            subject=f"Your {payload.tax_year} Tax Return Has Been Filed — BookKeepro",
+            body=f"""
+            <p>Dear {client.name or 'Client'},</p>
+            <p>Great news! Your <strong>{payload.tax_year}</strong> tax return has been successfully filed.</p>
+            <p>Total documents filed: {len(personal_docs) + len(business_docs)}</p>
+            {note_html}
+            <p>You can view the status in your dashboard at any time.</p>
+            <p><a href='{DASHBOARD_LINK}' style='color:#2c7a5b;font-weight:600;'>Go to Dashboard →</a></p>
+            <p style='margin-top:20px;'>Thank you for choosing BookKeepro.<br><strong>BookKeepro Team</strong></p>
+            """,
+        )
+
+    return {
+        "status": "filed",
+        "user_id": payload.user_id,
+        "tax_year": payload.tax_year,
+        "personal_filed": len(personal_docs),
+        "business_filed": len(business_docs),
+    }

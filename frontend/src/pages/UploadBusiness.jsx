@@ -6,7 +6,7 @@ import { useToast } from '../context/ToastContext';
 export default function UploadBusiness() {
   const { authFetch } = useAuth();
   const { showToast } = useToast();
-  const [taxYear, setTaxYear] = useState(new Date().getFullYear());
+  const [taxYear, setTaxYear] = useState(2025);
   const [docs, setDocs] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -162,12 +162,36 @@ export default function UploadBusiness() {
             <div className="empty-state">No required documents for this tax year.</div>
           ) : templates.map((dt, i) => {
             const uploaded = docs.filter(d => d.doc_type === dt.name);
+            const latestDoc = uploaded[0] || null;
+            const isRejected = latestDoc?.review_status === 'rejected';
+            const isApproved = latestDoc?.review_status === 'approved';
+            const isFiled = latestDoc?.review_status === 'filed';
             return (
-              <div className="doc-slot fade-up" key={i} style={{ animationDelay: `${i * 0.04}s` }}>
+              <div className="doc-slot fade-up" key={i} style={{ animationDelay: `${i * 0.04}s`, borderLeft: isRejected ? '3px solid #dc3545' : isApproved || isFiled ? '3px solid #2c7a5b' : 'none' }}>
                 <div className="doc-slot-info">
                   <div className="doc-slot-name">{i+1}. {dt.name}</div>
                   <div className="doc-slot-status">
-                    {uploaded.length ? (
+                    {isRejected ? (
+                      <div>
+                        <span style={{display:'inline-flex', alignItems:'center', gap:'5px', background:'#fdecea', color:'#c0392b', padding:'3px 10px', borderRadius:'20px', fontSize:'12px', fontWeight:700}}>
+                          <span className="material-symbols-outlined" style={{fontSize:'13px'}}>cancel</span> REJECTED
+                        </span>
+                        {latestDoc.review_note && (
+                          <div style={{fontSize:'12px', color:'#c0392b', marginTop:'5px', fontStyle:'italic', maxWidth:'260px'}}>
+                            ⚠️ Reason: "{latestDoc.review_note}"
+                          </div>
+                        )}
+                        <div style={{fontSize:'11px', color:'var(--muted)', marginTop:'3px'}}>Please correct and re-upload below.</div>
+                      </div>
+                    ) : isApproved ? (
+                      <span style={{display:'inline-flex', alignItems:'center', gap:'5px', background:'#edf7f2', color:'#2c7a5b', padding:'3px 10px', borderRadius:'20px', fontSize:'12px', fontWeight:700}}>
+                        <span className="material-symbols-outlined" style={{fontSize:'13px'}}>check_circle</span> APPROVED
+                      </span>
+                    ) : isFiled ? (
+                      <span style={{display:'inline-flex', alignItems:'center', gap:'5px', background:'#edf7f2', color:'#2c7a5b', padding:'3px 10px', borderRadius:'20px', fontSize:'12px', fontWeight:700}}>
+                        <span className="material-symbols-outlined" style={{fontSize:'13px'}}>inventory_2</span> FILED
+                      </span>
+                    ) : uploaded.length ? (
                       <span className="pill-pending"><span className="material-symbols-outlined">pending</span> Pending Review</span>
                     ) : dt.download ? (
                       <a href={dt.download} target="_blank" rel="noopener noreferrer" className="btn-link" style={{ fontSize: '14px', color: 'var(--brand)', textDecoration: 'underline' }}>View Template</a>
@@ -189,21 +213,30 @@ export default function UploadBusiness() {
                       }
                     }}
                   />
-                  <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                  <div style={{display: 'flex', gap: '8px', alignItems: 'center', flexWrap:'wrap'}}>
                     {dt.download && (
                       <a href={dt.download} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm" style={{borderRadius: 'var(--radius-pill)', padding: '4px 12px', display: 'flex', alignItems: 'center', gap: '4px'}}>
                         <span className="material-symbols-outlined" style={{fontSize: '16px'}}>download</span> Template
                       </a>
                     )}
-                    {!uploaded.length && (
-                      <button className="btn btn-sm btn-upload-pill" onClick={() => fileInputRefs.current[dt.name].click()}>Upload</button>
+                    {/* Show Upload button if no doc OR doc is rejected (re-upload allowed) */}
+                    {(!uploaded.length || isRejected) && (
+                      <button
+                        className={`btn btn-sm ${isRejected ? 'btn-primary' : 'btn-upload-pill'}`}
+                        style={isRejected ? {background:'#2c7a5b', borderColor:'#2c7a5b', color:'#fff', borderRadius:'var(--radius-pill)'} : {}}
+                        onClick={() => fileInputRefs.current[dt.name].click()}
+                      >
+                        {isRejected ? '🔄 Re-upload' : 'Upload'}
+                      </button>
                     )}
                   </div>
                   {uploaded.map(doc => (
-                    <div key={doc.id} style={{display:'flex', flexDirection:'column', gap:'8px', alignItems:'flex-end'}}>
+                    <div key={doc.id} style={{display:'flex', flexDirection:'column', gap:'8px', alignItems:'flex-end', marginTop:'4px'}}>
                       <div style={{display:'flex', gap:'8px'}}>
                         <button className="btn btn-secondary btn-xs" style={{borderRadius:'var(--radius-sm)'}} onClick={() => viewDoc(doc.storage_key)}>View</button>
-                        <button className="btn btn-danger btn-xs" style={{borderRadius:'var(--radius-sm)'}} onClick={() => deleteDoc(doc.id)}>Delete</button>
+                        {!isApproved && !isFiled && (
+                          <button className="btn btn-danger btn-xs" style={{borderRadius:'var(--radius-sm)'}} onClick={() => deleteDoc(doc.id)}>Delete</button>
+                        )}
                       </div>
                     </div>
                   ))}

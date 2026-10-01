@@ -28,6 +28,8 @@ router = APIRouter(prefix="/api/upload", tags=["upload"])
 
 from pathlib import Path
 
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://aiindiacpa.duckdns.org")
+
 # ─────────────────────────────────────────────
 # Local File Storage (Contabo VPS Disk)
 # ─────────────────────────────────────────────
@@ -89,6 +91,15 @@ def process_ai_extraction(table: str, doc_id: int, file_path: str, doc_type: str
                 doc = db.query(model_class).filter_by(id=doc_id).first()
                 if doc:
                     doc.file_hash = file_hash
+                    # Fix H2: Prevent 'Processing...' forever by setting a placeholder
+                    doc.extracted_data = {
+                        "_meta": {
+                            "status": "unsupported",
+                            "label": "Data Not Available",
+                            "description": "AI extraction is not supported for this file type or no text was found.",
+                            "color": "gray"
+                        }
+                    }
                     db.commit()
             return
 
@@ -474,13 +485,36 @@ async def upload_personal_document(
         db.commit()
     except IntegrityError:
         db.rollback()
-        # Clean up the already-uploaded S3 object
-        delete_from_storage(storage_key)
-        raise HTTPException(
-            status_code=409,
-            detail="You have already uploaded this document for this tax year. "
-                   "Delete the existing one to replace it."
-        )
+        # Check if there's an existing rejected/deleted doc to replace (B4 fix: allow re-upload)
+        existing = db.query(PersonalDocument).filter(
+            PersonalDocument.user_id == current_user.id,
+            PersonalDocument.doc_type == doc_type,
+            PersonalDocument.tax_year == tax_year,
+        ).first()
+        if existing and (existing.review_status == "rejected" or existing.deleted_at is not None):
+            old_storage_key = existing.storage_key
+            existing.filename = file.filename
+            existing.storage_key = storage_key
+            existing.content_type = file.content_type
+            existing.review_status = "pending"
+            existing.review_note = None
+            existing.deleted_at = None
+            existing.extracted_data = None
+            existing.uploaded_at = func.now()
+            db.commit()
+            db.refresh(existing)
+            record = existing
+            if old_storage_key:
+                delete_from_storage(old_storage_key)
+        elif existing and existing.deleted_at is None:
+            delete_from_storage(storage_key)
+            raise HTTPException(
+                status_code=409,
+                detail="You have already uploaded this document for this tax year. Delete the existing one to replace it."
+            )
+        else:
+            delete_from_storage(storage_key)
+            raise HTTPException(status_code=409, detail="You have already uploaded this document for this tax year.")
     db.refresh(record)
     
     # Append uploaded event
@@ -621,12 +655,36 @@ async def upload_business_document(
         db.commit()
     except IntegrityError:
         db.rollback()
-        delete_from_storage(storage_key)
-        raise HTTPException(
-            status_code=409,
-            detail="You have already uploaded this document for this tax year. "
-                   "Delete the existing one to replace it."
-        )
+        # Check if there's an existing rejected doc to replace (B4 fix: allow re-upload)
+        existing = db.query(BusinessDocument).filter(
+            BusinessDocument.user_id == current_user.id,
+            BusinessDocument.business_type == doc_type,
+            BusinessDocument.tax_year == tax_year,
+        ).first()
+        if existing and (existing.review_status == "rejected" or existing.deleted_at is not None):
+            old_storage_key = existing.storage_key
+            existing.filename = file.filename
+            existing.storage_key = storage_key
+            existing.content_type = file.content_type
+            existing.review_status = "pending"
+            existing.review_note = None
+            existing.deleted_at = None
+            existing.extracted_data = None
+            existing.uploaded_at = func.now()
+            db.commit()
+            db.refresh(existing)
+            record = existing
+            if old_storage_key:
+                delete_from_storage(old_storage_key)
+        elif existing and existing.deleted_at is None:
+            delete_from_storage(storage_key)
+            raise HTTPException(
+                status_code=409,
+                detail="You have already uploaded this document for this tax year. Delete the existing one to replace it."
+            )
+        else:
+            delete_from_storage(storage_key)
+            raise HTTPException(status_code=409, detail="You have already uploaded this document for this tax year.")
     db.refresh(record)
 
     # Append uploaded event
@@ -702,9 +760,10 @@ def delete_business_document(
 # ─────────────────────────────────────────────
 
 @router.patch("/personal-documents/{doc_id}/review-status")
-def set_personal_review_status(
+async def set_personal_review_status(
     doc_id: int,
     payload: ReviewStatusUpdate,
+    background: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
     _=Depends(require_admin),
@@ -714,6 +773,7 @@ def set_personal_review_status(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
+    prev_status = doc.review_status
     doc.review_status = payload.status
     doc.review_note   = payload.note
     db.commit()
@@ -724,13 +784,34 @@ def set_personal_review_status(
         target=f"personal_doc:{doc_id}",
         detail=f"owner:{doc.user_id}" + (f" note:{payload.note}" if payload.note else ""),
     )
+
+    # Email client on rejection (Gap #3 fix)
+    if payload.status == "rejected" and prev_status != "rejected":
+        owner = db.query(User).filter_by(id=doc.user_id).first()
+        if owner:
+            note_html = f"<p><strong>Reason:</strong> {payload.note}</p>" if payload.note else ""
+            background.add_task(
+                send_email,
+                to=owner.email,
+                subject="Action Required: Document Rejected — BookKeepro",
+                body=f"""
+                <p>Dear {owner.name or 'Client'},</p>
+                <p>Your personal document <strong>{doc.doc_type}</strong> (Tax Year {doc.tax_year}) has been <strong style='color:#c0392b;'>rejected</strong> by our team.</p>
+                {note_html}
+                <p>Please log in to your dashboard, review the reason, and re-upload a corrected document.</p>
+                <p><a href='{FRONTEND_URL}/upload-personal' style='color:#0077c8;font-weight:600;'>Re-upload Personal Documents →</a></p>
+                <p style='margin-top:20px;'>Kind regards,<br><strong>BookKeepro Team</strong></p>
+                """,
+            )
+
     return {"id": doc_id, "review_status": payload.status}
 
 
 @router.patch("/business-documents/{doc_id}/review-status")
-def set_business_review_status(
+async def set_business_review_status(
     doc_id: int,
     payload: ReviewStatusUpdate,
+    background: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
     _=Depends(require_admin),
@@ -740,6 +821,7 @@ def set_business_review_status(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
+    prev_status = doc.review_status
     doc.review_status = payload.status
     doc.review_note   = payload.note
     db.commit()
@@ -750,6 +832,26 @@ def set_business_review_status(
         target=f"business_doc:{doc_id}",
         detail=f"owner:{doc.user_id}" + (f" note:{payload.note}" if payload.note else ""),
     )
+
+    # Email client on rejection (Gap #3 fix)
+    if payload.status == "rejected" and prev_status != "rejected":
+        owner = db.query(User).filter_by(id=doc.user_id).first()
+        if owner:
+            note_html = f"<p><strong>Reason:</strong> {payload.note}</p>" if payload.note else ""
+            background.add_task(
+                send_email,
+                to=owner.email,
+                subject="Action Required: Document Rejected — BookKeepro",
+                body=f"""
+                <p>Dear {owner.name or 'Client'},</p>
+                <p>Your business document <strong>{doc.business_type}</strong> (Tax Year {doc.tax_year}) has been <strong style='color:#c0392b;'>rejected</strong> by our team.</p>
+                {note_html}
+                <p>Please log in to your dashboard, review the reason, and re-upload a corrected document.</p>
+                <p><a href='{FRONTEND_URL}/upload-business' style='color:#0077c8;font-weight:600;'>Re-upload Business Documents →</a></p>
+                <p style='margin-top:20px;'>Kind regards,<br><strong>BookKeepro Team</strong></p>
+                """,
+            )
+
     return {"id": doc_id, "review_status": payload.status}
 
 
@@ -938,8 +1040,27 @@ def delete_user_completely(
             db.delete(doc)
 
         # Clean up legacy uploaded_files rows to avoid FK constraint errors on db.delete(user)
-        from app.models import UploadedFile
+        from app.models import UploadedFile, ChatSession, ChatMessage
         db.query(UploadedFile).filter(UploadedFile.owner_id == user_id).delete()
+
+        # Fix B5: Delete user chat history to prevent FK constraint errors
+        sessions = db.query(ChatSession).filter(ChatSession.user_id == user_id).all()
+        for session in sessions:
+            db.query(ChatMessage).filter(ChatMessage.session_id == session.id).delete()
+        db.query(ChatSession).filter(ChatSession.user_id == user_id).delete()
+
+        # Manual cleanup for other tables without reliable ON DELETE CASCADE in older SQLite schemas
+        from app.models import FilingDeadline, DocumentReviewEvent, AdminDocumentBookmark
+        db.query(FilingDeadline).filter(FilingDeadline.user_id == user_id).delete()
+        db.query(DocumentReviewEvent).filter(DocumentReviewEvent.owner_user_id == user_id).delete()
+        db.query(AdminDocumentBookmark).filter(AdminDocumentBookmark.admin_id == user_id).delete()
+
+        # Delete embeddings
+        try:
+            delete_user_embeddings(user_id)
+            logger.info(f"Deleted embeddings for user {user_id}")
+        except Exception as emb_err:
+            logger.error(f"Failed to delete embeddings for user {user_id}: {emb_err}")
 
         # Log before deleting the user (audit_logs.user_id FK is SET NULL, so logs survive)
         crud.log_action(db, "delete_user", user_id=current_user.id, target=f"user:{user_id}", detail=f"{user.email}")

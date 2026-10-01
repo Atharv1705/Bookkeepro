@@ -26,6 +26,10 @@ export default function AdminUserDetail() {
 
   // Reject comment panel: { docId, type, note }
   const [rejectPanel, setRejectPanel] = useState(null);
+  // Send-for-approval panel: { docId, note }
+  const [sendApprovalPanel, setSendApprovalPanel] = useState(null);
+  const [sendingApproval, setSendingApproval] = useState(false);
+  const [markFiledLoading, setMarkFiledLoading] = useState(false);
 
   // Export Excel Function
   const exportToExcel = async () => {
@@ -204,6 +208,54 @@ export default function AdminUserDetail() {
       }
     } catch(err) {
       console.error(err);
+    }
+  };
+
+  const sendReturnForApproval = async (docId, note = "") => {
+    setSendingApproval(true);
+    try {
+      const res = await authFetch("/api/review/send-return-for-approval", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ doc_id: docId, note })
+      });
+      if (res.ok) {
+        setSendApprovalPanel(null);
+        showToast("Document sent to client for approval ✔", "success");
+        fetchUserDetails();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        showToast(data.detail || "Failed to send", "error");
+      }
+    } catch (err) { console.error(err);
+      showToast("Network error", "error");
+    } finally {
+      setSendingApproval(false);
+    }
+  };
+
+  const markFiled = async () => {
+    const yearForFiling = taxYear || 2025;
+    if (!window.confirm(`Mark all approved docs for ${yearForFiling} as FILED? This will send a confirmation email to the client.`)) return;
+    setMarkFiledLoading(true);
+    try {
+      const res = await authFetch("/api/review/mark-filed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: parseInt(userId), tax_year: parseInt(yearForFiling) })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        showToast(`Filed: ${data.personal_filed} personal + ${data.business_filed} business docs`, "success");
+        fetchUserDetails();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        showToast(data.detail || "Mark filed failed", "error");
+      }
+    } catch (err) { console.error(err);
+      showToast("Network error", "error");
+    } finally {
+      setMarkFiledLoading(false);
     }
   };
 
@@ -784,11 +836,20 @@ export default function AdminUserDetail() {
       {activeTab === 'returns' && (
         <div className="tab-panel active">
           <div className="card-flat">
-            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px'}}>
-              <h3 style={{margin:0}}>Admin Documents</h3>
-              <div>
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px', flexWrap:'wrap', gap:'8px'}}>
+              <h3 style={{margin:0}}>Admin Returns / Documents</h3>
+              <div style={{display:'flex', gap:'8px', flexWrap:'wrap'}}>
                 <input type="file" hidden ref={adminDocInputRef} accept=".pdf,.doc,.docx,.xls,.xlsx" onChange={e => {if(e.target.files[0]) uploadAdminDoc(e.target.files[0])}} />
-                <button className="btn btn-primary btn-sm" style={{borderRadius:'var(--radius-sm)'}} onClick={() => adminDocInputRef.current?.click()}>+ Upload Document</button>
+                <button className="btn btn-primary btn-sm" style={{borderRadius:'var(--radius-sm)'}} onClick={() => adminDocInputRef.current?.click()}>+ Upload Return</button>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  style={{borderRadius:'var(--radius-sm)', background:'#2c7a5b', color:'#fff', borderColor:'#2c7a5b'}}
+                  onClick={markFiled}
+                  disabled={markFiledLoading}
+                  title={`Mark all approved docs for ${taxYear || 'selected year'} as Filed`}
+                >
+                  {markFiledLoading ? 'Filing...' : '✔ Mark as Filed'}
+                </button>
               </div>
             </div>
             {returnDocs.length === 0 ? (
@@ -798,25 +859,95 @@ export default function AdminUserDetail() {
                 <table className="admin-table">
                   <thead>
                     <tr>
-                      <th>Filename</th>
+                      <th>Document</th>
+                      <th>Tax Year</th>
                       <th>Date</th>
+                      <th>Status</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {returnDocs.map(doc => (
-                      <tr key={doc.id}>
-                        <td>
-                          <div style={{fontWeight:500, color:'var(--navy)'}}>{doc.filename}</div>
-                        </td>
-                        <td>{new Date(doc.uploaded_at).toLocaleDateString()}</td>
-                        <td>
-                          <div style={{display:'flex', gap:'8px'}}>
-                            <button className="btn btn-secondary btn-sm" onClick={() => viewDoc(doc.storage_key)}>View</button>
-                            <button className="btn btn-danger btn-sm" onClick={() => deleteAdminDoc(doc.id)}>Delete</button>
-                          </div>
-                        </td>
-                      </tr>
+                      <>
+                        <tr key={doc.id}>
+                          <td>
+                            <div style={{fontWeight:500, color:'var(--navy)'}}>{doc.doc_label || doc.filename}</div>
+                            <div className="text-sm text-muted">{doc.filename}</div>
+                          </td>
+                          <td>{doc.tax_year || <span className="text-muted">N/A</span>}</td>
+                          <td>{new Date(doc.uploaded_at).toLocaleDateString()}</td>
+                          <td>
+                            {(() => {
+                              const s = doc.review_status || 'pending';
+                              const cls = s === 'approved' ? 'badge-green' : s === 'rejected' ? 'badge-red' : s === 'sent_for_approval' ? 'badge-blue' : s === 'filed' ? 'badge-green' : 'badge-yellow';
+                              return (
+                                <div>
+                                  <span className={`badge ${cls}`} style={{fontWeight:700}}>{s.replace(/_/g,' ').toUpperCase()}</span>
+                                  {doc.review_note && <div className="text-sm text-muted" style={{marginTop:'3px', fontSize:'11px'}}>{doc.review_note}</div>}
+                                </div>
+                              );
+                            })()}
+                          </td>
+                          <td>
+                            <div style={{display:'flex', gap:'6px', flexWrap:'wrap'}}>
+                              <button className="btn btn-secondary btn-sm" onClick={() => viewDoc(doc.storage_key)}>View</button>
+                              {doc.review_status !== 'filed' && doc.review_status !== 'approved' && (
+                                <button
+                                  className="btn btn-primary btn-sm"
+                                  style={{background:'#2c7a5b', borderColor:'#2c7a5b', fontSize:'12px'}}
+                                  onClick={() => setSendApprovalPanel({ docId: doc.id, note: '' })}
+                                  disabled={sendingApproval}
+                                >
+                                  📤 Send for Approval
+                                </button>
+                              )}
+                              <button className="btn btn-danger btn-sm" onClick={() => deleteAdminDoc(doc.id)}>Delete</button>
+                            </div>
+                          </td>
+                        </tr>
+
+                        {/* Inline Send-for-Approval Panel */}
+                        {sendApprovalPanel?.docId === doc.id && (
+                          <tr key={`send-${doc.id}`}>
+                            <td colSpan={5} style={{padding:'0'}}>
+                              <div style={{
+                                padding:'14px 16px',
+                                background:'rgba(44,122,91,0.05)',
+                                border:'1px solid rgba(44,122,91,0.25)',
+                                borderTop:'none',
+                                display:'flex', flexDirection:'column', gap:'10px'
+                              }}>
+                                <div style={{fontWeight:600, fontSize:'13px', color:'#2c7a5b'}}>
+                                  📤 Send this document to client for review
+                                </div>
+                                <textarea
+                                  rows={2}
+                                  placeholder="Optional note to client (e.g. 'Please review page 3')..."
+                                  value={sendApprovalPanel.note}
+                                  onChange={e => setSendApprovalPanel(prev => ({...prev, note: e.target.value}))}
+                                  style={{
+                                    width:'100%', padding:'8px 12px',
+                                    border:'1px solid rgba(44,122,91,0.35)', borderRadius:'var(--radius-sm)',
+                                    fontSize:'13px', resize:'vertical', outline:'none',
+                                    fontFamily:'inherit', background:'white', boxSizing:'border-box'
+                                  }}
+                                />
+                                <div style={{display:'flex', gap:'8px', justifyContent:'flex-end'}}>
+                                  <button className="btn btn-secondary btn-sm" onClick={() => setSendApprovalPanel(null)}>Cancel</button>
+                                  <button
+                                    className="btn btn-primary btn-sm"
+                                    style={{background:'#2c7a5b', borderColor:'#2c7a5b'}}
+                                    disabled={sendingApproval}
+                                    onClick={() => sendReturnForApproval(doc.id, sendApprovalPanel.note)}
+                                  >
+                                    {sendingApproval ? 'Sending...' : 'Confirm & Email Client'}
+                                  </button>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </>
                     ))}
                   </tbody>
                 </table>

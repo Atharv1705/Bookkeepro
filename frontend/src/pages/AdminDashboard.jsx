@@ -10,14 +10,14 @@ export default function AdminDashboard() {
   const [search, setSearch] = useState("");
   const [userFilter, setUserFilter] = useState("all");
   const [userSort, setUserSort] = useState("newest");
-  const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
+  const [filterYear, setFilterYear] = useState("2025");
   const [tab, setTab] = useState("users");
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   // --- Template Management State ---
   const [tplCategory, setTplCategory] = useState("personal");
-  const [tplYear, setTplYear] = useState(new Date().getFullYear().toString());
+  const [tplYear, setTplYear] = useState("2025");
   const [templates, setTemplates] = useState([]);
   const [tplName, setTplName] = useState("");
   const [tplFile, setTplFile] = useState(null);
@@ -50,8 +50,8 @@ export default function AdminDashboard() {
         
         // Compute stats locally
         const total    = usersArray.length;
-        const pendingP = usersArray.reduce((s, u) => s + (u.pending_personal || 0), 0);
-        const pendingB = usersArray.reduce((s, u) => s + (u.pending_business || 0), 0);
+        const pendingP = usersArray.filter(u => u.pending_personal > 0).length;
+        const pendingB = usersArray.filter(u => u.pending_business > 0).length;
         const admins   = usersArray.filter(u => u.role === "admin" || u.role === "super_admin").length;
         
         setStats({ total_users: total, pending_personal: pendingP, pending_business: pendingB, admins: admins });
@@ -133,7 +133,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const currentYear = new Date().getFullYear();
+  const currentYear = 2025;
   const yearOptions = [currentYear - 1, currentYear, currentYear + 1];
 
   const filteredUsers = users.filter(u => {

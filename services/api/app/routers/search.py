@@ -54,11 +54,12 @@ def semantic_search(
             ).first()
             
         if doc:
+            d_type = doc.doc_type if doc_type == "personal" else doc.business_type
             doc_data = {
                 "id": doc.id,
                 "table": doc_type,
-                "original_filename": doc.original_filename,
-                "document_type": doc.document_type,
+                "filename": doc.filename,
+                "document_type": d_type,
                 "uploaded_at": doc.uploaded_at,
                 "relevance_score": res['distance']
             }
