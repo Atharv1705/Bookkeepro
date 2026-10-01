@@ -1,4 +1,5 @@
 import os
+import sys
 import logging
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
@@ -10,6 +11,12 @@ from slowapi.errors import RateLimitExceeded
 from app.limiter import limiter
 from app import models
 from app.db import engine
+
+import subprocess
+try:
+    subprocess.run([sys.executable, "validate_env.py"], check=True)
+except subprocess.CalledProcessError:
+    sys.exit(1)
 
 log = logging.getLogger("uvicorn.error")
 from contextlib import asynccontextmanager
