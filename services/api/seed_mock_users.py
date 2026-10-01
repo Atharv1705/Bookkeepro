@@ -9,6 +9,9 @@ from sqlalchemy.orm import Session
 from app.db import SessionLocal
 from app.models import User, PersonalDocument, BusinessDocument, UserRole
 import app.crud as crud
+import secrets
+import string
+import fitz  # PyMuPDF
 
 UPLOAD_DIR = "/app/uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -26,10 +29,20 @@ MOCK_USERS = [
     {"name": "Charles Martinez", "email": "charles.m@example.com"},
 ]
 
+def generate_password(length=14):
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+    while True:
+        pwd = "".join(secrets.choice(alphabet) for _ in range(length))
+        if (any(c.islower() for c in pwd) and any(c.isupper() for c in pwd) and
+            any(c.isdigit() for c in pwd) and any(c in "!@#$%^&*" for c in pwd)):
+            return pwd
+
 def generate_pdf(filepath, title, content):
-    minimal_pdf = b"%PDF-1.0\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj 3 0 obj<</Type/Page/MediaBox[0 0 3 3]>>endobj\nxref\n0 4\n0000000000 65535 f\n0000000010 00000 n\n0000000053 00000 n\n0000000102 00000 n\ntrailer<</Size 4/Root 1 0 R>>\nstartxref\n149\n%EOF\n"
-    with open(filepath, 'wb') as f:
-        f.write(minimal_pdf)
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_text((50, 50), f"{title}\n\n{content}", fontsize=12)
+    doc.save(filepath)
+    doc.close()
 
 def seed_data():
     db: Session = SessionLocal()
@@ -38,16 +51,17 @@ def seed_data():
     for user_data in MOCK_USERS:
         existing_user = db.query(User).filter(User.email == user_data["email"]).first()
         if not existing_user:
+            password = generate_password()
             new_user = User(
                 name=user_data["name"],
                 email=user_data["email"],
-                hashed_password=crud.hash_password("Password123!"),
+                hashed_password=crud.hash_password(password),
                 role=UserRole.user
             )
             db.add(new_user)
             db.commit()
             db.refresh(new_user)
-            print(f"Created user: {new_user.email}")
+            print(f"Created user: {new_user.email} (Password: {password})")
             user_id = new_user.id
         else:
             user_id = existing_user.id

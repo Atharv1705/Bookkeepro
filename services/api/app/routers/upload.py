@@ -785,6 +785,22 @@ async def set_personal_review_status(
         detail=f"owner:{doc.user_id}" + (f" note:{payload.note}" if payload.note else ""),
     )
 
+    from app.models import DocumentReviewEvent
+    event = DocumentReviewEvent(
+        doc_kind="personal",
+        doc_id=doc.id,
+        owner_user_id=doc.user_id,
+        actor_id=current_user.id,
+        actor_role="admin",
+        action="status_updated",
+        from_status=prev_status,
+        to_status=payload.status,
+        comment=payload.note,
+        tax_year=doc.tax_year
+    )
+    db.add(event)
+    db.commit()
+
     # Email client on rejection (Gap #3 fix)
     if payload.status == "rejected" and prev_status != "rejected":
         owner = db.query(User).filter_by(id=doc.user_id).first()
@@ -832,6 +848,22 @@ async def set_business_review_status(
         target=f"business_doc:{doc_id}",
         detail=f"owner:{doc.user_id}" + (f" note:{payload.note}" if payload.note else ""),
     )
+
+    from app.models import DocumentReviewEvent
+    event = DocumentReviewEvent(
+        doc_kind="business",
+        doc_id=doc.id,
+        owner_user_id=doc.user_id,
+        actor_id=current_user.id,
+        actor_role="admin",
+        action="status_updated",
+        from_status=prev_status,
+        to_status=payload.status,
+        comment=payload.note,
+        tax_year=doc.tax_year
+    )
+    db.add(event)
+    db.commit()
 
     # Email client on rejection (Gap #3 fix)
     if payload.status == "rejected" and prev_status != "rejected":
