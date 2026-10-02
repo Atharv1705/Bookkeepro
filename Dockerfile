@@ -6,12 +6,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# System deps: Tesseract OCR (Stage 2 of extraction pipeline — CPU-only, no GPU)
-# eng: English, hin: Hindi — for bilingual Indian documents (Aadhaar, PAN, etc.)
+# System deps: Tesseract OCR (Stage 2 of extraction pipeline -- CPU-only, no GPU)
+# eng: English, hin: Hindi -- for bilingual Indian documents (Aadhaar, PAN, etc.)
+# su-exec: lightweight tool to drop privileges in the entrypoint script
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     tesseract-ocr-eng \
     tesseract-ocr-hin \
+    su-exec \
     libgl1 \
     curl \
     && rm -rf /var/lib/apt/lists/*
@@ -23,23 +25,27 @@ RUN pip install --upgrade pip && pip install -r /tmp/requirements.txt
 # Copy app source
 COPY . /app
 
+# Copy entrypoint -- runs as root to fix volume ownership, then drops to appuser
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Create non-root user and ensure directories exist for volume mounts
 RUN useradd -m appuser && \
     mkdir -p /app/uploads /app/services/api/chroma_db && \
     chown -R appuser:appuser /app
 
-USER appuser
-
 WORKDIR /app/services/api
 
 EXPOSE 8000
 
-# --forwarded-allow-ips=* trusts X-Forwarded-For from nginx container
-# Required so rate limiter and audit logs see real client IPs (not nginx's internal IP)
-
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:8000/health || exit 1
 
+# Entrypoint: fixes volume ownership, runs migrations, then drops to appuser
+ENTRYPOINT ["/entrypoint.sh"]
+
+# --forwarded-allow-ips=* trusts X-Forwarded-For from nginx container
+# Required so rate limiter and audit logs see real client IPs (not nginx internal IP)
 # B6 Fix: Drop --workers 4 to prevent scheduler from running 4 times concurrently
 CMD ["uvicorn", "app.main:app", \
      "--host", "0.0.0.0", \
