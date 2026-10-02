@@ -144,6 +144,59 @@ def upgrade():
                 print("  [OK] Backfilled uploaded events for admin_documents")
             except Exception as e:
                 print(f"  [WARN] Backfill uploaded events: {e}")
+            # -- v7: Chat history cascade -- existing DBs need the FK fixed ----
+            # SQLAlchemy ORM cascade handles Python-side deletes, but the DB-level
+            # constraint is required when MySQL cascades from a parent delete directly.
+            for stmt in [
+                "ALTER TABLE chat_messages DROP FOREIGN KEY chat_messages_ibfk_1",
+                "ALTER TABLE chat_messages ADD CONSTRAINT fk_chat_messages_session FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE",
+            ]:
+                try:
+                    conn.execute(text(stmt))
+                    print(f"  [OK] {stmt[:70]}...")
+                except (OperationalError, ProgrammingError) as e:
+                    msg = str(e).lower()
+                    if "duplicate" in msg or "already exists" in msg or "can't drop" in msg or "check that column" in msg:
+                        print(f"  [SKIP] Already applied or key not found: {stmt[:50]}...")
+                    else:
+                        print(f"  [WARN] {e}")
+
+            # -- v8: Seed required_document_templates for fresh databases ---------
+            # On a fresh DB the table exists but is empty. Seed 10 default templates
+            # for both personal and business categories so users see a checklist.
+            try:
+                count = conn.execute(text("SELECT COUNT(*) FROM required_document_templates")).scalar()
+                if count == 0:
+                    import datetime
+                    current_year = datetime.date.today().year
+                    personal_docs = [
+                        "W-2 Form", "1099-NEC / 1099-MISC", "SSA-1099 (Social Security Benefits)",
+                        "Mortgage Interest Statement (1098)", "Charitable Donation Receipts",
+                        "Medical & Dental Expense Receipts", "Student Loan Interest (1098-E)",
+                        "State & Local Tax Payment Records", "Investment Income (1099-B / 1099-DIV)",
+                        "Prior Year Tax Return",
+                    ]
+                    business_docs = [
+                        "Profit & Loss Statement", "Balance Sheet",
+                        "Bank Statements (All Accounts)", "Business Expense Receipts",
+                        "Payroll Records / W-3", "1099s Issued to Contractors",
+                        "Vehicle Mileage Log", "Home Office Documentation",
+                        "Business Asset Purchase Invoices", "Prior Year Business Tax Return",
+                    ]
+                    for name in personal_docs:
+                        conn.execute(text(
+                            "INSERT IGNORE INTO required_document_templates (category, tax_year, name) VALUES ('personal', :yr, :name)"
+                        ), {"yr": current_year, "name": name})
+                    for name in business_docs:
+                        conn.execute(text(
+                            "INSERT IGNORE INTO required_document_templates (category, tax_year, name) VALUES ('business', :yr, :name)"
+                        ), {"yr": current_year, "name": name})
+                    print(f"  [OK] Seeded {len(personal_docs)} personal + {len(business_docs)} business templates for {current_year}")
+                else:
+                    print(f"  [SKIP] required_document_templates already has {count} rows")
+            except Exception as e:
+                print(f"  [WARN] Template seed: {e}")
+
 
         print("\nAll migrations complete.")
     except Exception as e:
@@ -152,3 +205,4 @@ def upgrade():
 
 if __name__ == "__main__":
     upgrade()
+

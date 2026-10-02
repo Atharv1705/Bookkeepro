@@ -220,7 +220,7 @@ class ChatMessage(Base):
     __tablename__ = "chat_messages"
 
     id           = Column(Integer, primary_key=True, index=True)
-    session_id   = Column(Integer, ForeignKey("chat_sessions.id"), nullable=False)
+    session_id   = Column(Integer, ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=False)
     role         = Column(String(50), nullable=False) # 'user', 'assistant', 'system', 'tool'
     content      = Column(Text, nullable=True)
     tool_calls   = Column(JSON, nullable=True)
