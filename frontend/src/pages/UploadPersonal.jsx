@@ -2,10 +2,14 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import ConfirmModal from '../components/ConfirmModal';
 
 export default function UploadPersonal() {
   const { authFetch } = useAuth();
   const { showToast } = useToast();
+  const [confirmConfig, setConfirmConfig] = useState({
+    isOpen: false, title: "", message: "", confirmText: "OK", isDestructive: false, onConfirm: () => {}
+  });
   const [taxYear, setTaxYear] = useState(2025);
   const [docs, setDocs] = useState([]);
   const [templates, setTemplates] = useState([]);
@@ -65,18 +69,27 @@ export default function UploadPersonal() {
   };
 
   const deleteDoc = async (id) => {
-    if (!window.confirm("Delete this document?\nThis action cannot be undone.")) return;
-    try {
-      const res = await authFetch(`/api/upload/personal-documents/${id}`, { method: "DELETE" });
-      if (res.ok) {
-        showToast("Document deleted", "success");
-        fetchTemplatesAndDocs();
-      } else {
-        showToast("Delete failed", "error");
+    setConfirmConfig({
+      isOpen: true,
+      title: "Delete Document",
+      message: "Delete this document?\nThis action cannot be undone.",
+      isDestructive: true,
+      confirmText: "Delete",
+      onConfirm: async () => {
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        try {
+          const res = await authFetch(`/api/upload/personal-documents/${id}`, { method: "DELETE" });
+          if (res.ok) {
+            showToast("Document deleted", "success");
+            fetchTemplatesAndDocs();
+          } else {
+            showToast("Delete failed", "error");
+          }
+        } catch (err) { console.error(err);
+          showToast("Delete failed", "error");
+        }
       }
-    } catch (err) { console.error(err);
-      showToast("Delete failed", "error");
-    }
+    });
   };
 
   const viewDoc = async (storageKey) => {
@@ -134,6 +147,10 @@ export default function UploadPersonal() {
 
   return (
     <div>
+      <ConfirmModal 
+        {...confirmConfig} 
+        onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))} 
+      />
       <div style={{marginBottom: '16px'}}>
         <Link to="/dashboard" className="fancy-link" style={{fontSize: '14px', fontWeight: 500}}>← Back to Dashboard</Link>
       </div>

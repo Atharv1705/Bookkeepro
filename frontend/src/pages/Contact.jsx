@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { useToast } from '../context/ToastContext';
 
 export default function Contact() {
+  const { showToast } = useToast();
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
@@ -21,7 +23,7 @@ export default function Contact() {
         body: JSON.stringify(formData)
       });
       if (!res.ok) throw new Error("Failed to send");
-      alert("Message sent! Thank you for contacting us.");
+      showToast("Message sent! Thank you for contacting us.", "success");
       setFormData({
         first_name: '',
         last_name: '',
@@ -30,7 +32,7 @@ export default function Contact() {
         message: ''
       });
     } catch (err) { console.error(err);
-      alert("Failed to send message");
+      showToast("Failed to send message", "error");
     } finally {
       setLoading(false);
     }

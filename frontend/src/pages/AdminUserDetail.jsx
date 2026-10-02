@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import ExpandableSummaryBlock from '../components/ExpandableSummaryBlock';
+import ConfirmModal from '../components/ConfirmModal';
 
 
 export default function AdminUserDetail() {
@@ -17,8 +18,19 @@ export default function AdminUserDetail() {
   const [showAiSummary, setShowAiSummary] = useState({});
   const [activeTab, setActiveTab] = useState('personal');
   const [taxYear, setTaxYear] = useState("");
+  const [docSort, setDocSort] = useState("newest");
   const [loading, setLoading] = useState(true);
 
+
+  // State for ConfirmModal
+  const [confirmConfig, setConfirmConfig] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    confirmText: "OK",
+    isDestructive: false,
+    onConfirm: () => {}
+  });
 
   // States for Review Emails
   const [personalTimeline, setPersonalTimeline] = useState(0);
@@ -140,37 +152,55 @@ export default function AdminUserDetail() {
   }, [documents, fetchUserDetails]);
 
   const deleteUser = async () => {
-    if (!window.confirm("WARNING: This will permanently delete this user, all their documents, and their audit history. Are you sure?")) return;
-    try {
-      const res = await authFetch(`/api/upload/admin/users/${userId}`, { method: "DELETE" });
-      if (res.ok) {
-        navigate('/admin-dashboard');
-      } else {
-        alert("Failed to delete user");
+    setConfirmConfig({
+      isOpen: true,
+      title: "Delete User",
+      message: "WARNING: This will permanently delete this user, all their documents, and their audit history. Are you sure?",
+      isDestructive: true,
+      confirmText: "Delete User",
+      onConfirm: async () => {
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        try {
+          const res = await authFetch(`/api/upload/admin/users/${userId}`, { method: "DELETE" });
+          if (res.ok) {
+            navigate('/admin-dashboard');
+          } else {
+            showToast("Failed to delete user", "error");
+          }
+        } catch (err) { console.error(err);
+          console.error("Error deleting user", err);
+        }
       }
-    } catch (err) { console.error(err);
-      console.error("Error deleting user", err);
-    }
+    });
   };
 
   const handleChangeRole = async (newRole) => {
-    if (!window.confirm(`Change user role to ${newRole}?`)) return;
-    try {
-      const res = await authFetch(`/api/auth/admin/users/${userId}/role`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: newRole })
-      });
-      if (res.ok) {
-        showToast("Role updated successfully", "success");
-        fetchUserDetails();
-      } else {
-        const data = await res.json();
-        showToast(data.detail || "Failed to change role", "error");
+    setConfirmConfig({
+      isOpen: true,
+      title: "Change Role",
+      message: `Change user role to ${newRole}?`,
+      isDestructive: false,
+      confirmText: "Confirm",
+      onConfirm: async () => {
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        try {
+          const res = await authFetch(`/api/auth/admin/users/${userId}/role`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ role: newRole })
+          });
+          if (res.ok) {
+            showToast("Role updated successfully", "success");
+            fetchUserDetails();
+          } else {
+            const data = await res.json();
+            showToast(data.detail || "Failed to change role", "error");
+          }
+        } catch (err) { console.error(err);
+          showToast("Network error", "error");
+        }
       }
-    } catch (err) { console.error(err);
-      showToast("Network error", "error");
-    }
+    });
   };
 
   const handleDocApprove = async (docId, type, isApproved, note = '') => {
@@ -199,16 +229,25 @@ export default function AdminUserDetail() {
 
 
   const deleteAdminDoc = async (docId) => {
-    if (!window.confirm("Delete this admin document?")) return;
-    try {
-      const res = await authFetch(`/api/upload/admin-documents/${docId}`, { method: "DELETE" });
-      if (res.ok) {
-        showToast("Document deleted", "success");
-        fetchUserDetails();
+    setConfirmConfig({
+      isOpen: true,
+      title: "Delete Document",
+      message: "Delete this admin document?",
+      isDestructive: true,
+      confirmText: "Delete",
+      onConfirm: async () => {
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        try {
+          const res = await authFetch(`/api/upload/admin-documents/${docId}`, { method: "DELETE" });
+          if (res.ok) {
+            showToast("Document deleted", "success");
+            fetchUserDetails();
+          }
+        } catch(err) {
+          console.error(err);
+        }
       }
-    } catch(err) {
-      console.error(err);
-    }
+    });
   };
 
   const sendReturnForApproval = async (docId, note = "") => {
@@ -236,27 +275,36 @@ export default function AdminUserDetail() {
 
   const markFiled = async () => {
     const yearForFiling = taxYear || 2025;
-    if (!window.confirm(`Mark all approved docs for ${yearForFiling} as FILED? This will send a confirmation email to the client.`)) return;
-    setMarkFiledLoading(true);
-    try {
-      const res = await authFetch("/api/review/mark-filed", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: parseInt(userId), tax_year: parseInt(yearForFiling) })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        showToast(`Filed: ${data.personal_filed} personal + ${data.business_filed} business docs`, "success");
-        fetchUserDetails();
-      } else {
-        const data = await res.json().catch(() => ({}));
-        showToast(data.detail || "Mark filed failed", "error");
+    setConfirmConfig({
+      isOpen: true,
+      title: "Mark as Filed",
+      message: `Mark all approved docs for ${yearForFiling} as FILED?\nThis will send a confirmation email to the client.`,
+      isDestructive: false,
+      confirmText: "Mark as Filed",
+      onConfirm: async () => {
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        setMarkFiledLoading(true);
+        try {
+          const res = await authFetch("/api/review/mark-filed", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_id: parseInt(userId), tax_year: parseInt(yearForFiling) })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            showToast(`Filed: ${data.personal_filed} personal + ${data.business_filed} business docs`, "success");
+            fetchUserDetails();
+          } else {
+            const data = await res.json().catch(() => ({}));
+            showToast(data.detail || "Mark filed failed", "error");
+          }
+        } catch (err) { console.error(err);
+          showToast("Network error", "error");
+        } finally {
+          setMarkFiledLoading(false);
+        }
       }
-    } catch (err) { console.error(err);
-      showToast("Network error", "error");
-    } finally {
-      setMarkFiledLoading(false);
-    }
+    });
   };
 
   const uploadAdminDoc = async (file) => {
@@ -352,21 +400,30 @@ export default function AdminUserDetail() {
   };
 
   const submitAllDocs = async () => {
-    if (!window.confirm("Submit all documents for review?\nAn email will be sent to the user.")) return;
-    try {
-      const res = await authFetch("/api/review/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: userId })
-      });
-      if (res.ok) {
-        showToast("Documents submitted — email sent to user.", "success");
-      } else {
-        showToast("Failed to submit", "error");
+    setConfirmConfig({
+      isOpen: true,
+      title: "Submit for Review",
+      message: "Submit all documents for review?\nAn email will be sent to the user.",
+      isDestructive: false,
+      confirmText: "Submit",
+      onConfirm: async () => {
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        try {
+          const res = await authFetch("/api/review/submit", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_id: userId })
+          });
+          if (res.ok) {
+            showToast("Documents submitted — email sent to user.", "success");
+          } else {
+            showToast("Failed to submit", "error");
+          }
+        } catch (err) { console.error(err);
+          showToast("Error submitting documents", "error");
+        }
       }
-    } catch (err) { console.error(err);
-      showToast("Error submitting documents", "error");
-    }
+    });
   };
 
   if (loading && !userDetail) {
@@ -408,12 +465,27 @@ export default function AdminUserDetail() {
   const currentYear = new Date().getFullYear();
   const yearOptions = [currentYear - 1, currentYear, currentYear + 1];
 
-  const personalDocs = documents.filter(d => d.type === "personal");
-  const businessDocs = documents.filter(d => d.type === "business");
-  const returnDocs = documents.filter(d => d.type === "admin");
+  const sortDocs = (docsArray) => [...docsArray].sort((a, b) => {
+    const nameA = a.doc_type || a.doc_label || a.filename || '';
+    const nameB = b.doc_type || b.doc_label || b.filename || '';
+    if (docSort === 'asc') return nameA.localeCompare(nameB);
+    if (docSort === 'desc') return nameB.localeCompare(nameA);
+    if (docSort === 'newest') return new Date(b.uploaded_at || 0) - new Date(a.uploaded_at || 0);
+    if (docSort === 'oldest') return new Date(a.uploaded_at || 0) - new Date(b.uploaded_at || 0);
+    return 0;
+  });
+
+  const personalDocs = sortDocs(documents.filter(d => d.type === "personal"));
+  const businessDocs = sortDocs(documents.filter(d => d.type === "business"));
+  const returnDocs = sortDocs(documents.filter(d => d.type === "admin"));
 
   return (
     <div className="">
+      <ConfirmModal 
+        {...confirmConfig} 
+        onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))} 
+      />
+
       <button className="btn btn-secondary btn-sm" style={{ marginBottom: '16px', display: 'inline-flex', alignItems: 'center', gap: '4px', borderRadius: 'var(--radius-sm)' }} onClick={() => navigate('/admin-dashboard')}>
         <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>arrow_back</span>
         Back to Dashboard
@@ -476,6 +548,15 @@ export default function AdminUserDetail() {
           </div>
           <div className="aud-bar-actions">
             <button className="btn btn-primary btn-sm" onClick={submitAllDocs} style={{borderRadius:'var(--radius-sm)'}}>Trigger Submit Review</button>
+            <div className="aud-year-picker" style={{marginLeft: 'auto'}}>
+              <label className="form-label" style={{margin:0, fontSize: '11px'}}>Sort</label>
+              <select className="select-input" style={{width: 'auto', padding: '6px 12px', fontSize: '13px'}} value={docSort} onChange={(e) => setDocSort(e.target.value)}>
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+                <option value="asc">Name (A-Z)</option>
+                <option value="desc">Name (Z-A)</option>
+              </select>
+            </div>
             <div className="aud-year-picker">
               <label className="form-label" style={{margin:0, fontSize: '11px'}}>Tax Year</label>
               <select className="select-input" style={{width: 'auto', padding: '6px 12px', fontSize: '13px'}} value={taxYear} onChange={(e) => setTaxYear(e.target.value)}>

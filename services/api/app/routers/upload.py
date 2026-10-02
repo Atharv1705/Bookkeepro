@@ -8,6 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, UploadFile, File, HTTPException,
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func
 from jose import jwt, JWTError
 from datetime import timedelta
 
