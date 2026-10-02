@@ -2,9 +2,15 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import DOMPurify from 'dompurify';
+import { useToast } from '../context/ToastContext';
+import ConfirmModal from '../components/ConfirmModal';
 
 export default function AdminDashboard() {
   const { authFetch } = useAuth();
+  const { showToast } = useToast();
+  const [confirmConfig, setConfirmConfig] = useState({
+    isOpen: false, title: "", message: "", confirmText: "OK", isDestructive: false, onConfirm: () => {}
+  });
   const [stats, setStats] = useState({ total_users: 0, pending_personal: 0, pending_business: 0, admins: 0 });
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState("");
@@ -41,27 +47,42 @@ export default function AdminDashboard() {
   const fetchAdminData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await authFetch(`/api/auth/admin/users?tax_year=${filterYear}`);
+      const [usersRes, statsRes] = await Promise.all([
+        authFetch(`/api/auth/admin/users?tax_year=${filterYear}`),
+        authFetch(`/api/chatbot/admin-status?tax_year=${filterYear}`)
+      ]);
       
-      if (res.ok) {
-        const payload = await res.json();
-        const usersArray = Array.isArray(payload) ? payload : (payload.users || []);
-        setUsers(usersArray);
-        
-        // Compute stats locally
-        const total    = usersArray.length;
-        const pendingP = usersArray.reduce((acc, u) => acc + (u.pending_personal || 0), 0);
-        const pendingB = usersArray.reduce((acc, u) => acc + (u.pending_business || 0), 0);
-        const admins   = usersArray.filter(u => u.role === "admin" || u.role === "super_admin").length;
-        
-        setStats({ total_users: total, pending_personal: pendingP, pending_business: pendingB, admins: admins });
+      let newUsersArray = users;
+      let adminsCount = stats.admins;
+      
+      if (usersRes.ok) {
+        const payload = await usersRes.json();
+        newUsersArray = Array.isArray(payload) ? payload : (payload.users || []);
+        setUsers(newUsersArray);
+        adminsCount = newUsersArray.filter(u => u.role === "admin" || u.role === "super_admin").length;
+      }
+      
+      if (statsRes.ok) {
+        const statsData = await statsRes.json();
+        setStats({ 
+          total_users: statsData.total_users, 
+          pending_personal: statsData.pending_personal, 
+          pending_business: statsData.pending_business, 
+          admins: statsData.admin_accounts 
+        });
+      } else {
+        // Fallback to local computation if admin-status fails
+        const total    = newUsersArray.length;
+        const pendingP = newUsersArray.reduce((acc, u) => acc + (u.pending_personal || 0), 0);
+        const pendingB = newUsersArray.reduce((acc, u) => acc + (u.pending_business || 0), 0);
+        setStats({ total_users: total, pending_personal: pendingP, pending_business: pendingB, admins: adminsCount });
       }
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, [authFetch]);
+  }, [authFetch, filterYear]);
 
   const loadTemplates = useCallback(async () => {
     setTplLoading(true);
@@ -110,9 +131,10 @@ export default function AdminDashboard() {
         setTplFile(null);
         document.getElementById("tplFile").value = "";
         loadTemplates();
+        showToast("Template uploaded successfully", "success");
       } else {
         const err = await res.json();
-        alert(err.detail || "Upload failed");
+        showToast(err.detail || "Upload failed", "error");
       }
     } catch (err) {
       console.error("Upload error", err);
@@ -120,17 +142,28 @@ export default function AdminDashboard() {
   };
 
   const deleteTemplate = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this template?")) return;
-    try {
-      const res = await authFetch(`/api/upload/admin/templates/${id}`, { method: "DELETE" });
-      if (res.ok) {
-        loadTemplates();
-      } else {
-        alert("Failed to delete template");
+    setConfirmConfig({
+      isOpen: true,
+      title: "Delete Template",
+      message: "Are you sure you want to delete this template?",
+      isDestructive: true,
+      confirmText: "Delete",
+      onConfirm: async () => {
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+        try {
+          const res = await authFetch(`/api/upload/admin/templates/${id}`, { method: "DELETE" });
+          if (res.ok) {
+            loadTemplates();
+            showToast("Template deleted", "success");
+          } else {
+            showToast("Failed to delete template", "error");
+          }
+        } catch (err) {
+          console.error("Delete error", err);
+          showToast("Network error", "error");
+        }
       }
-    } catch (err) {
-      console.error("Delete error", err);
-    }
+    });
   };
 
   const currentYear = 2025;
@@ -138,6 +171,7 @@ export default function AdminDashboard() {
 
   const filteredUsers = users.filter(u => {
     // Stat Card Filters
+    if (userFilter === 'admin' && u.role !== 'admin' && u.role !== 'super_admin') return false;
     if (userFilter === 'pending_personal' && !(u.pending_personal > 0)) return false;
     if (userFilter === 'pending_business' && !(u.pending_business > 0)) return false;
 
@@ -160,6 +194,10 @@ export default function AdminDashboard() {
 
   return (
     <div className="">
+      <ConfirmModal 
+        {...confirmConfig} 
+        onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))} 
+      />
       <h1 style={{ 
         margin: '0 0 32px 0', 
         fontSize: '42px', 
@@ -250,7 +288,7 @@ export default function AdminDashboard() {
               <div className="stat-value">{stats.total_users}</div>
               <div className="stat-label">Total Users</div>
             </div>
-            <div className="stat-card accent-green">
+            <div className={`stat-card accent-green ${userFilter === 'admin' ? 'active-filter' : ''}`} onClick={() => setUserFilter('admin')} style={{ cursor: 'pointer', border: userFilter === 'admin' ? '2px solid var(--green)' : 'none' }}>
               <div className="stat-icon"><span className="material-symbols-outlined">security</span></div>
               <div className="stat-value">{stats.admins}</div>
               <div className="stat-label">Admin Accounts</div>

@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '../context/ToastContext';
 
 export default function Profile() {
   const { user, authFetch } = useAuth();
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [formData, setFormData] = useState({ name: '', phone: '' });
   const [pwData, setPwData] = useState({ currentPw: '', newPw: '', confirmPw: '' });
   const [showPwSection, setShowPwSection] = useState(false);
@@ -23,7 +25,7 @@ export default function Profile() {
       const payload = { ...formData };
       if (showPwSection && pwData.newPw) {
         if (pwData.newPw !== pwData.confirmPw) {
-          alert("New passwords do not match");
+          showToast("New passwords do not match", "error");
           setLoading(false);
           return;
         }
@@ -52,12 +54,12 @@ export default function Profile() {
         throw new Error(errorMsg);
       }
 
-      alert("Profile updated successfully. Please log in again if you changed your password.");
+      showToast("Profile updated successfully. Please log in again if you changed your password.", "success");
       if (payload.new_password) {
         window.location.href = '/login';
       }
     } catch (err) {
-      alert(err.message);
+      showToast(err.message, "error");
     } finally {
       setLoading(false);
     }

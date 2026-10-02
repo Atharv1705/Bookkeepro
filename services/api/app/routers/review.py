@@ -218,7 +218,7 @@ def get_document_review_history(
                 "actor_role": e.actor_role,
                 "action": e.action,
                 "to_status": e.to_status,
-                "note": e.note,
+                "note": e.comment,
                 "created_at": e.created_at.isoformat() + "Z" if e.created_at else None
             } for e in events
         ]

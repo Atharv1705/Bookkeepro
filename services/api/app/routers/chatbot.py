@@ -99,6 +99,7 @@ def _summarize_extracted(extracted_data: dict | None) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 @router.get("/admin-status")
 def get_admin_status(
+    tax_year: int | None = Query(None),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
     _=Depends(require_admin),
@@ -106,16 +107,18 @@ def get_admin_status(
     today_start = datetime.combine(date.today(), datetime.min.time())
     total_users     = db.query(User).count()
     new_users_today = db.query(User).filter(User.created_at >= today_start).count()
-    pending_personal = (
-        db.query(PersonalDocument)
-        .filter(PersonalDocument.review_status == "pending", PersonalDocument.deleted_at == None)
-        .count()
-    )
-    pending_business = (
-        db.query(BusinessDocument)
-        .filter(BusinessDocument.review_status == "pending", BusinessDocument.deleted_at == None)
-        .count()
-    )
+    
+    pq = db.query(PersonalDocument).filter(PersonalDocument.review_status == "pending", PersonalDocument.deleted_at == None)
+    if tax_year:
+        pq = pq.filter(PersonalDocument.tax_year == tax_year)
+    pending_personal = pq.count()
+
+    admin_accounts = db.query(User).filter(User.role.in_(["admin", "super_admin"])).count()
+
+    bq = db.query(BusinessDocument).filter(BusinessDocument.review_status == "pending", BusinessDocument.deleted_at == None)
+    if tax_year:
+        bq = bq.filter(BusinessDocument.tax_year == tax_year)
+    pending_business = bq.count()
 
     recent_personal = (
         db.query(PersonalDocument).filter(PersonalDocument.deleted_at == None)
@@ -158,6 +161,7 @@ def get_admin_status(
         "total_pending":    total_pending,
         "recent_uploads":   recent_uploads,
         "message":          message,
+        "admin_accounts":   admin_accounts,
     }
 
 

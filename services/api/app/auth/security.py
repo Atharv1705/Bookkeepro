@@ -225,7 +225,8 @@ def assert_admin_can_access(current_user, target_user):
     if current_user.role not in [UserRole.admin, UserRole.super_admin]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
         
-    if target_user.role != UserRole.user:
+    # Admins can only view 'user' accounts. Super admins can view any account.
+    if current_user.role != UserRole.super_admin and target_user.role != UserRole.user:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admins can only interact with regular user accounts"
