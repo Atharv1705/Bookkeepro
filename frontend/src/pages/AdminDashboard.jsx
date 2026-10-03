@@ -16,14 +16,14 @@ export default function AdminDashboard() {
   const [search, setSearch] = useState("");
   const [userFilter, setUserFilter] = useState("all");
   const [userSort, setUserSort] = useState("newest");
-  const [filterYear, setFilterYear] = useState("2025");
+  const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
   const [tab, setTab] = useState("users");
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   // --- Template Management State ---
   const [tplCategory, setTplCategory] = useState("personal");
-  const [tplYear, setTplYear] = useState("2025");
+  const [tplYear, setTplYear] = useState(new Date().getFullYear().toString());
   const [templates, setTemplates] = useState([]);
   const [tplName, setTplName] = useState("");
   const [tplFile, setTplFile] = useState(null);
@@ -166,7 +166,7 @@ export default function AdminDashboard() {
     });
   };
 
-  const currentYear = 2025;
+  const currentYear = new Date().getFullYear();
   const yearOptions = [currentYear - 1, currentYear, currentYear + 1];
 
   const filteredUsers = users.filter(u => {

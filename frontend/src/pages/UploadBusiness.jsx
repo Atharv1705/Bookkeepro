@@ -10,7 +10,7 @@ export default function UploadBusiness() {
   const [confirmConfig, setConfirmConfig] = useState({
     isOpen: false, title: "", message: "", confirmText: "OK", isDestructive: false, onConfirm: () => {}
   });
-  const [taxYear, setTaxYear] = useState(2025);
+  const [taxYear, setTaxYear] = useState(new Date().getFullYear());
   const [docs, setDocs] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(false);

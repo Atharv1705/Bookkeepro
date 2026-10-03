@@ -274,7 +274,7 @@ export default function AdminUserDetail() {
   };
 
   const markFiled = async () => {
-    const yearForFiling = taxYear || 2025;
+    const yearForFiling = taxYear || new Date().getFullYear();
     setConfirmConfig({
       isOpen: true,
       title: "Mark as Filed",
