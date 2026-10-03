@@ -1,4 +1,4 @@
-import os
+﻿import os
 import uuid
 import datetime
 import sys
@@ -51,7 +51,7 @@ def seed_data():
     for user_data in MOCK_USERS:
         existing_user = db.query(User).filter(User.email == user_data["email"]).first()
         if not existing_user:
-            password = generate_password()
+            password = "password123"
             new_user = User(
                 name=user_data["name"],
                 email=user_data["email"],
@@ -115,3 +115,4 @@ def seed_data():
 
 if __name__ == "__main__":
     seed_data()
+
