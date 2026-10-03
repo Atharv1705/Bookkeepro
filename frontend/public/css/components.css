@@ -815,8 +815,8 @@
     justify-content: flex-start;
   }
   .doc-review-actions .btn {
-    flex: 1;
-    min-width: 70px;
+    flex: 1 1 calc(50% - 8px);
+      min-width: 100px;
     justify-content: center;
   }
 }
@@ -854,4 +854,5 @@
   padding: 3px 8px;
   white-space: nowrap;
 }
+
 
