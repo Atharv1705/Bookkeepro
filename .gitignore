@@ -19,7 +19,8 @@ uploads/
 services/temp/
 
 # Blog / temporary files
-*.md
+# Exclude patch/temp markdown but keep docs
+*.patch.md
 *.docx
 *.patch
 *.msi
