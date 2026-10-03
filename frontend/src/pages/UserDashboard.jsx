@@ -55,7 +55,7 @@ export default function UserDashboard() {
         }
       }
       
-      const tplRes = await authFetch("/api/upload/templates?category=engagement&tax_year=2025");
+      const tplRes = await authFetch(`/api/upload/templates?category=engagement&tax_year=${new Date().getFullYear()}`);
       if (tplRes.ok) {
         const tpls = await tplRes.json();
         if (tpls && tpls.length > 0) {

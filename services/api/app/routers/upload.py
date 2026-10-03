@@ -462,10 +462,13 @@ async def upload_personal_document(
     background: BackgroundTasks,
     file: UploadFile = File(...),
     doc_type: str = Form(...),
-    tax_year: int = Form(2025),
+    tax_year: int = Form(None),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    if tax_year is None:
+        tax_year = datetime.now().year
+
     if not current_user.engagement_acknowledged_at:
         raise HTTPException(status_code=403, detail="You must acknowledge the engagement letter before uploading.")
 
@@ -632,10 +635,13 @@ async def upload_business_document(
     background: BackgroundTasks,
     file: UploadFile = File(...),
     doc_type: str = Form(...),
-    tax_year: int = Form(2025),
+    tax_year: int = Form(None),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    if tax_year is None:
+        tax_year = datetime.now().year
+
     if not current_user.engagement_acknowledged_at:
         raise HTTPException(status_code=403, detail="You must acknowledge the engagement letter before uploading.")
 
@@ -1570,3 +1576,4 @@ def remove_bookmark(
         db.commit()
         
     return {"status": "ok", "bookmarked": False}
+

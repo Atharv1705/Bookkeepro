@@ -63,7 +63,7 @@ class PersonalDocument(Base):
     deleted_at   = Column(DateTime(timezone=True), nullable=True, default=None)
     review_status = Column(String(20), default="draft", nullable=False)
     review_note   = Column(String(500), nullable=True)
-    tax_year      = Column(Integer, default=2025, nullable=False)
+    tax_year      = Column(Integer, default=lambda: __import__("datetime").datetime.now().year, nullable=False)
     extracted_data = Column(JSON, nullable=True)
     file_hash      = Column(String(64), nullable=True, index=True)  # SHA-256 for dedup
 
@@ -91,7 +91,7 @@ class BusinessDocument(Base):
     deleted_at    = Column(DateTime(timezone=True), nullable=True, default=None)
     review_status = Column(String(20), default="draft", nullable=False)
     review_note   = Column(String(500), nullable=True)
-    tax_year      = Column(Integer, default=2025, nullable=False)
+    tax_year      = Column(Integer, default=lambda: __import__("datetime").datetime.now().year, nullable=False)
     extracted_data = Column(JSON, nullable=True)
     file_hash      = Column(String(64), nullable=True, index=True)  # SHA-256 for dedup
 
