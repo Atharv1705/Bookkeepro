@@ -1,7 +1,7 @@
 import logging
 import json
 import uuid
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from fastapi import APIRouter, Depends, Request, Query
 from fastapi.responses import StreamingResponse
 from app.limiter import limiter
@@ -104,7 +104,7 @@ def get_admin_status(
     current_user=Depends(get_current_user),
     _=Depends(require_admin),
 ):
-    today_start = datetime.combine(date.today(), datetime.min.time())
+    today_start = datetime.combine(date.today(), datetime.min.time(), tzinfo=timezone.utc)
     total_users     = db.query(User).count()
     new_users_today = db.query(User).filter(User.created_at >= today_start).count()
     
@@ -617,4 +617,5 @@ def ask_chatbot(
     except Exception as e:
         logger.error(f"OpenRouter API error: {e}")
         raise HTTPException(status_code=500, detail="Failed to connect to AI service")
+
 
