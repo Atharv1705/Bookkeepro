@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 import json
 import uuid
 from datetime import datetime, date, timezone
@@ -21,9 +21,9 @@ router = APIRouter(prefix="/api/chatbot", tags=["chatbot"])
 
 CHAT_MODEL = os.getenv("CHAT_MODEL", "meta-llama/llama-3.3-70b-instruct")
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # User: doc status (also includes extracted data so user can ask about fields)
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @router.get("/doc-status")
 def get_doc_status(
     db: Session = Depends(get_db),
@@ -69,11 +69,11 @@ def get_doc_status(
     else:
         msg_lines.append(f"You have uploaded **{summary['total']}** documents in total.")
         if summary["pending"]:
-            msg_lines.append(f"\n� **{summary['pending']}** pending review.")
+            msg_lines.append(f"\n• **{summary['pending']}** pending review.")
         if summary["approved"]:
-            msg_lines.append(f"\n� **{summary['approved']}** approved.")
+            msg_lines.append(f"\n• **{summary['approved']}** approved.")
         if summary["rejected"]:
-            msg_lines.append(f"\n� **{summary['rejected']}** rejected. Please check the upload pages for notes.")
+            msg_lines.append(f"\n• **{summary['rejected']}** rejected. Please check the upload pages for notes.")
 
     return {"personal": personal_list, "business": business_list, "summary": summary,
             "message": "".join(msg_lines)}
@@ -94,9 +94,9 @@ def _summarize_extracted(extracted_data: dict | None) -> str:
     return " | ".join(parts[:8])
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Admin: system overview stats
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @router.get("/admin-status")
 def get_admin_status(
     tax_year: int | None = Query(None),
@@ -146,9 +146,9 @@ def get_admin_status(
     total_pending = pending_personal + pending_business
     message = (
         f"**System Overview:**\n\n"
-� Total Users: **{total_users}** (**{new_users_today}** joined today)\n"
-� Pending Personal Docs: **{pending_personal}**\n"
-� Pending Business Docs: **{pending_business}**\n\n"
+        f"- Total Users: **{total_users}** (**{new_users_today}** joined today)\n"
+        f"- Pending Personal Docs: **{pending_personal}**\n"
+        f"- Pending Business Docs: **{pending_business}**\n\n"
         + (f"You have **{total_pending}** documents awaiting review." if total_pending > 0
            else "All documents have been reviewed!")
     )
@@ -270,9 +270,9 @@ def admin_bulk_action(
     }
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Shared chat — streaming (new) + conversation memory via DB
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# Shared chat â€” streaming (new) + conversation memory via DB
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class ChatMessageInput(BaseModel):
     role: str
     content: str | None = None
@@ -361,7 +361,7 @@ def ask_chatbot(
             "CAPABILITIES: Answer questions about uploads, user activity, pending docs, registration counts.\n"
             "BULK ACTIONS: When asked to approve/reject all docs for a user, respond with a structured "
             "JSON action block like: {\"bulk_action\": {\"user_id\": N, \"action\": \"approve_personal\", \"confirm\": false}} "
-            "— the frontend will show a confirmation dialog before executing.\n"
+            "â€” the frontend will show a confirmation dialog before executing.\n"
             "TOOLS: Use the lookup_user tool to fetch details about a specific user if their name or email is mentioned.\n"
             "RULES: Only answer BookKeepPro, accounting, or tax questions. Use live data. Be concise.\n\n"
             f"{context}"
@@ -374,21 +374,21 @@ def ask_chatbot(
         if doc_status["personal"]:
             context += "\nPersonal Documents:\n"
             for d in doc_status["personal"]:
-                note = f" — Note: {d['note']}" if d['note'] else ""
+                note = f" â€” Note: {d['note']}" if d['note'] else ""
                 extracted = f" | Data: {d['extracted_summary']}" if d['extracted_summary'] else ""
-                context += f"  • {d['doc_type']} ({d['tax_year']}): {d['status']}{note}{extracted}\n"
+                context += f"  â€¢ {d['doc_type']} ({d['tax_year']}): {d['status']}{note}{extracted}\n"
         if doc_status["business"]:
             context += "\nBusiness Documents:\n"
             for d in doc_status["business"]:
-                note = f" — Note: {d['note']}" if d['note'] else ""
+                note = f" â€” Note: {d['note']}" if d['note'] else ""
                 extracted = f" | Data: {d['extracted_summary']}" if d['extracted_summary'] else ""
-                context += f"  • {d['business_type']} ({d['tax_year']}): {d['status']}{note}{extracted}\n"
+                context += f"  â€¢ {d['business_type']} ({d['tax_year']}): {d['status']}{note}{extracted}\n"
 
         system_prompt = (
             "You are the BookKeepPro Assistant. Help users with the app and basic accounting/tax questions.\n\n"
             "UPLOAD GUIDANCE: If user wants to upload a document, tell them:\n"
-            "- Personal docs → go to /upload-personal\n"
-            "- Business docs → go to /upload-business\n"
+            "- Personal docs â†’ go to /upload-personal\n"
+            "- Business docs â†’ go to /upload-business\n"
             "- You can also say: 'Click here: [Upload Personal](/upload-personal)'\n\n"
             "EXTRACTED DATA: You have access to key fields extracted from the user's documents. "
             "Use this to answer specific questions like 'what is my PAN number' or 'what does my W-2 show'.\n\n"
@@ -617,5 +617,6 @@ def ask_chatbot(
     except Exception as e:
         logger.error(f"OpenRouter API error: {e}")
         raise HTTPException(status_code=500, detail="Failed to connect to AI service")
+
 
 
