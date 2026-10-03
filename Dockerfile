@@ -8,12 +8,12 @@ WORKDIR /app
 
 # System deps: Tesseract OCR (Stage 2 of extraction pipeline -- CPU-only, no GPU)
 # eng: English, hin: Hindi -- for bilingual Indian documents (Aadhaar, PAN, etc.)
-# su-exec: lightweight tool to drop privileges in the entrypoint script
+# gosu: lightweight tool to drop privileges in the entrypoint script
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     tesseract-ocr-eng \
     tesseract-ocr-hin \
-    su-exec \
+    gosu \
     libgl1 \
     curl \
     && rm -rf /var/lib/apt/lists/*
