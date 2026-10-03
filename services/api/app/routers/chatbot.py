@@ -67,13 +67,13 @@ def get_doc_status(
     if summary["total"] == 0:
         msg_lines.append("You have not uploaded any documents yet.")
     else:
-        msg_lines.append(f"You have uploaded <b>{summary['total']}</b> documents in total.")
+        msg_lines.append(f"You have uploaded **{summary['total']}** documents in total.")
         if summary["pending"]:
-            msg_lines.append(f"<br>â€¢ <b>{summary['pending']}</b> pending review.")
+            msg_lines.append(f"\n• **{summary['pending']}** pending review.")
         if summary["approved"]:
-            msg_lines.append(f"<br>â€¢ <span style='color:var(--success)'><b>{summary['approved']}</b> approved.</span>")
+            msg_lines.append(f"\n• **{summary['approved']}** approved.")
         if summary["rejected"]:
-            msg_lines.append(f"<br>â€¢ <span style='color:var(--error)'><b>{summary['rejected']}</b> rejected.</span> Please check the upload pages for notes.")
+            msg_lines.append(f"\n• **{summary['rejected']}** rejected. Please check the upload pages for notes.")
 
     return {"personal": personal_list, "business": business_list, "summary": summary,
             "message": "".join(msg_lines)}
@@ -145,11 +145,11 @@ def get_admin_status(
 
     total_pending = pending_personal + pending_business
     message = (
-        f"<b>System Overview:</b><br><br>"
-        f"â€¢ Total Users: <b>{total_users}</b> (<b>{new_users_today}</b> joined today)<br>"
-        f"â€¢ Pending Personal Docs: <b>{pending_personal}</b><br>"
-        f"â€¢ Pending Business Docs: <b>{pending_business}</b><br><br>"
-        + (f"You have <b>{total_pending}</b> documents awaiting review." if total_pending > 0
+        f"**System Overview:**\n\n"
+• Total Users: **{total_users}** (**{new_users_today}** joined today)\n"
+• Pending Personal Docs: **{pending_personal}**\n"
+• Pending Business Docs: **{pending_business}**\n\n"
+        + (f"You have **{total_pending}** documents awaiting review." if total_pending > 0
            else "All documents have been reviewed!")
     )
 
@@ -617,3 +617,4 @@ def ask_chatbot(
     except Exception as e:
         logger.error(f"OpenRouter API error: {e}")
         raise HTTPException(status_code=500, detail="Failed to connect to AI service")
+
