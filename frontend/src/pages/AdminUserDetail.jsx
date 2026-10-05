@@ -504,6 +504,22 @@ export default function AdminUserDetail() {
   const businessDocs = sortDocs(documents.filter(d => d.type === "business"));
   const returnDocs = sortDocs(documents.filter(d => d.type === "admin"));
 
+  const toggleBookmark = async (docKind, docId, isCurrentlyBookmarked) => {
+    try {
+      const method = isCurrentlyBookmarked ? "DELETE" : "PUT";
+      const res = await authFetch(`/api/upload/bookmarks/${docKind}/${docId}`, { method });
+      if (res.ok) {
+        showToast(isCurrentlyBookmarked ? "Bookmark removed" : "Document bookmarked", "success");
+        fetchUserDetails();
+      } else {
+        showToast("Failed to update bookmark", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Error updating bookmark", "error");
+    }
+  };
+
   return (
     <div className="">
       <ConfirmModal 
@@ -638,6 +654,11 @@ export default function AdminUserDetail() {
                         <div className="doc-review-actions">
                           <button onClick={() => viewDoc(doc.storage_key)} className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)'}}>View</button>
                           <button onClick={() => downloadDoc(doc.storage_key, doc.filename)} className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)', display:'flex', alignItems:'center', gap:'4px'}}><span className="material-symbols-outlined" style={{fontSize:'16px'}}>download</span></button>
+                          <button onClick={() => toggleBookmark(doc.type || 'admin', doc.id, doc.bookmarked)} className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)', display:'flex', alignItems:'center', gap:'4px', padding:'4px 8px'}} title={doc.bookmarked ? "Remove Bookmark" : "Bookmark"}>
+                            <span className="material-symbols-outlined" style={{fontSize:'18px', color: doc.bookmarked ? 'var(--orange)' : 'inherit'}}>
+                              {doc.bookmarked ? 'star' : 'star_border'}
+                            </span>
+                          </button>
                           <button className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)'}} onClick={() => handleDocApprove(doc.id, doc.type, true)}>Approve</button>
                           <button className="btn btn-danger btn-sm" style={{borderRadius:'var(--radius-sm)'}} onClick={() => openRejectPanel(doc.id, doc.type)}>Reject</button>
                           <button 
@@ -806,6 +827,11 @@ export default function AdminUserDetail() {
                         <div className="doc-review-actions">
                           <button onClick={() => viewDoc(doc.storage_key)} className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)'}}>View</button>
                           <button onClick={() => downloadDoc(doc.storage_key, doc.filename)} className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)', display:'flex', alignItems:'center', gap:'4px'}}><span className="material-symbols-outlined" style={{fontSize:'16px'}}>download</span></button>
+                          <button onClick={() => toggleBookmark(doc.type || 'admin', doc.id, doc.bookmarked)} className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)', display:'flex', alignItems:'center', gap:'4px', padding:'4px 8px'}} title={doc.bookmarked ? "Remove Bookmark" : "Bookmark"}>
+                            <span className="material-symbols-outlined" style={{fontSize:'18px', color: doc.bookmarked ? 'var(--orange)' : 'inherit'}}>
+                              {doc.bookmarked ? 'star' : 'star_border'}
+                            </span>
+                          </button>
                           <button className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)'}} onClick={() => handleDocApprove(doc.id, doc.type, true)}>Approve</button>
                           <button className="btn btn-danger btn-sm" style={{borderRadius:'var(--radius-sm)'}} onClick={() => openRejectPanel(doc.id, doc.type)}>Reject</button>
                           <button 
@@ -1000,6 +1026,11 @@ export default function AdminUserDetail() {
                             <div style={{display:'flex', gap:'6px', flexWrap:'wrap'}}>
                               <button className="btn btn-secondary btn-sm" onClick={() => viewDoc(doc.storage_key)}>View</button>
                               <button className="btn btn-secondary btn-sm" onClick={() => downloadDoc(doc.storage_key, doc.filename)} style={{display:'flex', alignItems:'center', gap:'4px'}}><span className="material-symbols-outlined" style={{fontSize:'16px'}}>download</span></button>
+                          <button onClick={() => toggleBookmark(doc.type || 'admin', doc.id, doc.bookmarked)} className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)', display:'flex', alignItems:'center', gap:'4px', padding:'4px 8px'}} title={doc.bookmarked ? "Remove Bookmark" : "Bookmark"}>
+                            <span className="material-symbols-outlined" style={{fontSize:'18px', color: doc.bookmarked ? 'var(--orange)' : 'inherit'}}>
+                              {doc.bookmarked ? 'star' : 'star_border'}
+                            </span>
+                          </button>
                               {doc.review_status !== 'filed' && doc.review_status !== 'approved' && (
                                 <button
                                   className="btn btn-primary btn-sm"
