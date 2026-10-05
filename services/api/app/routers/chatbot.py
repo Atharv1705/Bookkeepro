@@ -296,7 +296,7 @@ class ChatRequest(BaseModel):
     session_id: str | None = None
 
 def _build_admin_context(db: Session, current_user) -> str:
-    status = get_admin_status(db=db, current_user=current_user, _=None)
+    status = get_admin_status(tax_year=None, db=db, current_user=current_user, _=None)
     ctx  = f"=== LIVE SYSTEM DATA (as of {datetime.now().strftime('%Y-%m-%d %H:%M')}) ===\n"
     ctx += f"Total registered users: {status['total_users']}\n"
     ctx += f"New users registered TODAY: {status['new_users_today']}\n"
@@ -359,25 +359,15 @@ def ask_chatbot(
     if is_admin:
         context = _build_admin_context(db, current_user)
         system_prompt = (
-            "You are the BookKeepPro Admin Assistant with live access to system data.
-
-"
-            "CAPABILITIES: Answer questions about uploads, user activity, pending docs, registration counts.
-"
-            "WORKFLOW GUIDANCE: If asked how to do something in the app:
-"
-            "- Send document for review: Go to Users Overview -> Click the User -> Upload under 'Filing Timeline' -> Click Submit Review.
-"
-            "- Review user documents: Go to Users Overview -> Click the User -> Go to Personal/Business Docs -> Click Approve or Reject.
-"
+            "You are the BookKeepPro Admin Assistant with live access to system data.\n\n"
+            "CAPABILITIES: Answer questions about uploads, user activity, pending docs, registration counts.\n"
+            "WORKFLOW GUIDANCE: If asked how to do something in the app:\n"
+            "- Send document for review: Go to Users Overview -> Click the User -> Upload under 'Filing Timeline' -> Click Submit Review.\n"
+            "- Review user documents: Go to Users Overview -> Click the User -> Go to Personal/Business Docs -> Click Approve or Reject.\n"
             "BULK ACTIONS: When asked to approve/reject all docs for a user, respond with a structured "
-            "JSON action block like: {\"bulk_action\": {\"user_id\": N, \"action\": \"approve_personal\", \"confirm\": false}}
-"
-            "TOOLS: Use the lookup_user tool to fetch details about a specific user if their name or email is mentioned.
-"
-            "RULES: Only answer BookKeepPro, accounting, or tax questions. Use live data. Be concise.
-
-"
+            "JSON action block like: {\"bulk_action\": {\"user_id\": N, \"action\": \"approve_personal\", \"confirm\": false}}\n"
+            "TOOLS: Use the lookup_user tool to fetch details about a specific user if their name or email is mentioned.\n"
+            "RULES: Only answer BookKeepPro, accounting, or tax questions. Use live data. Be concise.\n\n"
             f"{context}"
         )
     else:
