@@ -11,7 +11,7 @@ import os
 import requests
 from pydantic import BaseModel, field_validator
 from fastapi import HTTPException
-from app.models import PersonalDocument, BusinessDocument, User, AuditLog, ChatSession, ChatMessage as DBChatMessage
+from app.models import PersonalDocument, BusinessDocument, AdminDocument, User, AuditLog, ChatSession, ChatMessage as DBChatMessage
 from app.db import get_db
 from app.auth.security import get_current_user, require_admin
 
@@ -119,6 +119,11 @@ def get_admin_status(
     if tax_year:
         bq = bq.filter(BusinessDocument.tax_year == tax_year)
     pending_business = bq.count()
+    
+    admin_docs = db.query(AdminDocument).filter(AdminDocument.deleted_at == None)
+    if tax_year:
+        admin_docs = admin_docs.filter(AdminDocument.tax_year == tax_year)
+    pending_admin_returns = admin_docs.filter(AdminDocument.review_status == "pending").count()
 
     recent_personal = (
         db.query(PersonalDocument).filter(PersonalDocument.deleted_at == None)
@@ -128,13 +133,19 @@ def get_admin_status(
         db.query(BusinessDocument).filter(BusinessDocument.deleted_at == None)
         .order_by(BusinessDocument.uploaded_at.desc()).limit(10).all()
     )
+    recent_admin = (
+        db.query(AdminDocument).filter(AdminDocument.deleted_at == None)
+        .order_by(AdminDocument.uploaded_at.desc()).limit(10).all()
+    )
     recent_uploads = sorted(
         [{"user_id": d.user_id, "doc": d.doc_type,       "type": "personal",
           "uploaded_at": d.uploaded_at, "status": d.review_status} for d in recent_personal] +
         [{"user_id": d.user_id, "doc": d.business_type,  "type": "business",
-          "uploaded_at": d.uploaded_at, "status": d.review_status} for d in recent_business],
+          "uploaded_at": d.uploaded_at, "status": d.review_status} for d in recent_business] +
+        [{"user_id": d.user_id, "doc": d.doc_label,      "type": "admin_return",
+          "uploaded_at": d.uploaded_at, "status": d.review_status} for d in recent_admin],
         key=lambda x: x["uploaded_at"].isoformat() if x["uploaded_at"] else "", reverse=True
-    )[:10]
+    )[:15]
 
     user_map = {u.id: u for u in db.query(User).filter(User.id.in_([r["user_id"] for r in recent_uploads])).all()}
     for r in recent_uploads:
@@ -143,27 +154,17 @@ def get_admin_status(
         r["user_email"]  = u.email if u else "Unknown"
         r["uploaded_at"] = r["uploaded_at"].strftime("%Y-%m-%d %H:%M") if r["uploaded_at"] else "N/A"
 
-    total_pending = pending_personal + pending_business
-    message = (
-        f"**System Overview:**\n\n"
-        f"- Total Users: **{total_users}** (**{new_users_today}** joined today)\n"
-        f"- Pending Personal Docs: **{pending_personal}**\n"
-        f"- Pending Business Docs: **{pending_business}**\n\n"
-        + (f"You have **{total_pending}** documents awaiting review." if total_pending > 0
-           else "All documents have been reviewed!")
-    )
+    total_pending = pending_personal + pending_business + pending_admin_returns
 
     return {
         "total_users":      total_users,
         "new_users_today":  new_users_today,
         "pending_personal": pending_personal,
         "pending_business": pending_business,
-        "total_pending":    total_pending,
-        "recent_uploads":   recent_uploads,
-        "message":          message,
-        "admin_accounts":   admin_accounts,
+        "pending_admin_returns": pending_admin_returns,
+        "total_pending": total_pending,
+        "recent_uploads":   recent_uploads
     }
-
 
 @router.get("/daily-digest")
 def get_daily_digest(

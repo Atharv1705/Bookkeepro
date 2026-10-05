@@ -172,16 +172,20 @@ def build_daily_digest(db_stats: dict) -> str:
         f"Date: {today}\n"
         f"New users registered today: {db_stats.get('new_users_today', 0)}\n"
         f"Total users: {db_stats.get('total_users', 0)}\n"
-        f"Pending personal docs: {db_stats.get('pending_personal', 0)}\n"
-        f"Pending business docs: {db_stats.get('pending_business', 0)}\n"
-        f"Total pending docs: {db_stats.get('total_pending', 0)}\n"
+        f"Pending user-uploaded personal docs: {db_stats.get('pending_personal', 0)}\n"
+        f"Pending user-uploaded business docs: {db_stats.get('pending_business', 0)}\n"
+        f"Pending admin-uploaded returns (awaiting user review): {db_stats.get('pending_admin_returns', 0)}\n"
+        f"Total pending actionable docs: {db_stats.get('total_pending', 0)}\n"
     )
 
     recent = db_stats.get("recent_uploads", [])
     if recent:
-        stats_text += "\nRecent uploads today:\n"
-        for r in recent[:5]:
-            stats_text += f"- {r['user_name']} uploaded {r['doc']} ({r['type']}) at {r['uploaded_at']}\n"
+        stats_text += "\nRecent Document Activity:\n"
+        for r in recent[:10]:
+            if r['type'] == 'admin_return':
+                stats_text += f"- Admin-uploaded return for {r['user_name']} '{r['doc']}' (Status: {r['status']}) at {r['uploaded_at']}\n"
+            else:
+                stats_text += f"- {r['user_name']} uploaded {r['doc']} ({r['type']}) (Status: {r['status']}) at {r['uploaded_at']}\n"
 
     prompt = (
         "You are an accounting firm assistant. Write a brief, friendly, plain-English daily digest "

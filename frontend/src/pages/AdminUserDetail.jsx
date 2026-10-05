@@ -345,6 +345,31 @@ export default function AdminUserDetail() {
     }
   };
 
+
+  const downloadDoc = async (storageKey, originalFilename) => {
+    try {
+      const res = await authFetch(`/api/upload/view-url?key=${encodeURIComponent(storageKey)}`);
+      if (res.ok) {
+        const data = await res.json();
+        const fileRes = await fetch(data.url);
+        const blob = await fileRes.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = originalFilename || storageKey.split('/').pop() || 'document';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+      } else {
+        showToast("Could not generate download link", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Error downloading document", "error");
+    }
+  };
+
   const handleUpdateExtractedData = async (docId, type, newData) => {
     try {
       const res = await authFetch(`/api/upload/${type}-documents/${docId}/extracted-data`, {
@@ -592,7 +617,7 @@ export default function AdminUserDetail() {
                     <div key={doc.id} className="doc-review-row">
                       <div className="doc-review-row-top">
                         <div className="doc-review-info">
-                          <div style={{ fontWeight:700, fontSize:'15px', color:'var(--navy)', lineHeight:'1.3' }}>{doc.doc_type}</div>
+                          <div style={{ fontWeight:700, fontSize:'15px', color:'var(--navy)', lineHeight:'1.3' }}>{doc.filename || doc.doc_type}</div>
                           <div style={{ fontSize:'12px', color:'var(--muted)', marginTop:'3px' }}>
                             <span className="material-symbols-outlined" style={{fontSize:'12px', verticalAlign:'middle', marginRight:'3px'}}>calendar_today</span>
                             {new Date(doc.uploaded_at).toLocaleDateString('en-US', {year:'numeric', month:'short', day:'numeric'})}
@@ -612,6 +637,7 @@ export default function AdminUserDetail() {
                         </div>
                         <div className="doc-review-actions">
                           <button onClick={() => viewDoc(doc.storage_key)} className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)'}}>View</button>
+                          <button onClick={() => downloadDoc(doc.storage_key, doc.filename)} className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)', display:'flex', alignItems:'center', gap:'4px'}}><span className="material-symbols-outlined" style={{fontSize:'16px'}}>download</span></button>
                           <button className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)'}} onClick={() => handleDocApprove(doc.id, doc.type, true)}>Approve</button>
                           <button className="btn btn-danger btn-sm" style={{borderRadius:'var(--radius-sm)'}} onClick={() => openRejectPanel(doc.id, doc.type)}>Reject</button>
                           <button 
@@ -759,7 +785,7 @@ export default function AdminUserDetail() {
                     <div key={doc.id} className="doc-review-row">
                       <div className="doc-review-row-top">
                         <div className="doc-review-info">
-                          <div style={{ fontWeight:700, fontSize:'15px', color:'var(--navy)', lineHeight:'1.3' }}>{doc.doc_type}</div>
+                          <div style={{ fontWeight:700, fontSize:'15px', color:'var(--navy)', lineHeight:'1.3' }}>{doc.filename || doc.doc_type}</div>
                           <div style={{ fontSize:'12px', color:'var(--muted)', marginTop:'3px' }}>
                             <span className="material-symbols-outlined" style={{fontSize:'12px', verticalAlign:'middle', marginRight:'3px'}}>calendar_today</span>
                             {new Date(doc.uploaded_at).toLocaleDateString('en-US', {year:'numeric', month:'short', day:'numeric'})}
@@ -779,6 +805,7 @@ export default function AdminUserDetail() {
                         </div>
                         <div className="doc-review-actions">
                           <button onClick={() => viewDoc(doc.storage_key)} className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)'}}>View</button>
+                          <button onClick={() => downloadDoc(doc.storage_key, doc.filename)} className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)', display:'flex', alignItems:'center', gap:'4px'}}><span className="material-symbols-outlined" style={{fontSize:'16px'}}>download</span></button>
                           <button className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)'}} onClick={() => handleDocApprove(doc.id, doc.type, true)}>Approve</button>
                           <button className="btn btn-danger btn-sm" style={{borderRadius:'var(--radius-sm)'}} onClick={() => openRejectPanel(doc.id, doc.type)}>Reject</button>
                           <button 
@@ -972,6 +999,7 @@ export default function AdminUserDetail() {
                           <td>
                             <div style={{display:'flex', gap:'6px', flexWrap:'wrap'}}>
                               <button className="btn btn-secondary btn-sm" onClick={() => viewDoc(doc.storage_key)}>View</button>
+                              <button className="btn btn-secondary btn-sm" onClick={() => downloadDoc(doc.storage_key, doc.filename)} style={{display:'flex', alignItems:'center', gap:'4px'}}><span className="material-symbols-outlined" style={{fontSize:'16px'}}>download</span></button>
                               {doc.review_status !== 'filed' && doc.review_status !== 'approved' && (
                                 <button
                                   className="btn btn-primary btn-sm"

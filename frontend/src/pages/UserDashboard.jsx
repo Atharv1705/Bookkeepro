@@ -134,6 +134,31 @@ export default function UserDashboard() {
     }
   };
 
+
+  const downloadDoc = async (storageKey, originalFilename) => {
+    try {
+      const res = await authFetch(`/api/upload/view-url?key=${encodeURIComponent(storageKey)}`);
+      if (res.ok) {
+        const data = await res.json();
+        const fileRes = await fetch(data.url);
+        const blob = await fileRes.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = originalFilename || storageKey.split('/').pop() || 'document';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+      } else {
+        showToast("Could not generate download link", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Error downloading document", "error");
+    }
+  };
+
   const respondDoc = async (docId, approved, reason = "") => {
     if (docLoading) return;
     setDocLoading(true);
@@ -293,6 +318,7 @@ export default function UserDashboard() {
                       <td>
                         <div style={{display:'flex', gap:'8px', flexWrap:'wrap', alignItems:'center'}}>
                           <button className="btn btn-secondary btn-sm" onClick={() => viewDoc(doc.storage_key)}>View</button>
+                              <button className="btn btn-secondary btn-sm" onClick={() => downloadDoc(doc.storage_key, doc.filename)} style={{display:'flex', alignItems:'center', gap:'4px'}}><span className="material-symbols-outlined" style={{fontSize:'16px'}}>download</span></button>
                           <button className="btn btn-primary btn-sm" onClick={() => respondDoc(doc.id, true)} disabled={docLoading}>Approve</button>
                           <button className="btn btn-danger btn-sm" onClick={() => openUserRejectPanel(doc.id)} disabled={docLoading}>Reject</button>
                         </div>
