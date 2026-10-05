@@ -218,43 +218,6 @@ export default function AdminDashboard() {
         Admin Dashboard <span style={{ color: 'var(--brass)', fontWeight: 600, fontSize: '32px' }}>{tab === 'templates' ? '| Templates' : ''}</span>
       </h1>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-        
-      {tab === 'bookmarks' && (
-        <div className="card shadow-sm p-lg">
-          <h2 style={{fontSize:'20px', fontWeight:700, color:'var(--navy)', marginBottom:'24px'}}>Bookmarked Documents</h2>
-          {bookmarks.length === 0 ? (
-            <p style={{color:'var(--text-light)'}}>No bookmarked documents found.</p>
-          ) : (
-            <div className="table-responsive">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Document Name</th>
-                    <th>User</th>
-                    <th>Type</th>
-                    <th>Date</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {bookmarks.map((b) => (
-                    <tr key={`${b.type}-${b.id}`}>
-                      <td style={{fontWeight:500, color:'var(--navy)'}}>{b.filename || b.doc_name}</td>
-                      <td>{b.user_name}</td>
-                      <td style={{textTransform:'capitalize'}}>{b.type}</td>
-                      <td>{new Date(b.uploaded_at).toLocaleDateString()}</td>
-                      <td>
-                        <button onClick={() => navigate(`/admin-user-detail?user_id=${b.user_id}`)} className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)'}}>Go to User</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
       {tab === 'users' && (
           <div style={{ display: 'flex', gap: '12px', width: '100%', maxWidth: '500px', flexWrap: 'wrap' }}>
             <div className="search-wrap" style={{ flex: 1, minWidth: '200px', position: 'relative' }}>
@@ -309,41 +272,51 @@ export default function AdminDashboard() {
       {/* Users Tab */}
       
       {tab === 'bookmarks' && (
-        <div className="card shadow-sm p-lg">
-          <h2 style={{fontSize:'20px', fontWeight:700, color:'var(--navy)', marginBottom:'24px'}}>Bookmarked Documents</h2>
+        <div style={{marginTop: '16px'}}>
+          <h2 style={{fontFamily: 'var(--font-display)', fontSize:'28px', fontWeight:700, color:'var(--navy)', marginBottom:'24px', display:'flex', alignItems:'center', gap:'12px', letterSpacing: '-0.5px'}}>
+            <span className="material-symbols-outlined" style={{color:'var(--orange)', fontSize:'32px'}}>star</span>
+            Bookmarked Documents
+          </h2>
           {bookmarks.length === 0 ? (
-            <p style={{color:'var(--text-light)'}}>No bookmarked documents found.</p>
+            <div className="card shadow-sm p-lg" style={{textAlign: 'center', padding: '48px 24px'}}>
+              <span className="material-symbols-outlined" style={{fontSize: '48px', color: 'var(--border)'}}>star_border</span>
+              <p style={{color:'var(--text-light)', marginTop: '16px', fontSize: '16px'}}>No bookmarked documents found.</p>
+            </div>
           ) : (
-            <div className="table-responsive">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Document Name</th>
-                    <th>User</th>
-                    <th>Type</th>
-                    <th>Date</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {bookmarks.map((b) => (
-                    <tr key={`${b.type}-${b.id}`}>
-                      <td style={{fontWeight:500, color:'var(--navy)'}}>{b.filename || b.doc_name}</td>
-                      <td>{b.user_name}</td>
-                      <td style={{textTransform:'capitalize'}}>{b.type}</td>
-                      <td>{new Date(b.uploaded_at).toLocaleDateString()}</td>
-                      <td>
-                        <button onClick={() => navigate(`/admin-user-detail?user_id=${b.user_id}`)} className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)'}}>Go to User</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="users-grid" style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px'}}>
+              {bookmarks.map((b) => (
+                <div key={`${b.type}-${b.id}`} className="user-card stagger fade-up" style={{background: 'var(--surface)', padding: '24px', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s', display: 'flex', flexDirection: 'column'}} onClick={() => navigate(`/admin-user-detail?user_id=${b.user_id}`)}
+                onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.1)'; }}
+                onMouseOut={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.05)'; }}
+                >
+                  <div className="user-top" style={{alignItems: 'flex-start', display: 'flex', gap: '16px'}}>
+                    <div className="user-avatar" style={{background: 'var(--orange-light)', color: 'var(--orange)', borderRadius: '12px', width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0}}>
+                      <span className="material-symbols-outlined" style={{fontSize: '24px'}}>description</span>
+                    </div>
+                    <div className="user-info" style={{flex: 1}}>
+                      <div className="u-name" style={{fontSize: '16px', fontWeight: 700, color: 'var(--navy)', wordBreak: 'break-word'}}>{b.filename || b.doc_name}</div>
+                      <div className="u-email" style={{fontSize: '14px', color: 'var(--muted)', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px'}}>
+                         <span className="material-symbols-outlined" style={{fontSize:'16px'}}>person</span> {b.user_name}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="user-bottom" style={{marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px', paddingTop: '16px', marginTop: '20px'}}>
+                    <span className={`badge ${b.type === 'personal' ? 'badge-blue' : b.type === 'business' ? 'badge-green' : 'badge-gray'}`} style={{textTransform:'uppercase', fontSize: '12px'}}>
+                      {b.type}
+                    </span>
+                    <span className="badge badge-gray" style={{fontSize: '12px', background: 'white', border: '1px solid var(--border)', color: 'var(--text-light)'}}>
+                       <span className="material-symbols-outlined" style={{fontSize:'14px', verticalAlign:'middle', marginRight: '4px'}}>calendar_today</span>
+                       {new Date(b.uploaded_at).toLocaleDateString()}
+                    </span>
+                    <span style={{flex: 1}}></span>
+                    <span className="material-symbols-outlined" style={{color: 'var(--orange)', fontSize: '20px'}}>arrow_forward</span>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
       )}
-
       {tab === 'users' && (
         <>
           {/* Daily Digest */}
