@@ -1513,16 +1513,30 @@ def get_bookmarks(
     db: Session = Depends(get_db),
     current_user=Depends(require_admin),
 ):
-    from app.models import AdminDocumentBookmark
+    from app.models import AdminDocumentBookmark, PersonalDocument, BusinessDocument, AdminDocument, User
     bookmarks = db.query(AdminDocumentBookmark).filter_by(
         admin_id=current_user.id
     ).all()
-    return {
-        "bookmarks": [
-            {"doc_kind": b.doc_kind, "doc_id": b.doc_id}
-            for b in bookmarks
-        ]
-    }
+    
+    docs = []
+    for b in bookmarks:
+        if b.doc_kind == 'personal':
+            d = db.query(PersonalDocument).get(b.doc_id)
+            if d and not d.deleted_at:
+                u = db.query(User).get(d.user_id)
+                docs.append({"id": d.id, "type": "personal", "doc_name": d.doc_type, "filename": d.filename, "uploaded_at": d.uploaded_at.isoformat() if d.uploaded_at else None, "user_name": u.name if u else "Unknown", "user_id": d.user_id, "storage_key": d.storage_key})
+        elif b.doc_kind == 'business':
+            d = db.query(BusinessDocument).get(b.doc_id)
+            if d and not d.deleted_at:
+                u = db.query(User).get(d.user_id)
+                docs.append({"id": d.id, "type": "business", "doc_name": d.business_type, "filename": d.filename, "uploaded_at": d.uploaded_at.isoformat() if d.uploaded_at else None, "user_name": u.name if u else "Unknown", "user_id": d.user_id, "storage_key": d.storage_key})
+        elif b.doc_kind == 'admin':
+            d = db.query(AdminDocument).get(b.doc_id)
+            if d and not d.deleted_at:
+                u = db.query(User).get(d.user_id)
+                docs.append({"id": d.id, "type": "admin", "doc_name": d.doc_label, "filename": d.filename, "uploaded_at": d.uploaded_at.isoformat() if d.uploaded_at else None, "user_name": u.name if u else "Unknown", "user_id": d.user_id, "storage_key": d.storage_key})
+                
+    return {"bookmarks": docs}
 
 @router.put("/bookmarks/{doc_kind}/{doc_id}")
 def add_bookmark(

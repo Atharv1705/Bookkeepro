@@ -11,7 +11,9 @@ export default function AdminDashboard() {
   const [confirmConfig, setConfirmConfig] = useState({
     isOpen: false, title: "", message: "", confirmText: "OK", isDestructive: false, onConfirm: () => {}
   });
+  const [activeTab, setActiveTab] = useState("users");
   const [stats, setStats] = useState({ total_users: 0, pending_personal: 0, pending_business: 0, admins: 0 });
+  const [bookmarks, setBookmarks] = useState([]);
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState("");
   const [userFilter, setUserFilter] = useState("all");
@@ -47,10 +49,16 @@ export default function AdminDashboard() {
   const fetchAdminData = useCallback(async () => {
     setLoading(true);
     try {
-      const [usersRes, statsRes] = await Promise.all([
+      const [usersRes, statsRes, bookmarksRes] = await Promise.all([
         authFetch(`/api/auth/admin/users?tax_year=${filterYear}`),
-        authFetch(`/api/chatbot/admin-status?tax_year=${filterYear}`)
+        authFetch(`/api/chatbot/admin-status?tax_year=${filterYear}`),
+        authFetch(`/api/upload/bookmarks`)
       ]);
+      
+      if (bookmarksRes.ok) {
+        const payload = await bookmarksRes.json();
+        setBookmarks(payload.bookmarks || []);
+      }
       
       let newUsersArray = users;
       let adminsCount = stats.admins;
@@ -210,7 +218,44 @@ export default function AdminDashboard() {
         Admin Dashboard <span style={{ color: 'var(--brass)', fontWeight: 600, fontSize: '32px' }}>{tab === 'templates' ? '| Templates' : ''}</span>
       </h1>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-        {tab === 'users' && (
+        
+      {tab === 'bookmarks' && (
+        <div className="card shadow-sm p-lg">
+          <h2 style={{fontSize:'20px', fontWeight:700, color:'var(--navy)', marginBottom:'24px'}}>Bookmarked Documents</h2>
+          {bookmarks.length === 0 ? (
+            <p style={{color:'var(--text-light)'}}>No bookmarked documents found.</p>
+          ) : (
+            <div className="table-responsive">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Document Name</th>
+                    <th>User</th>
+                    <th>Type</th>
+                    <th>Date</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bookmarks.map((b) => (
+                    <tr key={`${b.type}-${b.id}`}>
+                      <td style={{fontWeight:500, color:'var(--navy)'}}>{b.filename || b.doc_name}</td>
+                      <td>{b.user_name}</td>
+                      <td style={{textTransform:'capitalize'}}>{b.type}</td>
+                      <td>{new Date(b.uploaded_at).toLocaleDateString()}</td>
+                      <td>
+                        <button onClick={() => navigate(`/admin-user-detail?user_id=${b.user_id}`)} className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)'}}>Go to User</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'users' && (
           <div style={{ display: 'flex', gap: '12px', width: '100%', maxWidth: '500px', flexWrap: 'wrap' }}>
             <div className="search-wrap" style={{ flex: 1, minWidth: '200px', position: 'relative' }}>
               <span className="material-symbols-outlined search-icon" style={{position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', fontSize: '20px'}}>search</span>
@@ -253,12 +298,52 @@ export default function AdminDashboard() {
         <button className={`tab-btn ${tab === 'users' ? 'active' : ''}`} onClick={() => setTab('users')}>
           <span className="material-symbols-outlined">group</span> Users Overview
         </button>
+        <button className={`tab-btn ${tab === 'bookmarks' ? 'active' : ''}`} onClick={() => setTab('bookmarks')}>
+          <span className="material-symbols-outlined">star</span> Bookmarks
+        </button>
         <button className={`tab-btn ${tab === 'templates' ? 'active' : ''}`} onClick={() => setTab('templates')}>
           <span className="material-symbols-outlined">description</span> Templates
         </button>
       </div>
 
       {/* Users Tab */}
+      
+      {tab === 'bookmarks' && (
+        <div className="card shadow-sm p-lg">
+          <h2 style={{fontSize:'20px', fontWeight:700, color:'var(--navy)', marginBottom:'24px'}}>Bookmarked Documents</h2>
+          {bookmarks.length === 0 ? (
+            <p style={{color:'var(--text-light)'}}>No bookmarked documents found.</p>
+          ) : (
+            <div className="table-responsive">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Document Name</th>
+                    <th>User</th>
+                    <th>Type</th>
+                    <th>Date</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bookmarks.map((b) => (
+                    <tr key={`${b.type}-${b.id}`}>
+                      <td style={{fontWeight:500, color:'var(--navy)'}}>{b.filename || b.doc_name}</td>
+                      <td>{b.user_name}</td>
+                      <td style={{textTransform:'capitalize'}}>{b.type}</td>
+                      <td>{new Date(b.uploaded_at).toLocaleDateString()}</td>
+                      <td>
+                        <button onClick={() => navigate(`/admin-user-detail?user_id=${b.user_id}`)} className="btn btn-secondary btn-sm" style={{borderRadius:'var(--radius-sm)'}}>Go to User</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {tab === 'users' && (
         <>
           {/* Daily Digest */}
