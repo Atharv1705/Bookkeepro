@@ -256,11 +256,35 @@ def admin_bulk_action(
         model_class.deleted_at   == None,
     ).all()
 
+    from app import crud
+    from app.models import DocumentReviewEvent
+    from datetime import datetime
+
     count = 0
     for doc in docs:
         doc.review_status = new_status
+        if new_status == "approved":
+            doc.reviewed_at = datetime.utcnow()
+        event = DocumentReviewEvent(
+            doc_kind=doc_type,
+            doc_id=doc.id,
+            owner_user_id=payload.user_id,
+            actor_id=current_user.id,
+            actor_role="admin",
+            action=f"bulk_{new_status}",
+            from_status="pending",
+            to_status=new_status,
+            tax_year=doc.tax_year,
+        )
+        db.add(event)
         count += 1
 
+    crud.log_action(
+        db, "bulk_review_docs",
+        user_id=current_user.id,
+        target=f"user:{payload.user_id}",
+        detail=f"bulk_{new_status} {count} {doc_type} documents",
+    )
     db.commit()
     logger.info(f"Admin {current_user.id} bulk {new_status} {count} {doc_type} docs for user {payload.user_id}")
 

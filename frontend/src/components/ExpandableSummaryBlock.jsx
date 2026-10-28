@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+
 import { useState } from 'react';
 import ExpandableValue from './ExpandableValue';
 
@@ -62,45 +62,7 @@ export default function ExpandableSummaryBlock({ extractedData, onSave }) {
     }
   };
 
-  const handleExport = () => {
-    // Export extracted AI data as a proper .xlsx file using SheetJS
-    const { _meta, ...dataFields } = extractedData || {};
-
-    const rows = [['Field', 'Value']];
-    Object.entries(dataFields).forEach(([key, val]) => {
-      let valStr = val;
-      if (Array.isArray(val)) valStr = val.join('; ');
-      else if (typeof val === 'object' && val !== null) valStr = JSON.stringify(val);
-      
-      let finalKey = String(key);
-      let finalVal = String(valStr ?? '');
-      
-      // Sanitize CSV/Excel Formula Injection
-      if (/^[=+\-@]/.test(finalKey)) finalKey = "'" + finalKey;
-      if (/^[=+\-@]/.test(finalVal)) finalVal = "'" + finalVal;
-
-      rows.push([finalKey, finalVal]);
-    });
-
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-
-    // Bold + green header
-    ['A1', 'B1'].forEach(ref => {
-      if (ws[ref]) ws[ref].s = { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '2C7A5B' } } };
-    });
-
-    // Column widths
-    ws['!cols'] = [
-      { wch: Math.max(10, ...Object.keys(dataFields).map(k => k.length + 2)) },
-      { wch: 45 },
-    ];
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Extracted Data');
-    XLSX.writeFile(wb, 'extracted_data.xlsx');
-  }
-
-  const showToggle = entries.length > 3;
+    const showToggle = entries.length > 3;
   const entriesToShow = expanded ? entries : entries.slice(0, 3);
   const confidenceStyle = CONFIDENCE_STYLES[_meta?.tier] || CONFIDENCE_STYLES.unknown;
 
@@ -164,9 +126,6 @@ export default function ExpandableSummaryBlock({ extractedData, onSave }) {
         ) : <div />}
 
         <div style={{ display: 'flex', gap: '6px' }}>
-          <button onClick={handleExport} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '11px', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '4px', padding: '2px' }} title="Export Excel">
-            <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>download</span> Export Excel
-          </button>
           <button onClick={handleEditClick} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '11px', color: 'var(--emerald)', display: 'flex', alignItems: 'center', gap: '4px', padding: '2px', fontWeight: 600 }} title="Edit Summary">
             <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>edit</span> Edit
           </button>

@@ -96,7 +96,7 @@ async def forgot_password(
 
     reset_token = create_password_reset_token(user.email)
 
-    frontend_url = os.getenv("FRONTEND_URL", "https://aiindiacpa.duckdns.org")
+    frontend_url = os.getenv("FRONTEND_URL", "https://aicpa.duckdns.org")
     reset_link = f"{frontend_url}/reset-password?token={reset_token}"
 
     reset_body = (
@@ -267,7 +267,7 @@ async def signup(request: Request, payload: SignupRequest, background: Backgroun
     # Send verification email in background (non-blocking)
     if not is_admin:
         verify_token = create_email_verification_token(user.email)
-        frontend_url = os.getenv("FRONTEND_URL", "https://aiindiacpa.duckdns.org")
+        frontend_url = os.getenv("FRONTEND_URL", "https://aicpa.duckdns.org")
         verify_link = f"{frontend_url}/verify-email?token={verify_token}"
         verify_body = (
             f"Hi {user.name},<br><br>"
@@ -376,7 +376,7 @@ async def resend_verification(
         return {"message": "If the email exists and is unverified, a new link has been sent"}
 
     verify_token = create_email_verification_token(user.email)
-    frontend_url = os.getenv("FRONTEND_URL", "https://aiindiacpa.duckdns.org")
+    frontend_url = os.getenv("FRONTEND_URL", "https://aicpa.duckdns.org")
     verify_link = f"{frontend_url}/verify-email?token={verify_token}"
 
     resend_body = (
@@ -446,18 +446,20 @@ def update_me(
     current_user=Depends(get_current_user),
 ):
     """Update own profile (name, phone, password). Any authenticated user."""
-    name         = payload.get("name", "").strip()
-    phone        = payload.get("phone", "").strip()
-    current_pw   = payload.get("current_password", "")
-    new_pw       = payload.get("new_password", "")
+    name_raw     = payload.get("name")
+    phone_raw    = payload.get("phone")
+    name         = name_raw.strip() if isinstance(name_raw, str) else None
+    phone        = phone_raw.strip() if isinstance(phone_raw, str) else None
+    current_pw   = payload.get("current_password") or ""
+    new_pw       = payload.get("new_password") or ""
 
     changed = []
 
-    if name and name != current_user.name:
+    if name is not None and name and name != current_user.name:
         current_user.name = name
         changed.append("name")
 
-    if phone != current_user.phone:
+    if phone is not None and phone != (current_user.phone or ""):
         current_user.phone = phone
         changed.append("phone")
 

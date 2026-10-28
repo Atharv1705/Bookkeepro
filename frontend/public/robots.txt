@@ -14,4 +14,4 @@ Disallow: /reset-password
 Disallow: /verify-email
 Disallow: /resend-verification
 
-Sitemap: https://aiindiacpa.duckdns.org/sitemap.xml
+Sitemap: https://aicpa.duckdns.org/sitemap.xml

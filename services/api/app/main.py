@@ -194,6 +194,8 @@ def llms_txt():
 
 @app.get("/{full_path:path}", tags=["frontend"])
 def spa_fallback(full_path: str):
+    if full_path.startswith("api/") or full_path == "api":
+        raise HTTPException(status_code=404, detail="API endpoint not found")
     if os.path.isfile(SPA_INDEX):
         return FileResponse(
             SPA_INDEX,

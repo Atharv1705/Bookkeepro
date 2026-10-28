@@ -5,19 +5,19 @@
   --color-brand-emerald: #1F5D46;
   --color-brand-emerald-dark: #163F30;
   --color-brand-emerald-light: #E8F1EC;
-  --color-brand-brass: #B0803D;
+  --color-brand-brass: #8F6528;
   --color-brand-brass-dark: #8F6528;
   --color-brand-brass-light: #F6EEE0;
   --color-brand-paper: #F5F2E9;
   --color-brand-card: #FFFFFF;
-  --color-brand-muted: #6B7268;
+  --color-brand-muted: #656C62;
   --color-brand-border: #E3DDC9;
   
   --color-status-success: #1F5D46;
   --color-status-success-bg: #E8F1EC;
   --color-status-error: #A63A3A;
   --color-status-error-bg: #F7E9E9;
-  --color-status-warn: #B0803D;
+  --color-status-warn: #8F6528;
   --color-status-warn-bg: #F6EEE0;
 
   --font-sans: "IBM Plex Sans", system-ui, sans-serif;
@@ -321,3 +321,70 @@ h3 { @apply text-2xl md:text-3xl; }
 .toast-info { border-left: 4px solid var(--emerald); }
 .toast-message { flex: 1; font-size: 14px; font-weight: 500; }
 .toast-close { background: none; border: none; color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+/* -------------------------------- */
+/* Fixes from QA                    */
+/* -------------------------------- */
+.tab-bar {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 24px;
+  overflow-x: auto;
+  scrollbar-width: none; /* Firefox */
+  position: relative;
+  white-space: nowrap;
+}
+
+.tab-bar::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+/* Fade on the right edge to indicate scrolling */
+.tab-bar-container {
+  position: relative;
+}
+.tab-bar-container::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 40px;
+  background: linear-gradient(to right, transparent, var(--paper));
+  pointer-events: none;
+}
+
+.tab-btn {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 12px 16px;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.tab-btn:hover {
+  color: var(--navy);
+}
+
+.tab-btn.active {
+  color: var(--emerald);
+  border-bottom-color: var(--emerald);
+}
+
+.card-title {
+  font-family: var(--font-sans);
+  font-weight: 600;
+}
+
+.footer-copy {
+  color: #8c9289; /* Increased contrast for footer copyright */
+}
+

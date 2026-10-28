@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import ExpandableSummaryBlock from '../components/ExpandableSummaryBlock';
 import ConfirmModal from '../components/ConfirmModal';
+import StatusChip from '../components/StatusChip';
 
 
 export default function AdminUserDetail() {
@@ -44,29 +45,7 @@ export default function AdminUserDetail() {
   const [markFiledLoading, setMarkFiledLoading] = useState(false);
 
   // Export Excel Function
-  const exportToExcel = async () => {
-    try {
-      showToast("Preparing Excel export...", "info");
-      const res = await authFetch(`/api/upload/admin/users/${userId}/export`);
-      if (res.ok) {
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `user_${userId}_excel_summaries.zip`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(url);
-        showToast("Excel export ready!", "success");
-      } else {
-        showToast("Failed to export Excel file", "error");
-      }
-    } catch (err) {
-      console.error(err);
-      showToast("Error exporting Excel file", "error");
-    }
-  };
+  ;
 
   // States for Audit Log
   const [auditLog, setAuditLog] = useState([]);
@@ -261,6 +240,7 @@ export default function AdminUserDetail() {
       if (res.ok) {
         setSendApprovalPanel(null);
         showToast("Document sent to client for approval ✔", "success");
+        setDocuments(prev => prev.map(d => d.id === docId ? { ...d, review_status: 'sent_for_approval', review_note: note || d.review_note } : d));
         fetchUserDetails();
       } else {
         const data = await res.json().catch(() => ({}));
@@ -393,13 +373,10 @@ export default function AdminUserDetail() {
 
   const sendEmail = async (type) => {
     const docsToReview = documents.filter(d => d.type === type);
-    const approved = docsToReview.filter(d => d.review_status === "approved").map(d => d.doc_type);
-    const rejected = docsToReview.filter(d => d.review_status === "rejected").map(d => d.doc_type);
+    const approved = docsToReview.filter(d => d.review_status === "approved").map(d => d.filename || d.doc_type);
+    const rejected = docsToReview.filter(d => d.review_status === "rejected").map(d => d.filename || d.doc_type);
     
-    if (approved.length === 0 && rejected.length === 0) {
-      showToast(`No ${type} documents selected.`, "warning");
-      return;
-    }
+
 
     try {
       const res = await authFetch("/api/review/notify-user", {
@@ -540,7 +517,7 @@ export default function AdminUserDetail() {
               {(userDetail.name || "U").charAt(0).toUpperCase()}
             </div>
             <div>
-              <div style={{fontWeight:700, fontSize:'18px', color:'var(--navy)'}}>{userDetail.name || "—"}</div>
+              <h1 style={{fontWeight: 700, fontSize: "18px", color: "var(--navy)", margin: 0}}>{userDetail.name || "?"}</h1>
               <div style={{fontSize:'13px', color:'var(--muted)', marginTop:'2px'}}>{userDetail.email}</div>
               <div style={{display:'flex', gap:'8px', marginTop:'6px', flexWrap:'wrap'}}>
                 {currentUser?.role === 'super_admin' && currentUser.id !== userDetail.id ? (
@@ -756,7 +733,7 @@ export default function AdminUserDetail() {
             </div>
             <div className="doc-review-sidebar">
               <div className="card-flat" style={{display:'flex', flexDirection:'column', gap:'16px'}}>
-                <h3>Filing Timeline</h3>
+                <h3 className="card-title">Filing Timeline</h3>
                 {deadlines.filter(d => d.doc_type === 'personal').map(d => (
                   <div key="personal-dl" style={{
                     margin: '0 0 16px', padding: '12px 16px',
@@ -929,7 +906,7 @@ export default function AdminUserDetail() {
             </div>
             <div className="doc-review-sidebar">
               <div className="card-flat" style={{display:'flex', flexDirection:'column', gap:'16px'}}>
-                <h3>Filing Timeline</h3>
+                <h3 className="card-title">Filing Timeline</h3>
                 {deadlines.filter(d => d.doc_type === 'business').map(d => (
                   <div key="business-dl" style={{
                     margin: '0 0 16px', padding: '12px 16px',
@@ -971,7 +948,7 @@ export default function AdminUserDetail() {
         <div className="tab-panel active">
           <div className="card-flat">
             <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px', flexWrap:'wrap', gap:'8px'}}>
-              <h3 style={{margin:0}}>Admin Returns / Documents</h3>
+              <h3 style={{margin:0}} className="card-title">Admin Returns / Documents</h3>
               <div style={{display:'flex', gap:'8px', flexWrap:'wrap'}}>
                 <input type="file" hidden ref={adminDocInputRef} accept=".pdf,.doc,.docx,.xls,.xlsx" onChange={e => {if(e.target.files[0]) uploadAdminDoc(e.target.files[0])}} />
                 <button className="btn btn-primary btn-sm" style={{borderRadius:'var(--radius-sm)'}} onClick={() => adminDocInputRef.current?.click()}>+ Upload Return</button>
@@ -1009,18 +986,9 @@ export default function AdminUserDetail() {
                             <div className="text-sm text-muted">{doc.filename}</div>
                           </td>
                           <td>{doc.tax_year || <span className="text-muted">N/A</span>}</td>
-                          <td>{new Date(doc.uploaded_at).toLocaleDateString()}</td>
+                          <td>{new Date(doc.uploaded_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</td>
                           <td>
-                            {(() => {
-                              const s = doc.review_status || 'pending';
-                              const cls = s === 'approved' ? 'badge-green' : s === 'rejected' ? 'badge-red' : s === 'sent_for_approval' ? 'badge-blue' : s === 'filed' ? 'badge-green' : 'badge-yellow';
-                              return (
-                                <div>
-                                  <span className={`badge ${cls}`} style={{fontWeight:700}}>{s.replace(/_/g,' ').toUpperCase()}</span>
-                                  {doc.review_note && <div className="text-sm text-muted" style={{marginTop:'3px', fontSize:'11px'}}>{doc.review_note}</div>}
-                                </div>
-                              );
-                            })()}
+                            <StatusChip status={doc.review_status} note={doc.review_note} />
                           </td>
                           <td>
                             <div style={{display:'flex', gap:'6px', flexWrap:'wrap'}}>
@@ -1031,7 +999,17 @@ export default function AdminUserDetail() {
                               {doc.bookmarked ? 'star' : 'star_border'}
                             </span>
                           </button>
-                              {doc.review_status !== 'filed' && doc.review_status !== 'approved' && (
+                              {doc.review_status === 'sent_for_approval' ? (
+                                <button
+                                  className="btn btn-secondary btn-sm"
+                                  style={{fontSize:'12px', display:'inline-flex', alignItems:'center', gap:'4px'}}
+                                  onClick={() => setSendApprovalPanel({ docId: doc.id, note: '' })}
+                                  disabled={sendingApproval}
+                                  title="Already sent to client. Click to resend notification."
+                                >
+                                  <span>📨 Resend for Approval</span>
+                                </button>
+                              ) : (doc.review_status !== 'filed' && doc.review_status !== 'approved') ? (
                                 <button
                                   className="btn btn-primary btn-sm"
                                   style={{background:'#2c7a5b', borderColor:'#2c7a5b', fontSize:'12px'}}
@@ -1040,8 +1018,19 @@ export default function AdminUserDetail() {
                                 >
                                   📤 Send for Approval
                                 </button>
+                              ) : null}
+                              {doc.review_status === 'approved' ? (
+                                <button
+                                  className="btn btn-secondary btn-sm"
+                                  disabled
+                                  title="Approved return is locked from deletion"
+                                  style={{ opacity: 0.5, cursor: 'not-allowed' }}
+                                >
+                                  Locked
+                                </button>
+                              ) : (
+                                <button className="btn btn-danger btn-sm" onClick={() => deleteAdminDoc(doc.id)}>Delete</button>
                               )}
-                              <button className="btn btn-danger btn-sm" onClick={() => deleteAdminDoc(doc.id)}>Delete</button>
                             </div>
                           </td>
                         </tr>
@@ -1058,7 +1047,7 @@ export default function AdminUserDetail() {
                                 display:'flex', flexDirection:'column', gap:'10px'
                               }}>
                                 <div style={{fontWeight:600, fontSize:'13px', color:'#2c7a5b'}}>
-                                  📤 Send this document to client for review
+                                  {doc.review_status === 'sent_for_approval' ? '📨 Resend this document to client for review' : '📤 Send this document to client for review'}
                                 </div>
                                 <textarea
                                   rows={2}
@@ -1080,7 +1069,7 @@ export default function AdminUserDetail() {
                                     disabled={sendingApproval}
                                     onClick={() => sendReturnForApproval(doc.id, sendApprovalPanel.note)}
                                   >
-                                    {sendingApproval ? 'Sending...' : 'Confirm & Email Client'}
+                                    {sendingApproval ? 'Sending...' : doc.review_status === 'sent_for_approval' ? 'Resend & Email Client' : 'Confirm & Email Client'}
                                   </button>
                                 </div>
                               </div>
@@ -1101,7 +1090,7 @@ export default function AdminUserDetail() {
       {activeTab === 'audit' && (
         <div className="tab-panel active">
           <div className="card-flat">
-            <h3 style={{marginBottom:'16px'}}>Recent Activity</h3>
+            <h3 style={{marginBottom:'16px'}} className="card-title">Recent Activity</h3>
             {auditLog.length === 0 ? (
               <p className="text-muted">No audit logs found.</p>
             ) : (

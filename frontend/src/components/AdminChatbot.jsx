@@ -98,19 +98,7 @@ export default function AdminChatbot() {
 
   // ── System overview ───────────────────────────────────────────────────────
   const handleAdminStatusCheck = async () => {
-    setMessages(prev => [...prev, { type: 'user', role: 'user', text: 'Give me a system overview.' }]);
-    setView('chat');
-    try {
-      const res = await authFetch('/api/chatbot/admin-status');
-      if (res.ok) {
-        const data = await res.json();
-        setMessages(prev => [...prev, { type: 'bot', role: 'assistant', text: data.message }]);
-      } else {
-        setMessages(prev => [...prev, { type: 'bot', role: 'assistant', text: 'Could not fetch system status right now.' }]);
-      }
-    } catch {
-      setMessages(prev => [...prev, { type: 'bot', role: 'assistant', text: 'Network error.' }]);
-    }
+    sendMessage('Give me a system overview.');
   };
 
   // ── Bulk action executor with confirmation ────────────────────────────────
@@ -161,18 +149,32 @@ export default function AdminChatbot() {
         const replyText = data.content || "Sorry, I couldn't understand that.";
 
         // Check if response contains a bulk_action JSON block
-        const bulkMatch = replyText.match(/\{[^{}]*"bulk_action"[^{}]*\}/s);
-        if (bulkMatch) {
+        let jsonStr = replyText;
+        const mdMatch = replyText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+        if (mdMatch) {
+          jsonStr = mdMatch[1];
+        } else {
+          const firstIdx = replyText.indexOf('{');
+          const lastIdx = replyText.lastIndexOf('}');
+          if (firstIdx !== -1 && lastIdx !== -1) {
+            jsonStr = replyText.substring(firstIdx, lastIdx + 1);
+          }
+        }
+        
+        if (jsonStr.includes('"bulk_action"')) {
           try {
-            const parsed = JSON.parse(bulkMatch[0]);
+            const parsed = JSON.parse(jsonStr);
             if (parsed.bulk_action) {
               setPendingBulk(parsed.bulk_action);
-              const cleanText = replyText.replace(bulkMatch[0], '').trim();
+              const cleanText = replyText.replace(jsonStr, '').replace(/```(?:json)?|```/g, '').trim();
               setMessages(prev => [...prev, { type: 'bot', role: 'assistant', text: cleanText || "I can do that. Please confirm below." }]);
               setIsTyping(false);
               return;
             }
-          } catch { /* not valid JSON, render as text */ }
+          } catch (e) {
+             console.error("Failed to parse JSON:", e, jsonStr);
+             /* not valid JSON, render as text */ 
+          }
         }
 
         setMessages(prev => [...prev, { type: 'bot', role: 'assistant', text: replyText }]);

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import CountUp from '../components/CountUp';
 
 const SERVICES = [
   {
@@ -39,15 +40,15 @@ export default function Home() {
 
         <div className="hero-stats">
           <div className="stat-block">
-            <div className="stat-figure tnum">27</div>
+            <div className="stat-figure tnum"><CountUp value={27} /></div>
             <div className="stat-caption">Years in accounting</div>
           </div>
           <div className="stat-block">
-            <div className="stat-figure tnum">2</div>
+            <div className="stat-figure tnum"><CountUp value={2} /></div>
             <div className="stat-caption">Countries operating</div>
           </div>
           <div className="stat-block">
-            <div className="stat-figure tnum">100%</div>
+            <div className="stat-figure tnum"><CountUp value={100} suffix="%" /></div>
             <div className="stat-caption">Filings on schedule</div>
           </div>
         </div>
@@ -89,7 +90,7 @@ export default function Home() {
               </div>
               <div className="service-body">
                 <span className="service-label">{s.label}</span>
-                <h3>{s.title}</h3>
+                <h3 className="card-title">{s.title}</h3>
                 <Link to="/contact"><button className="btn btn-outline btn-sm w-full">Get consultation</button></Link>
               </div>
             </div>

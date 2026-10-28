@@ -1,5 +1,5 @@
 import os
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 import logging
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/review", tags=["review"])
 
-DASHBOARD_LINK = f"{os.getenv('FRONTEND_URL', 'https://aiindiacpa.duckdns.org')}/dashboard"
+DASHBOARD_LINK = f"{os.getenv('FRONTEND_URL', 'https://aicpa.duckdns.org')}/dashboard"
 
 
 # ─────────────────────────────────────────────
@@ -127,6 +127,7 @@ async def notify_user_review(
 @router.post("/admin-doc-response")
 async def admin_doc_response(
     payload: AdminDocResponseRequest,
+    background: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -147,6 +148,7 @@ async def admin_doc_response(
         raise HTTPException(status_code=403, detail="Not authorized")
         
     doc.review_status = payload.status
+    doc.reviewed_at = datetime.utcnow()
     if payload.reason:
         doc.review_note = payload.reason
     db.commit()
@@ -166,28 +168,29 @@ async def admin_doc_response(
     db.add(event)
     db.commit()
 
-    admin = db.query(User).filter_by(id=doc.uploaded_by).first()
-    if not admin:
-        raise HTTPException(status_code=404, detail="Admin not found")
+    admin = db.query(User).filter_by(id=doc.uploaded_by).first() if doc.uploaded_by else None
+    admin_email = admin.email if admin else os.getenv("ADMIN_EMAIL")
 
-    body = f"""
-    <p>Dear Admin,</p>
-    <p>User <b>{current_user.email}</b> has <b>{payload.status.upper()}</b> the document:</p>
-    <p><b>{doc.doc_label}</b></p>
-    """
-    if payload.status == "rejected" and payload.reason:
-        body += f"<p><strong>Reason:</strong></p><p>{payload.reason}</p>"
+    if admin_email:
+        body = f"""
+        <p>Dear Admin,</p>
+        <p>User <b>{current_user.email}</b> has <b>{payload.status.upper()}</b> the document:</p>
+        <p><b>{doc.doc_label}</b></p>
+        """
+        if payload.status == "rejected" and payload.reason:
+            body += f"<p><strong>Reason:</strong></p><p>{payload.reason}</p>"
 
-    body += "<p style='margin-top:20px;'>BookKeepro System</p>"
+        body += "<p style='margin-top:20px;'>BookKeepro System</p>"
 
-    await send_email(
-        to=admin.email,
-        subject=f"Admin Return Status {payload.status.capitalize()} — BookKeepro",
-        body=body,
-    )
+        background.add_task(
+            send_email,
+            to=admin_email,
+            subject=f"Admin Return Status {payload.status.capitalize()} — BookKeepro",
+            body=body,
+        )
 
     logger.info(f"User {current_user.id} {payload.status} admin doc {payload.doc_id}")
-    return {"status": "notified"}
+    return {"status": "notified", "review_status": doc.review_status}
     
 # ─────────────────────────────────────────────
 # Update Status and History
@@ -279,13 +282,40 @@ def update_document_status(
 # Get filing deadlines for a user
 # ─────────────────────────────────────────────
 
+@router.get("/my-deadlines")
+def get_my_filing_deadlines(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    from app.models import FilingDeadline
+    deadlines = db.query(FilingDeadline).filter(FilingDeadline.user_id == current_user.id).all()
+    today = date.today()
+    result = []
+    for dl in deadlines:
+        days_left = (dl.deadline_date - today).days
+        result.append({
+            "id": dl.id,
+            "doc_type": dl.doc_type,
+            "deadline_date": dl.deadline_date.isoformat(),
+            "days_given": dl.days_given,
+            "days_left": days_left,
+            "is_overdue": days_left < 0,
+        })
+    return result
+
+
 @router.get("/deadlines/{user_id}")
 def get_filing_deadlines(
     user_id: int,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
-    _=Depends(require_admin),
 ):
+    is_admin = current_user.role in ("admin", "super_admin") or (
+        hasattr(current_user.role, "value") and current_user.role.value in ("admin", "super_admin")
+    )
+    if not is_admin and current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to view these deadlines")
+
     from app.models import FilingDeadline
     deadlines = db.query(FilingDeadline).filter(FilingDeadline.user_id == user_id).all()
     today = date.today()
@@ -293,6 +323,7 @@ def get_filing_deadlines(
     for dl in deadlines:
         days_left = (dl.deadline_date - today).days
         result.append({
+            "id": dl.id,
             "doc_type": dl.doc_type,
             "deadline_date": dl.deadline_date.isoformat(),
             "days_given": dl.days_given,

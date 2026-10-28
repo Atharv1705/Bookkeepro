@@ -1,5 +1,17 @@
 import os
 import sys
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Try loading .env from repo root or current directory
+for env_candidate in [
+    Path(__file__).resolve().parents[2] / ".env",
+    Path(__file__).resolve().parent / ".env",
+    Path(".env")
+]:
+    if env_candidate.is_file():
+        load_dotenv(env_candidate)
+        break
 
 REQUIRED_VARS = [
     "MYSQL_USER",
@@ -12,11 +24,16 @@ REQUIRED_VARS = [
 
 def main():
     missing = []
+    placeholder_values = {
+        "your_password", "your_password_here", "password", "secret",
+        "your_secret_key", "changeme", "change_me", "placeholder",
+        "your_api_key_here", "example", "admin"
+    }
     for var in REQUIRED_VARS:
         val = os.getenv(var)
-        if not val:
+        if not val or not val.strip():
             missing.append(var)
-        elif "password" in val.lower() or "secret" in val.lower() or "your" in val.lower() or "here" in val.lower():
+        elif val.lower().strip() in placeholder_values or val.lower().startswith("your_") or val.lower().endswith("_here"):
             if var in ["SECRET_KEY", "MYSQL_PASSWORD"]:
                 missing.append(f"{var} (looks like a placeholder)")
             else:

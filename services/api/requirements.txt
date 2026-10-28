@@ -42,5 +42,5 @@ pypdf==4.3.1
 
 chromadb==0.5.5
 
-openpyxl
-APScheduler
+openpyxl==3.1.5
+APScheduler==3.11.3

@@ -160,8 +160,8 @@ export default function UploadPersonal() {
           <p className="page-meta">Upload your personal tax documents securely</p>
         </div>
         <div style={{display:'flex', flexDirection:'column', alignItems:'flex-end', gap:'4px'}}>
-          <label className="form-label" style={{margin:0}}>Tax Year</label>
-          <select 
+          <label htmlFor="taxYearSelect" className="form-label" style={{margin:0}}>Tax Year</label>
+          <select id="taxYearSelect" 
             className="select-input" 
             style={{width:'auto', padding:'8px 14px'}}
             value={taxYear}
@@ -173,7 +173,7 @@ export default function UploadPersonal() {
       </div>
 
       <div className="card" style={{marginBottom: '20px'}}>
-        <h3 style={{marginBottom: '16px'}}>Required Documents</h3>
+        <h3 style={{marginBottom: '16px'}} className="card-title">Required Documents</h3>
         <div id="docWrapper">
           {loading ? (
             <div className="empty-state">Loading templates...</div>
@@ -228,7 +228,7 @@ export default function UploadPersonal() {
                     ) : uploaded.length ? (
                       <span className="pill-pending"><span className="material-symbols-outlined">pending</span> Pending Review</span>
                     ) : dt.download ? (
-                      <a href={dt.download} target="_blank" rel="noopener noreferrer" className="btn-link" style={{ fontSize: '14px', color: 'var(--brand)', textDecoration: 'underline' }}>View Template</a>
+                      <a href={dt.download} target="_blank" rel="noopener noreferrer" className="btn-link" style={{ fontSize: '14px', color: 'var(--emerald)', textDecoration: 'underline' }}>View Template</a>
                     ) : (
                       "Missing"
                     )}
@@ -284,7 +284,7 @@ export default function UploadPersonal() {
       <div className="card">
         <div className="flex-between" style={{marginBottom: '16px'}}>
           <div>
-            <h3>Additional Documents</h3>
+            <h3 className="card-title">Additional Documents</h3>
             <p className="text-sm" style={{marginTop:'2px'}}>Upload any supplementary personal documents</p>
           </div>
           <label 
@@ -350,7 +350,7 @@ export default function UploadPersonal() {
       <div className="card mt-20" style={{marginTop: '20px'}}>
         <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'16px'}}>
           <div>
-            <h3 style={{marginBottom:'4px'}}>Finished Uploading?</h3>
+            <h3 style={{marginBottom:'4px'}} className="card-title">Finished Uploading?</h3>
             <p className="text-sm" style={{margin:0}}>Send your personal documents for review.</p>
           </div>
           <button className="btn btn-primary" onClick={notifyComplete}>

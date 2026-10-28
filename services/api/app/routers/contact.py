@@ -1,4 +1,5 @@
 import os
+import html
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from app.limiter import limiter
 from pydantic import BaseModel, EmailStr, field_validator
@@ -7,7 +8,7 @@ from app.utils.emailer import send_email
 router = APIRouter(prefix="/api", tags=["contact"])
 
 # Get admin email from environment, with fallback
-ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@bookkeepro.net")
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "atharvg.aiindia@gmail.com")
 
 class ContactForm(BaseModel):
     first_name: str
@@ -28,6 +29,12 @@ class ContactForm(BaseModel):
 async def contact_message(request: Request, form: ContactForm, background: BackgroundTasks):
     if not ADMIN_EMAIL or "@" not in ADMIN_EMAIL:
         raise HTTPException(status_code=500, detail="Admin email not configured")
+    safe_first = html.escape(form.first_name)
+    safe_last = html.escape(form.last_name)
+    safe_email = html.escape(str(form.email))
+    safe_phone = html.escape(form.phone)
+    safe_message = html.escape(form.message) if form.message else '(none)'
+
     background.add_task(
         send_email,
         to=ADMIN_EMAIL,
@@ -37,10 +44,10 @@ async def contact_message(request: Request, form: ContactForm, background: Backg
             <br><br>
             A new contact enquiry has been received. Please find the details below:
             <br><br>
-            <b>Name:</b> {form.first_name} {form.last_name}<br>
-            <b>Email:</b> {form.email}<br>
-            <b>Phone:</b> {form.phone}<br>
-            <b>Message:</b> {form.message or '(none)'}<br><br>
+            <b>Name:</b> {safe_first} {safe_last}<br>
+            <b>Email:</b> {safe_email}<br>
+            <b>Phone:</b> {safe_phone}<br>
+            <b>Message:</b> {safe_message}<br><br>
             Kindly follow up with the user at the earliest convenience.
             <br><br>
             Thank you,<br>
@@ -54,7 +61,7 @@ async def contact_message(request: Request, form: ContactForm, background: Backg
         to=form.email,
         subject="Thanks for contacting BookKeepro",
         body=f"""
-            Hi {form.first_name},<br><br>
+            Hi {safe_first},<br><br>
             Thank you for reaching out to BookKeepro.<br>
             We’ve received your enquiry, and our team will get back to you shortly.<br><br>
             Best Regards,<br>

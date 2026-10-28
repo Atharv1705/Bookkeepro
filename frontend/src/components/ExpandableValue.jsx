@@ -23,7 +23,7 @@ export default function ExpandableValue({ value, isArray }) {
             style={{ 
               background: 'none', 
               border: 'none', 
-              color: 'var(--primary)', 
+              color: 'var(--emerald)', 
               fontSize: '12px', 
               fontWeight: 600, 
               padding: '4px 0', 
@@ -60,7 +60,7 @@ export default function ExpandableValue({ value, isArray }) {
         style={{ 
           background: 'none', 
           border: 'none', 
-          color: 'var(--primary)', 
+          color: 'var(--emerald)', 
           fontSize: '12px', 
           fontWeight: 600, 
           padding: '4px 0', 

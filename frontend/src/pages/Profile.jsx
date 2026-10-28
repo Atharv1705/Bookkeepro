@@ -83,7 +83,7 @@ export default function Profile() {
       </div>
 
       <div className="card" style={{ marginBottom: '20px' }}>
-        <h3 style={{ marginBottom: '20px', paddingBottom: '12px', borderBottom: '1px solid var(--border)' }}>Account Info</h3>
+        <h3 style={{ marginBottom: '20px', paddingBottom: '12px', borderBottom: '1px solid var(--border)' }} className="card-title">Account Info</h3>
         <div className="form-group">
           <label className="form-label">Email Address <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(cannot be changed)</span></label>
           <input type="email" className="input" readOnly value={user?.email || ''} />
@@ -102,7 +102,7 @@ export default function Profile() {
 
       <div className="card" style={{ marginBottom: '24px' }}>
         <div className="flex-between" style={{ marginBottom: '4px', cursor: 'pointer' }} onClick={() => setShowPwSection(!showPwSection)}>
-          <h3>Change Password</h3>
+          <h3 className="card-title">Change Password</h3>
           <span style={{ color: 'var(--muted)', fontSize: '18px' }}>{showPwSection ? '▼' : '▶'}</span>
         </div>
         <p className="text-sm" style={{ marginBottom: 0 }}>Click to expand and update your password</p>

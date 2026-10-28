@@ -59,7 +59,7 @@ export default function Contact() {
         <div className="contact-container">
           <div className="contact-info">
             <div className="info-box usa">
-              <h3>USA</h3>
+              <h3 className="card-title">USA</h3>
               <p>2520 Indigo Dr<br />McKinney, TX<br />75072, United States</p>
               <p className="phone">
                 <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>call</span> +1 469-796-6151
@@ -67,7 +67,7 @@ export default function Contact() {
             </div>
 
             <div className="info-box ind">
-              <h3>India</h3>
+              <h3 className="card-title">India</h3>
               <p>508, White Square,<br />Hinjewadi Road, Pune<br />411057, India</p>
               <p className="phone">
                 <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>call</span> +91 738 793 6020
@@ -76,7 +76,7 @@ export default function Contact() {
           </div>
 
           <form className="contact-form" onSubmit={handleSubmit}>
-            <h3 style={{ marginBottom: '22px' }}>Send us a message</h3>
+            <h3 style={{ marginBottom: '22px' }} className="card-title">Send us a message</h3>
             <div className="form-row">
               <input
                 type="text"

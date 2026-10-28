@@ -13,7 +13,7 @@
   /* core palette */
   --ink:          #17211D;
   --ink-soft:     #2A362F;
-  --brass:        #B0803D;
+  --brass:        #8F6528;
   --brass-dark:   #8F6528;
   --brass-light:  rgba(176, 128, 61, 0.12);
   --emerald:      #1F5D46;
@@ -41,7 +41,7 @@
   --success-bg:   rgba(31, 93, 70, 0.10);
   --error:        #A63A3A;
   --error-bg:     rgba(166, 58, 58, 0.10);
-  --warn:         #B0803D;
+  --warn:         #8F6528;
   --warn-bg:      rgba(176, 128, 61, 0.12);
 
   --font-display: 'Fraunces', 'Georgia', serif;
@@ -298,4 +298,14 @@ textarea:focus {
 @keyframes spin {
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
+}
+
+
+@media (max-width: 640px) {
+  .btn:not(.btn-icon):not(.toast-close), .btn-sm:not(.btn-icon), .select-input, .input-field {
+    min-height: 44px;
+  }
+  .chatbot-fab {
+    bottom: 80px; /* move it up so it doesn't cover footer/bottom content on mobile */
+  }
 }

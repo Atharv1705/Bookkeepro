@@ -8,10 +8,10 @@ BookKeepPro handles the books, the payroll and the filings for growing businesse
 
 ## Pages
 
-- [Home](https://aiindiacpa.duckdns.org/)
-- [About Us](https://aiindiacpa.duckdns.org/about-us)
-- [Services](https://aiindiacpa.duckdns.org/services)
-- [Contact Us](https://aiindiacpa.duckdns.org/contact)
+- [Home](https://aicpa.duckdns.org/)
+- [About Us](https://aicpa.duckdns.org/about-us)
+- [Services](https://aicpa.duckdns.org/services)
+- [Contact Us](https://aicpa.duckdns.org/contact)
 
 ## Services
 

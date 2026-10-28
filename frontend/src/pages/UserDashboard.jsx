@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -13,37 +13,15 @@ export default function UserDashboard() {
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [docLoading, setDocLoading] = useState(false);
   const [engagementLink, setEngagementLink] = useState(null);
-  // Track which doc rows have the AI summary panel open
-  const [expandedSummary, setExpandedSummary] = useState({});
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState([]);
-  const [isSearching, setIsSearching] = useState(false);
+  const [deadlines, setDeadlines] = useState([]);
+  
   // Reject comment panel for admin docs: { docId, note }
   const [rejectPanel, setRejectPanel] = useState(null);
 
 
   // ── declare callbacks BEFORE the effects that reference them ──
 
-  const handleSearch = async (e) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
-    
-    setIsSearching(true);
-    try {
-      const res = await authFetch(`/api/search/semantic?q=${encodeURIComponent(searchQuery)}`);
-      if (res.ok) {
-        setSearchResults(await res.json());
-      } else {
-        showToast("Search failed", "error");
-      }
-    } catch (err) {
-      console.error(err);
-      showToast("Search failed", "error");
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
+  
   const checkEngagement = useCallback(async () => {
     try {
       const res = await authFetch("/api/auth/me");
@@ -87,10 +65,23 @@ export default function UserDashboard() {
     }
   }, [authFetch]);
 
+  const loadDeadlines = useCallback(async () => {
+    try {
+      const res = await authFetch("/api/review/my-deadlines");
+      if (res.ok) {
+        const data = await res.json();
+        setDeadlines(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error("Failed to load deadlines:", err);
+    }
+  }, [authFetch]);
+
   useEffect(() => {
     checkEngagement();
     loadAdminDocs();
-  }, [checkEngagement, loadAdminDocs]);
+    loadDeadlines();
+  }, [checkEngagement, loadAdminDocs, loadDeadlines]);
 
   // Poll every 15s while any doc still has ai_summary === null (backend still processing)
   useEffect(() => {
@@ -187,9 +178,6 @@ export default function UserDashboard() {
   };
 
 
-  const toggleSummary = (docId) => {
-    setExpandedSummary(prev => ({ ...prev, [docId]: !prev[docId] }));
-  };
 
   return (
     <div>
@@ -199,6 +187,36 @@ export default function UserDashboard() {
           <p className="page-meta">Here is your dashboard overview</p>
         </div>
       </div>
+
+      {/* Action Required: Deadline Warning Banner */}
+      {deadlines && deadlines.length > 0 && deadlines.some(d => d.days_left <= 7) && (
+        <div className="card fade-up" style={{
+          background: 'rgba(230, 81, 0, 0.08)',
+          border: '1px solid rgba(230, 81, 0, 0.35)',
+          borderRadius: 'var(--radius-sm)',
+          padding: '16px 20px',
+          marginBottom: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '16px'
+        }}>
+          <span className="material-symbols-outlined" style={{fontSize: '32px', color: '#e65100'}}>warning</span>
+          <div style={{flex: 1}}>
+            <div style={{fontWeight: 700, color: '#e65100', fontSize: '15px'}}>Action Required: Upcoming Filing Deadlines</div>
+            <div style={{fontSize: '13px', color: 'var(--navy)', marginTop: '4px'}}>
+              {deadlines.filter(d => d.days_left <= 7).map((d, idx) => (
+                <span key={idx} style={{marginRight: '16px', display: 'inline-block'}}>
+                  <strong>{d.doc_type?.toUpperCase()}</strong>: {d.is_overdue ? (
+                    <span style={{color: '#c0392b', fontWeight: 600}}>Overdue by {Math.abs(d.days_left)} day(s)</span>
+                  ) : (
+                    <span>Due in {d.days_left} day(s) ({new Date(d.deadline_date).toLocaleDateString()})</span>
+                  )}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="card fade-up">
         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '16px'}}>
@@ -292,7 +310,7 @@ export default function UserDashboard() {
               </thead>
               <tbody>
                 {adminDocs.map(doc => (
-                  <>
+                  <React.Fragment key={doc.id}>
                     <tr key={doc.id}>
                       <td>
                         <div style={{fontWeight: 500, color: 'var(--navy)'}}>{doc.doc_label}</div>
@@ -302,12 +320,17 @@ export default function UserDashboard() {
                       <td>
                         {doc.review_status ? (
                           <div>
-                            <span className={`badge ${doc.review_status === 'approved' ? 'badge-green' : doc.review_status === 'rejected' ? 'badge-red' : 'badge-yellow'}`} style={{fontWeight:700}}>
-                              {doc.review_status.toUpperCase()}
+                            <span className={`badge ${doc.review_status === 'approved' ? 'badge-green' : doc.review_status === 'rejected' ? 'badge-red' : doc.review_status === 'sent_for_approval' ? 'badge-blue' : 'badge-yellow'}`} style={{fontWeight:700}}>
+                              {doc.review_status.replace(/_/g, ' ').toUpperCase()}
                             </span>
                             {doc.review_status === 'rejected' && doc.review_note && (
                               <div style={{fontSize:'12px', color:'#c0392b', fontStyle:'italic', marginTop:'4px'}}>
                                 Reason: "{doc.review_note}"
+                              </div>
+                            )}
+                            {doc.review_status === 'sent_for_approval' && doc.review_note && (
+                              <div style={{fontSize:'12px', color:'var(--blue)', fontStyle:'italic', marginTop:'4px'}}>
+                                Note from Admin: "{doc.review_note}"
                               </div>
                             )}
                           </div>
@@ -318,9 +341,29 @@ export default function UserDashboard() {
                       <td>
                         <div style={{display:'flex', gap:'8px', flexWrap:'wrap', alignItems:'center'}}>
                           <button className="btn btn-secondary btn-sm" onClick={() => viewDoc(doc.storage_key)}>View</button>
-                              <button className="btn btn-secondary btn-sm" onClick={() => downloadDoc(doc.storage_key, doc.filename)} style={{display:'flex', alignItems:'center', gap:'4px'}}><span className="material-symbols-outlined" style={{fontSize:'16px'}}>download</span></button>
-                          <button className="btn btn-primary btn-sm" onClick={() => respondDoc(doc.id, true)} disabled={docLoading}>Approve</button>
-                          <button className="btn btn-danger btn-sm" onClick={() => openUserRejectPanel(doc.id)} disabled={docLoading}>Reject</button>
+                          <button className="btn btn-secondary btn-sm" onClick={() => downloadDoc(doc.storage_key, doc.filename)} style={{display:'flex', alignItems:'center', gap:'4px'}}><span className="material-symbols-outlined" style={{fontSize:'16px'}}>download</span></button>
+                          {(doc.review_status === 'sent_for_approval' || doc.review_status === 'pending' || !doc.review_status) && (
+                            <>
+                              <button 
+                                className="btn btn-primary btn-sm" 
+                                style={{background:'#2c7a5b', borderColor:'#2c7a5b', display:'inline-flex', alignItems:'center', gap:'4px'}} 
+                                onClick={() => respondDoc(doc.id, true)} 
+                                disabled={docLoading}
+                              >
+                                <span className="material-symbols-outlined" style={{fontSize:'15px'}}>check_circle</span>
+                                Approve
+                              </button>
+                              <button 
+                                className="btn btn-danger btn-sm" 
+                                style={{display:'inline-flex', alignItems:'center', gap:'4px'}} 
+                                onClick={() => openUserRejectPanel(doc.id)} 
+                                disabled={docLoading}
+                              >
+                                <span className="material-symbols-outlined" style={{fontSize:'15px'}}>cancel</span>
+                                Reject
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -380,7 +423,7 @@ export default function UserDashboard() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>

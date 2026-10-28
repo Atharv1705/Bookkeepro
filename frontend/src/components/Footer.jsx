@@ -20,7 +20,8 @@ export default function Footer() {
         <div className="footer-contact">
           <h3>Reach us</h3>
           <p>USA · 2520 Indigo Dr, McKinney, TX 75072</p>
-          <p>India · 508 White Square, Hinjewadi Road, Pune 411057</p>
+          <p>India · Office no.405, Fourth floor, Above Just In Time,<br />
+            Landmark Centre, Survey No 46/1B, Plot No 2, Satara Rd,<br /> Opposite City Pride Theater, Pune, Maharashtra-411009</p>
           <p>atharvg.aiindia@gmail.com</p>
           <p>+91 8275367267</p>
         </div>

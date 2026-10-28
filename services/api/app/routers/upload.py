@@ -29,7 +29,7 @@ router = APIRouter(prefix="/api/upload", tags=["upload"])
 
 from pathlib import Path
 
-FRONTEND_URL = os.getenv("FRONTEND_URL", "https://aiindiacpa.duckdns.org")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://aicpa.duckdns.org")
 
 # ─────────────────────────────────────────────
 # Local File Storage (Contabo VPS Disk)
@@ -282,9 +282,12 @@ async def upload_admin_document(
     logger.info(f"Admin {current_user.id} uploading document for user {user_id}")
     storage_key = await upload_to_storage(file)
 
+    safe_doc_key = (doc_key or "").strip()[:100]
+    safe_doc_label = (doc_label or "").strip()[:150]
+
     record = AdminDocument(
-        doc_key=doc_key,
-        doc_label=doc_label,
+        doc_key=safe_doc_key,
+        doc_label=safe_doc_label,
         filename=file.filename,
         storage_key=storage_key,
         content_type=file.content_type,
@@ -413,6 +416,12 @@ def delete_admin_document(
         raise HTTPException(
             status_code=403, 
             detail="Standard admins can only manage documents for standard users"
+        )
+
+    if doc.review_status == "approved":
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete an approved return. Approved documents are locked."
         )
 
     logger.info(f"Admin {current_user.id} deleting admin document {doc_id}")
@@ -819,7 +828,7 @@ async def set_personal_review_status(
                 subject="Action Required: Document Rejected — BookKeepro",
                 body=f"""
                 <p>Dear {owner.name or 'Client'},</p>
-                <p>Your personal document <strong>{doc.doc_type}</strong> (Tax Year {doc.tax_year}) has been <strong style='color:#c0392b;'>rejected</strong> by our team.</p>
+                <p>Your personal document <strong>{doc.filename}</strong> (Tax Year {doc.tax_year}) has been <strong style='color:#c0392b;'>rejected</strong> by our team.</p>
                 {note_html}
                 <p>Please log in to your dashboard, review the reason, and re-upload a corrected document.</p>
                 <p><a href='{FRONTEND_URL}/upload-personal' style='color:#0077c8;font-weight:600;'>Re-upload Personal Documents →</a></p>
@@ -883,7 +892,7 @@ async def set_business_review_status(
                 subject="Action Required: Document Rejected — BookKeepro",
                 body=f"""
                 <p>Dear {owner.name or 'Client'},</p>
-                <p>Your business document <strong>{doc.business_type}</strong> (Tax Year {doc.tax_year}) has been <strong style='color:#c0392b;'>rejected</strong> by our team.</p>
+                <p>Your business document <strong>{doc.filename}</strong> (Tax Year {doc.tax_year}) has been <strong style='color:#c0392b;'>rejected</strong> by our team.</p>
                 {note_html}
                 <p>Please log in to your dashboard, review the reason, and re-upload a corrected document.</p>
                 <p><a href='{FRONTEND_URL}/upload-business' style='color:#0077c8;font-weight:600;'>Re-upload Business Documents →</a></p>
@@ -1234,17 +1243,17 @@ from app.models import RequiredDocumentTemplate
 
 @router.get("/templates")
 def list_templates(
-    category: str,
-    tax_year: int,
+    category: str | None = None,
+    tax_year: int | None = None,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    templates = (
-        db.query(RequiredDocumentTemplate)
-        .filter_by(category=category, tax_year=tax_year)
-        .order_by(RequiredDocumentTemplate.id.asc())
-        .all()
-    )
+    query = db.query(RequiredDocumentTemplate)
+    if category:
+        query = query.filter(RequiredDocumentTemplate.category == category)
+    if tax_year:
+        query = query.filter(RequiredDocumentTemplate.tax_year == tax_year)
+    templates = query.order_by(RequiredDocumentTemplate.id.asc()).all()
 
     results = []
     for t in templates:

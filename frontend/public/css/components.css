@@ -195,8 +195,8 @@
   flex-shrink: 0; font-family: var(--font-display);
 }
 .user-info          { min-width: 0; flex: 1; }
-.user-info .u-name  { font-weight: 600; color: var(--ink); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.user-info .u-email { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.user-info .u-name  { font-weight: 600; color: var(--ink); font-size: 14px; word-break: break-word; }
+.user-info .u-email { font-size: 12px; color: var(--muted); word-break: break-word; margin-top: 2px; }
 .user-bottom        { display: flex; align-items: center; justify-content: space-between; gap: 8px; position: relative; z-index: 10; flex-wrap: wrap; }
 
 /* ── Role Controls ───────────────────────────────────────── */
@@ -227,7 +227,7 @@
 }
 .doc-row:hover    { border-color: #cfc7ad; background: #fff; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(23,33,29,0.06); }
 .doc-row-left     { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
-.doc-row-name     { font-weight: 600; font-size: 13px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.doc-row-name     { font-weight: 600; font-size: 13px; color: var(--ink); word-break: break-word; }
 .doc-row-type     { font-size: 12px; color: var(--muted); }
 .doc-row-actions  { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
 
@@ -856,3 +856,16 @@
 }
 
 
+
+/* StatusChip */
+.status-chip-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.status-chip-note {
+  font-size: 12px;
+  color: var(--error);
+  font-style: italic;
+}

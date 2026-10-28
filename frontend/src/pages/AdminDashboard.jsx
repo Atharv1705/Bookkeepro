@@ -11,7 +11,7 @@ export default function AdminDashboard() {
   const [confirmConfig, setConfirmConfig] = useState({
     isOpen: false, title: "", message: "", confirmText: "OK", isDestructive: false, onConfirm: () => {}
   });
-  const [activeTab, setActiveTab] = useState("users");
+  // activeTab state removed (unused)
   const [stats, setStats] = useState({ total_users: 0, pending_personal: 0, pending_business: 0, admins: 0 });
   const [bookmarks, setBookmarks] = useState([]);
   const [users, setUsers] = useState([]);
@@ -225,7 +225,7 @@ export default function AdminDashboard() {
               <input 
                 type="text" 
                 className="search-input" 
-                style={{ width: '100%', padding: '10px 12px 10px 40px', border: '1px solid var(--border)', borderRadius: 'var(--radius-full)', outline: 'none' }}
+                style={{ width: '100%', padding: '10px 12px 10px 40px', border: '1px solid var(--border)', borderRadius: 'var(--radius-pill)', outline: 'none' }}
                 placeholder="Search by name or email" 
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -233,7 +233,7 @@ export default function AdminDashboard() {
             </div>
             <select 
               className="select-input" 
-              style={{ width: 'auto', padding: '10px 16px', borderRadius: 'var(--radius-full)', border: '1px solid var(--border)', outline: 'none', background: 'white' }}
+              style={{ width: 'auto', padding: '10px 16px', borderRadius: 'var(--radius-pill)', border: '1px solid var(--border)', outline: 'none', background: 'white' }}
               value={userSort}
               onChange={(e) => setUserSort(e.target.value)}
             >
@@ -245,7 +245,7 @@ export default function AdminDashboard() {
             </select>
             <select
               className="select-input"
-              style={{ width: 'auto', padding: '10px 16px', borderRadius: 'var(--radius-full)', border: '1px solid var(--border)', outline: 'none', background: 'white' }}
+              style={{ width: 'auto', padding: '10px 16px', borderRadius: 'var(--radius-pill)', border: '1px solid var(--border)', outline: 'none', background: 'white' }}
               value={filterYear}
               onChange={(e) => setFilterYear(e.target.value)}
             >
@@ -300,7 +300,7 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                   </div>
-                  <div className="user-bottom" style={{marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px', paddingTop: '16px', marginTop: '20px'}}>
+                  <div className="user-bottom" style={{marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px'}}>
                     <span className={`badge ${b.type === 'personal' ? 'badge-blue' : b.type === 'business' ? 'badge-green' : 'badge-gray'}`} style={{textTransform:'uppercase', fontSize: '12px'}}>
                       {b.type}
                     </span>

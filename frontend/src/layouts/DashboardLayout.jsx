@@ -1,9 +1,10 @@
-import { Outlet, Link, useNavigate } from 'react-router-dom';
+import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function DashboardLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
 
   return (
     <div className="app-body">
@@ -21,7 +22,7 @@ export default function DashboardLayout() {
         </div>
       </header>
 
-      <main className={`${(user?.role === 'admin' || user?.role === 'super_admin') ? 'page-main-wide' : 'page-main'} page-enter`}>
+      <main key={pathname} className={`${(user?.role === 'admin' || user?.role === 'super_admin') ? 'page-main-wide' : 'page-main'} page-enter`}>
         <Outlet />
       </main>
     </div>

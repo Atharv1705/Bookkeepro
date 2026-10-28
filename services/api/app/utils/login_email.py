@@ -1,7 +1,7 @@
 import os
 from app.utils.emailer import send_email
 
-_FRONTEND_URL = os.getenv("FRONTEND_URL", "https://aiindiacpa.duckdns.org")
+_FRONTEND_URL = os.getenv("FRONTEND_URL", "https://aicpa.duckdns.org")
 
 
 async def send_signup_welcome_email(to: str, name: str | None = None):

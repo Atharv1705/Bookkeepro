@@ -38,66 +38,65 @@ def _run_deadline_reminders():
         ).all()
         admin_emails = [a.email for a in admins]
 
-        for days_out, flag_col, label in thresholds:
-            target_date = today + timedelta(days=days_out)
-            deadlines = (
-                db.query(FilingDeadline)
-                .filter(
-                    FilingDeadline.deadline_date == target_date,
-                    getattr(FilingDeadline, flag_col) == False,
+        async def _dispatch_reminders():
+            for days_out, flag_col, label in thresholds:
+                target_date = today + timedelta(days=days_out)
+                deadlines = (
+                    db.query(FilingDeadline)
+                    .filter(
+                        FilingDeadline.deadline_date == target_date,
+                        getattr(FilingDeadline, flag_col) == False,
+                    )
+                    .all()
                 )
-                .all()
-            )
 
-            for dl in deadlines:
-                user = db.query(User).filter(User.id == dl.user_id).first()
-                if not user:
-                    continue
+                for dl in deadlines:
+                    user = db.query(User).filter(User.id == dl.user_id).first()
+                    if not user:
+                        continue
 
-                doc_label = dl.doc_type.capitalize()
+                    doc_label = dl.doc_type.capitalize()
 
-                # Email to user
-                user_body = f"""
-                <p>Dear {user.name or "Sir/Ma'am"},</p>
-                <p>This is a reminder that your <strong>{doc_label} document filing deadline</strong>
-                is in <strong>{label}</strong> ({dl.deadline_date.strftime('%B %d, %Y')}).</p>
-                <p>Please ensure all outstanding actions are completed before the deadline.</p>
-                <p>Kind regards,<br><strong>BookKeepro Team</strong></p>
-                """
-                asyncio.run(
-                    send_email(
+                    # Email to user
+                    user_body = f"""
+                    <p>Dear {user.name or "Sir/Ma'am"},</p>
+                    <p>This is a reminder that your <strong>{doc_label} document filing deadline</strong>
+                    is in <strong>{label}</strong> ({dl.deadline_date.strftime('%B %d, %Y')}).</p>
+                    <p>Please ensure all outstanding actions are completed before the deadline.</p>
+                    <p>Kind regards,<br><strong>BookKeepro Team</strong></p>
+                    """
+                    await send_email(
                         to=user.email,
                         subject=f"Reminder: {doc_label} Filing Deadline in {label} — BookKeepro",
                         body=user_body,
                     )
-                )
 
-                # Email to all admins
-                admin_body = f"""
-                <p>Admin Notice:</p>
-                <p>The <strong>{doc_label} filing deadline</strong> for client
-                <strong>{user.name or user.email}</strong> ({user.email}) is in
-                <strong>{label}</strong> ({dl.deadline_date.strftime('%B %d, %Y')}).</p>
-                <p>Please review the client's status and take any necessary action.</p>
-                <p><strong>BookKeepro System</strong></p>
-                """
-                for admin_email in admin_emails:
-                    asyncio.run(
-                        send_email(
+                    # Email to all admins
+                    admin_body = f"""
+                    <p>Admin Notice:</p>
+                    <p>The <strong>{doc_label} filing deadline</strong> for client
+                    <strong>{user.name or user.email}</strong> ({user.email}) is in
+                    <strong>{label}</strong> ({dl.deadline_date.strftime('%B %d, %Y')}).</p>
+                    <p>Please review the client's status and take any necessary action.</p>
+                    <p><strong>BookKeepro System</strong></p>
+                    """
+                    for admin_email in admin_emails:
+                        await send_email(
                             to=admin_email,
                             subject=f"Admin Reminder: {user.email} — {doc_label} Deadline in {label}",
                             body=admin_body,
                         )
+
+                    # Mark as notified
+                    setattr(dl, flag_col, True)
+                    db.commit()
+
+                    logger.info(
+                        "Sent %s deadline reminder for user %s (%s)",
+                        label, dl.user_id, dl.doc_type,
                     )
 
-                # Mark as notified
-                setattr(dl, flag_col, True)
-                db.commit()
-
-                logger.info(
-                    "Sent %s deadline reminder for user %s (%s)",
-                    label, dl.user_id, dl.doc_type,
-                )
+        asyncio.run(_dispatch_reminders())
     except Exception as exc:
         logger.error("Deadline reminder job failed: %s", exc)
     finally:
