@@ -44,6 +44,9 @@ class User(Base):
     is_verified     = Column(Integer, default=0, nullable=False)   # 0 = unverified, 1 = verified
     created_at      = Column(DateTime(timezone=True), server_default=func.now())
     engagement_acknowledged_at = Column(DateTime(timezone=True), nullable=True, default=None)
+    assigned_admin_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+
+    assigned_admin  = relationship("User", remote_side=[id], foreign_keys=[assigned_admin_id])
 
 
 # ─────────────────────────────────────────────

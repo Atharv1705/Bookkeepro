@@ -38,7 +38,7 @@ async def contact_message(request: Request, form: ContactForm, background: Backg
     background.add_task(
         send_email,
         to=ADMIN_EMAIL,
-        subject="New Contact Enquiry Received — Follow-Up Required - BookKeepro",
+        subject="New Contact Enquiry Received — Follow-Up Required",
         body=f"""
             Dear Team,
             <br><br>
@@ -51,7 +51,7 @@ async def contact_message(request: Request, form: ContactForm, background: Backg
             Kindly follow up with the user at the earliest convenience.
             <br><br>
             Thank you,<br>
-            BookKeepro Support Team
+            Support Team
         """
     )
 
@@ -59,13 +59,13 @@ async def contact_message(request: Request, form: ContactForm, background: Backg
     background.add_task(
         send_email,
         to=form.email,
-        subject="Thanks for contacting BookKeepro",
+        subject="Thanks for contacting us",
         body=f"""
             Hi {safe_first},<br><br>
-            Thank you for reaching out to BookKeepro.<br>
+            Thank you for reaching out.<br>
             We’ve received your enquiry, and our team will get back to you shortly.<br><br>
             Best Regards,<br>
-            BookKeepro Team
+            Support Team
         """
     )
 

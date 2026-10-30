@@ -32,7 +32,7 @@ async def send_email(to: str, subject: str, body: str) -> bool:
         if smtp_password:
             smtp_password = smtp_password.replace(" ", "")
         mail_from_email = os.getenv("MAIL_FROM") or smtp_user
-        mail_from_name = os.getenv("MAIL_FROM_NAME", "BookKeepro")
+        mail_from_name = os.getenv("MAIL_FROM_NAME", "Admin Portal")
         smtp_tls = os.getenv("SMTP_TLS", "True").strip().lower() == "true"
         smtp_ssl_tls = os.getenv("MAIL_SSL_TLS", "False").strip().lower() == "true"
 

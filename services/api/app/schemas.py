@@ -75,6 +75,17 @@ class RoleChangeRequest(BaseModel):
         return v.lower()
 
 
+class AssignAdminRequest(BaseModel):
+    """Body for PATCH /api/auth/admin/users/{id}/assign-admin — super_admin only."""
+    admin_id: Optional[int] = None
+
+
+class BulkAssignAdminRequest(BaseModel):
+    """Body for POST /api/auth/admin/users/bulk-assign-admin — super_admin only."""
+    user_ids: List[int]
+    admin_id: Optional[int] = None
+
+
 # ─────────────────────────────────────────────
 # Review schemas
 # ─────────────────────────────────────────────

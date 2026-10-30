@@ -63,11 +63,11 @@ def _run_deadline_reminders():
                     <p>This is a reminder that your <strong>{doc_label} document filing deadline</strong>
                     is in <strong>{label}</strong> ({dl.deadline_date.strftime('%B %d, %Y')}).</p>
                     <p>Please ensure all outstanding actions are completed before the deadline.</p>
-                    <p>Kind regards,<br><strong>BookKeepro Team</strong></p>
+                    <p>Kind regards,<br><strong>Support Team</strong></p>
                     """
                     await send_email(
                         to=user.email,
-                        subject=f"Reminder: {doc_label} Filing Deadline in {label} — BookKeepro",
+                        subject=f"Reminder: {doc_label} Filing Deadline in {label}",
                         body=user_body,
                     )
 
@@ -78,7 +78,7 @@ def _run_deadline_reminders():
                     <strong>{user.name or user.email}</strong> ({user.email}) is in
                     <strong>{label}</strong> ({dl.deadline_date.strftime('%B %d, %Y')}).</p>
                     <p>Please review the client's status and take any necessary action.</p>
-                    <p><strong>BookKeepro System</strong></p>
+                    <p><strong>Admin System</strong></p>
                     """
                     for admin_email in admin_emails:
                         await send_email(

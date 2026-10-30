@@ -1,4 +1,4 @@
-﻿import logging
+import logging
 import json
 import uuid
 from datetime import datetime, date, timezone
@@ -11,7 +11,16 @@ import os
 import requests
 from pydantic import BaseModel, field_validator
 from fastapi import HTTPException
-from app.models import PersonalDocument, BusinessDocument, AdminDocument, User, AuditLog, ChatSession, ChatMessage as DBChatMessage
+from app.models import (
+    PersonalDocument,
+    BusinessDocument,
+    AdminDocument,
+    User,
+    UserRole,
+    AuditLog,
+    ChatSession,
+    ChatMessage as DBChatMessage,
+)
 from app.db import get_db
 from app.auth.security import get_current_user, require_admin
 
@@ -104,11 +113,34 @@ def get_admin_status(
     current_user=Depends(get_current_user),
     _=Depends(require_admin),
 ):
+    if not isinstance(tax_year, int):
+        tax_year = None
+
     today_start = datetime.combine(date.today(), datetime.min.time(), tzinfo=timezone.utc)
-    total_users     = db.query(User).count()
-    new_users_today = db.query(User).filter(User.created_at >= today_start).count()
+    
+    is_standard_admin = current_user.role == UserRole.admin
+    assigned_uids = None
+    if is_standard_admin:
+        assigned_uids = [
+            u.id for u in db.query(User.id).filter(
+                User.role == UserRole.user,
+                User.assigned_admin_id == current_user.id
+            ).all()
+        ]
+        total_users = len(assigned_uids)
+        new_users_today = (
+            db.query(User)
+            .filter(User.id.in_(assigned_uids), User.created_at >= today_start)
+            .count()
+            if assigned_uids else 0
+        )
+    else:
+        total_users     = db.query(User).count()
+        new_users_today = db.query(User).filter(User.created_at >= today_start).count()
     
     pq = db.query(PersonalDocument).filter(PersonalDocument.review_status == "pending", PersonalDocument.deleted_at == None)
+    if is_standard_admin:
+        pq = pq.filter(PersonalDocument.user_id.in_(assigned_uids)) if assigned_uids else pq.filter(False)
     if tax_year:
         pq = pq.filter(PersonalDocument.tax_year == tax_year)
     pending_personal = pq.count()
@@ -116,27 +148,37 @@ def get_admin_status(
     admin_accounts = db.query(User).filter(User.role.in_(["admin", "super_admin"])).count()
 
     bq = db.query(BusinessDocument).filter(BusinessDocument.review_status == "pending", BusinessDocument.deleted_at == None)
+    if is_standard_admin:
+        bq = bq.filter(BusinessDocument.user_id.in_(assigned_uids)) if assigned_uids else bq.filter(False)
     if tax_year:
         bq = bq.filter(BusinessDocument.tax_year == tax_year)
     pending_business = bq.count()
     
     admin_docs = db.query(AdminDocument).filter(AdminDocument.deleted_at == None)
+    if is_standard_admin:
+        admin_docs = admin_docs.filter(AdminDocument.user_id.in_(assigned_uids)) if assigned_uids else admin_docs.filter(False)
     if tax_year:
         admin_docs = admin_docs.filter(AdminDocument.tax_year == tax_year)
     pending_admin_returns = admin_docs.filter(AdminDocument.review_status == "pending").count()
 
-    recent_personal = (
-        db.query(PersonalDocument).filter(PersonalDocument.deleted_at == None)
-        .order_by(PersonalDocument.uploaded_at.desc()).limit(10).all()
-    )
-    recent_business = (
-        db.query(BusinessDocument).filter(BusinessDocument.deleted_at == None)
-        .order_by(BusinessDocument.uploaded_at.desc()).limit(10).all()
-    )
-    recent_admin = (
-        db.query(AdminDocument).filter(AdminDocument.deleted_at == None)
-        .order_by(AdminDocument.uploaded_at.desc()).limit(10).all()
-    )
+    rpq = db.query(PersonalDocument).filter(PersonalDocument.deleted_at == None)
+    rbq = db.query(BusinessDocument).filter(BusinessDocument.deleted_at == None)
+    raq = db.query(AdminDocument).filter(AdminDocument.deleted_at == None)
+
+    if is_standard_admin:
+        if assigned_uids:
+            rpq = rpq.filter(PersonalDocument.user_id.in_(assigned_uids))
+            rbq = rbq.filter(BusinessDocument.user_id.in_(assigned_uids))
+            raq = raq.filter(AdminDocument.user_id.in_(assigned_uids))
+        else:
+            rpq = rpq.filter(False)
+            rbq = rbq.filter(False)
+            raq = raq.filter(False)
+
+    recent_personal = rpq.order_by(PersonalDocument.uploaded_at.desc()).limit(10).all()
+    recent_business = rbq.order_by(BusinessDocument.uploaded_at.desc()).limit(10).all()
+    recent_admin    = raq.order_by(AdminDocument.uploaded_at.desc()).limit(10).all()
+
     recent_uploads = sorted(
         [{"user_id": d.user_id, "doc": d.doc_type,       "type": "personal",
           "uploaded_at": d.uploaded_at, "status": d.review_status} for d in recent_personal] +
@@ -174,7 +216,7 @@ def get_daily_digest(
     _=Depends(require_admin),
 ):
     from app.utils.doc_intelligence import build_daily_digest
-    stats = get_admin_status(db=db, current_user=current_user, _=None)
+    stats = get_admin_status(tax_year=None, db=db, current_user=current_user, _=None)
     digest_html = build_daily_digest(stats)
     return {"digest": digest_html, "generated_at": datetime.now().isoformat()}
 

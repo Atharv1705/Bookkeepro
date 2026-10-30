@@ -11,7 +11,7 @@ async def send_signup_welcome_email(to: str, name: str | None = None):
     <p>Dear {display_name},</p>
 
     <p>
-      Welcome to <strong>BookKeepro</strong> 🎉
+      Welcome! 🎉
     </p>
 
     <p>
@@ -26,7 +26,7 @@ async def send_signup_welcome_email(to: str, name: str | None = None):
     <p>
       <a href="{_FRONTEND_URL}/login"
          style="color:#0077c8;font-weight:600;text-decoration:none;">
-        👉 Login to BookKeepro
+        👉 Login to Dashboard
       </a>
     </p>
 
@@ -36,12 +36,12 @@ async def send_signup_welcome_email(to: str, name: str | None = None):
 
     <p style="margin-top:20px;">
       Kind regards,<br>
-      <strong>BookKeepro Team</strong>
+      <strong>Support Team</strong>
     </p>
     """
 
     await send_email(
         to=to,
-        subject="Welcome to BookKeepro 🎉",
+        subject="Welcome 🎉",
         body=body
     )

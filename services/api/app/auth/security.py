@@ -9,7 +9,17 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 import app.crud as crud
-from app.schemas import SignupRequest, LoginRequest, TokenResponse, ForgotPasswordRequest, ResetPasswordRequest, ResendVerificationRequest, RoleChangeRequest
+from app.schemas import (
+    SignupRequest,
+    LoginRequest,
+    TokenResponse,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
+    ResendVerificationRequest,
+    RoleChangeRequest,
+    AssignAdminRequest,
+    BulkAssignAdminRequest,
+)
 from app.models import UserRole, User as UserModel, PersonalDocument, BusinessDocument
 
 logger = logging.getLogger(__name__)
@@ -107,12 +117,12 @@ async def forgot_password(
         f'text-decoration:none;border-radius:6px;">'
         f"Reset Password</a><br><br>"
         f"This link expires in 15 minutes.<br><br>"
-        f"BookKeepro Team"
+        f"Support Team"
     )
     background.add_task(
         send_email,
         to=user.email,
-        subject="Reset your BookKeepro password",
+        subject="Reset your password",
         body=reset_body,
     )
 
@@ -217,7 +227,8 @@ def assert_admin_can_access(current_user, target_user):
     Enforces that:
     1. The current user is actually an admin/super_admin.
     2. The target user exists (throws 404).
-    3. The target user has a 'user' role (throws 403).
+    3. The target user has a 'user' role (throws 403) unless current_user is super_admin.
+    4. If current_user is a standard admin, the target user must not be assigned to another admin.
     """
     if not target_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -225,11 +236,22 @@ def assert_admin_can_access(current_user, target_user):
     if current_user.role not in [UserRole.admin, UserRole.super_admin]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
         
-    # Admins can only view 'user' accounts. Super admins can view any account.
-    if current_user.role != UserRole.super_admin and target_user.role != UserRole.user:
+    # Super admins can view and manage any account
+    if current_user.role == UserRole.super_admin:
+        return
+
+    # Admins can only view 'user' accounts
+    if target_user.role != UserRole.user:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admins can only interact with regular user accounts"
+        )
+
+    # Standard admin: verify client assignment
+    if target_user.assigned_admin_id is not None and target_user.assigned_admin_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This client is assigned to another administrator"
         )
 
 
@@ -271,18 +293,18 @@ async def signup(request: Request, payload: SignupRequest, background: Backgroun
         verify_link = f"{frontend_url}/verify-email?token={verify_token}"
         verify_body = (
             f"Hi {user.name},<br><br>"
-            f"Welcome to BookKeepro! Please verify your email address to activate your account.<br><br>"
+            f"Welcome! Please verify your email address to activate your account.<br><br>"
             f'<a href="{verify_link}" '
             f'style="padding:12px 24px;background:#FF7F11;color:#fff;'
             f'text-decoration:none;border-radius:6px;font-weight:600;">'
             f"Verify My Email</a><br><br>"
             f"This link expires in 24 hours. If you did not sign up, ignore this email.<br><br>"
-            f"BookKeepro Team"
+            f"Support Team"
         )
         background.add_task(
             send_email,
             to=user.email,
-            subject="Verify your BookKeepro email",
+            subject="Verify your email",
             body=verify_body,
         )
 
@@ -387,12 +409,12 @@ async def resend_verification(
         f'text-decoration:none;border-radius:6px;font-weight:600;">'
         f"Verify My Email</a><br><br>"
         f"This link expires in 24 hours.<br><br>"
-        f"BookKeepro Team"
+        f"Support Team"
     )
     background.add_task(
         send_email,
         to=user.email,
-        subject="Verify your BookKeepro email",
+        subject="Verify your email",
         body=resend_body,
     )
     return {"message": "If the email exists and is unverified, a new link has been sent"}
@@ -499,17 +521,18 @@ def list_users_for_admin(
     skip:  int = Query(0,   ge=0),
     limit: int = Query(100, ge=1, le=500),
     tax_year: int = Query(None),
+    assigned_admin_id: str | None = Query(None),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
     _=Depends(require_admin),
 ):
     """
     List users:
-    - super_admin  → sees all users (user + admin + super_admin)
-    - admin        → sees only role=user accounts
-    Supports skip/limit pagination. Returns pending_docs count per user.
+    - super_admin  → sees all users (user + admin + super_admin) and can filter by assigned_admin_id ("all", "unassigned", or specific admin id)
+    - admin        → sees their assigned user accounts (assigned_admin_id == current_user.id) or can view unassigned accounts
+    Supports skip/limit pagination. Returns pending_docs count per user and assigned admin info.
     """
-    from sqlalchemy import func as sqlfunc
+    from sqlalchemy import func as sqlfunc, or_
 
     def _pending_count(uid: int) -> dict:
         p_q = db.query(sqlfunc.count(PersonalDocument.id)).filter(
@@ -532,8 +555,28 @@ def list_users_for_admin(
 
     if current_user.role == UserRole.super_admin:
         q = db.query(UserModel)
+        if assigned_admin_id == "unassigned":
+            q = q.filter(UserModel.assigned_admin_id == None, UserModel.role == UserRole.user)
+        elif assigned_admin_id and assigned_admin_id != "all":
+            try:
+                aid = int(assigned_admin_id)
+                q = q.filter(UserModel.assigned_admin_id == aid)
+            except ValueError:
+                pass
     else:
-        q = db.query(UserModel).filter(UserModel.role == UserRole.user)
+        # Standard admin:
+        # By default (or assigned_admin_id == "me"), show clients assigned to this admin.
+        # If assigned_admin_id == "unassigned", show unassigned clients.
+        # If assigned_admin_id == "all", show clients assigned to this admin + unassigned clients.
+        if assigned_admin_id == "unassigned":
+            q = db.query(UserModel).filter(UserModel.role == UserRole.user, UserModel.assigned_admin_id == None)
+        elif assigned_admin_id == "all":
+            q = db.query(UserModel).filter(
+                UserModel.role == UserRole.user,
+                or_(UserModel.assigned_admin_id == current_user.id, UserModel.assigned_admin_id == None)
+            )
+        else:
+            q = db.query(UserModel).filter(UserModel.role == UserRole.user, UserModel.assigned_admin_id == current_user.id)
 
     total = q.count()
     users = q.offset(skip).limit(limit).all()
@@ -541,11 +584,14 @@ def list_users_for_admin(
     return {
         "users": [
             {
-                "id":               u.id,
-                "name":             u.name,
-                "email":            u.email,
-                "phone":            u.phone,
-                "role":             u.role.value if hasattr(u.role, "value") else str(u.role),
+                "id":                   u.id,
+                "name":                 u.name,
+                "email":                u.email,
+                "phone":                u.phone,
+                "role":                 u.role.value if hasattr(u.role, "value") else str(u.role),
+                "assigned_admin_id":    u.assigned_admin_id,
+                "assigned_admin_name":  u.assigned_admin.name if u.assigned_admin else None,
+                "assigned_admin_email": u.assigned_admin.email if u.assigned_admin else None,
                 **_pending_count(u.id),   # inlines pending_personal, pending_business, pending_docs (total)
             }
             for u in users
@@ -683,5 +729,244 @@ def change_user_role(
         "new_role": new_role,
         "message":  f"Role updated from {old_role} to {new_role}"
     }
+
+
+# ─────────────────────────────────────────────
+# Admin assignment management
+# ─────────────────────────────────────────────
+
+@router.get("/admin/staff")
+def list_admin_staff(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+    _=Depends(require_admin),
+):
+    """
+    Returns list of staff administrators (admin and super_admin) with count of assigned clients.
+    Accessible to admins and super_admins.
+    """
+    from sqlalchemy import func as sqlfunc
+    staff = (
+        db.query(UserModel)
+        .filter(UserModel.role.in_([UserRole.admin, UserRole.super_admin]))
+        .order_by(UserModel.name.asc(), UserModel.email.asc())
+        .all()
+    )
+
+    counts = dict(
+        db.query(UserModel.assigned_admin_id, sqlfunc.count(UserModel.id))
+        .filter(UserModel.assigned_admin_id != None)
+        .group_by(UserModel.assigned_admin_id)
+        .all()
+    )
+
+    return [
+        {
+            "id": s.id,
+            "name": s.name or s.email,
+            "email": s.email,
+            "role": s.role.value if hasattr(s.role, "value") else str(s.role),
+            "assigned_clients_count": counts.get(s.id, 0),
+        }
+        for s in staff
+    ]
+
+
+@router.patch("/admin/users/{user_id}/assign-admin")
+def assign_user_to_admin(
+    user_id: int,
+    payload: AssignAdminRequest,
+    request: Request,
+    background: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+    _=Depends(require_super_admin),
+):
+    """
+    Assign or unassign a client user to an administrator. Super admin only.
+    Sends an email notification to the assigned admin.
+    """
+    client = crud.get_user_by_id(db, user_id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client user not found")
+
+    old_admin_id = client.assigned_admin_id
+    old_admin = crud.get_user_by_id(db, old_admin_id) if old_admin_id else None
+    old_admin_name = f"{old_admin.name or old_admin.email} (#{old_admin.id})" if old_admin else "Unassigned"
+
+    if payload.admin_id is None or payload.admin_id == 0:
+        # Unassign
+        client.assigned_admin_id = None
+        new_admin = None
+        new_admin_name = "Unassigned"
+    else:
+        new_admin = crud.get_user_by_id(db, payload.admin_id)
+        if not new_admin:
+            raise HTTPException(status_code=404, detail="Target admin not found")
+        if new_admin.role not in [UserRole.admin, UserRole.super_admin]:
+            raise HTTPException(status_code=400, detail="Assigned user must have an admin role")
+        client.assigned_admin_id = new_admin.id
+        new_admin_name = f"{new_admin.name or new_admin.email} (#{new_admin.id})"
+
+    db.commit()
+    db.refresh(client)
+
+    crud.log_action(
+        db,
+        action="assign_admin",
+        user_id=current_user.id,
+        target=f"user:{client.id}",
+        detail=f"Assigned admin changed: {old_admin_name} → {new_admin_name}",
+        ip_address=request.client.host if request.client else None,
+    )
+
+    logger.info(
+        f"Super admin {current_user.email} assigned client {client.email} to {new_admin_name}"
+    )
+
+    # Send email notification to the assigned admin
+    if new_admin:
+        frontend_url = os.getenv("FRONTEND_URL", "https://aicpa.duckdns.org")
+        client_link = f"{frontend_url}/admin-user-detail?user_id={client.id}"
+        super_admin_name = current_user.name or current_user.email
+        client_display = client.name or client.email
+        phone_html = f"<p style='margin:4px 0;'><strong>Phone:</strong> {client.phone}</p>" if client.phone else ""
+
+        email_body = f"""
+        <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.6;color:#1e293b;max-width:580px;margin:0 auto;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.05);">
+          <div style="background-color:#0f172a;padding:24px 28px;text-align:left;">
+            <h2 style="color:#ffffff;margin:0;font-size:20px;font-weight:700;letter-spacing:-0.3px;">Admin Portal</h2>
+            <p style="color:#94a3b8;margin:6px 0 0 0;font-size:13px;">Client Portfolio Assignment Notification</p>
+          </div>
+          <div style="padding:28px;">
+            <p style="font-size:15px;margin-top:0;">Hello <strong>{new_admin.name or 'Admin'}</strong>,</p>
+            <p style="font-size:14px;color:#334155;">Super Admin <strong>{super_admin_name}</strong> has assigned a client to your portfolio:</p>
+            <div style="background-color:#f8fafc;border-left:4px solid #0284c7;padding:16px;margin:20px 0;border-radius:6px;font-size:14px;">
+              <p style="margin:4px 0;"><strong>Client Name:</strong> {client_display}</p>
+              <p style="margin:4px 0;"><strong>Client Email:</strong> {client.email}</p>
+              {phone_html}
+            </div>
+            <p style="font-size:14px;color:#475569;">You now have administrative responsibility to review their uploaded documents, upload finalized tax returns, and assist them through filing.</p>
+            <div style="margin:28px 0 16px;">
+              <a href="{client_link}" style="background-color:#0284c7;color:#ffffff;padding:12px 24px;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px;display:inline-block;">
+                Open Client File →
+              </a>
+            </div>
+          </div>
+          <div style="background-color:#f1f5f9;padding:16px 28px;border-top:1px solid #e2e8f0;font-size:12px;color:#64748b;">
+            This is an automated notification from the Admin Portal.
+          </div>
+        </div>
+        """
+        background.add_task(
+            send_email,
+            to=new_admin.email,
+            subject=f"New Client Assigned: {client_display}",
+            body=email_body,
+        )
+
+    return {
+        "success": True,
+        "user_id": client.id,
+        "assigned_admin_id": client.assigned_admin_id,
+        "assigned_admin_name": new_admin.name if new_admin else None,
+        "assigned_admin_email": new_admin.email if new_admin else None,
+        "message": f"Client assigned to {new_admin_name}",
+    }
+
+
+@router.post("/admin/users/bulk-assign-admin")
+def bulk_assign_users_to_admin(
+    payload: BulkAssignAdminRequest,
+    request: Request,
+    background: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+    _=Depends(require_super_admin),
+):
+    """
+    Bulk assign multiple clients to an administrator. Super admin only.
+    Sends an email notification to the assigned admin.
+    """
+    if not payload.user_ids:
+        raise HTTPException(status_code=400, detail="No user IDs provided")
+
+    new_admin = None
+    new_admin_name = "Unassigned"
+    if payload.admin_id is not None and payload.admin_id != 0:
+        new_admin = crud.get_user_by_id(db, payload.admin_id)
+        if not new_admin:
+            raise HTTPException(status_code=404, detail="Target admin not found")
+        if new_admin.role not in [UserRole.admin, UserRole.super_admin]:
+            raise HTTPException(status_code=400, detail="Assigned user must have an admin role")
+        new_admin_name = f"{new_admin.name or new_admin.email} (#{new_admin.id})"
+
+    clients = db.query(UserModel).filter(UserModel.id.in_(payload.user_ids)).all()
+    count = 0
+    client_names = []
+    for client in clients:
+        client.assigned_admin_id = new_admin.id if new_admin else None
+        client_names.append(f"{client.name or client.email} ({client.email})")
+        count += 1
+
+    db.commit()
+
+    crud.log_action(
+        db,
+        action="bulk_assign_admin",
+        user_id=current_user.id,
+        target=f"users:{len(clients)}",
+        detail=f"Bulk assigned {count} clients to {new_admin_name}",
+        ip_address=request.client.host if request.client else None,
+    )
+
+    # Send email notification to new_admin
+    if new_admin and count > 0:
+        frontend_url = os.getenv("FRONTEND_URL", "https://aicpa.duckdns.org")
+        dashboard_link = f"{frontend_url}/admin-dashboard"
+        super_admin_name = current_user.name or current_user.email
+        items_html = "".join(f"<li style='margin:4px 0;'>{name}</li>" for name in client_names[:10])
+        if len(client_names) > 10:
+            items_html += f"<li style='margin:4px 0;color:#64748b;'><em>...and {len(client_names) - 10} more clients</em></li>"
+
+        email_body = f"""
+        <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.6;color:#1e293b;max-width:580px;margin:0 auto;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.05);">
+          <div style="background-color:#0f172a;padding:24px 28px;text-align:left;">
+            <h2 style="color:#ffffff;margin:0;font-size:20px;font-weight:700;letter-spacing:-0.3px;">Admin Portal</h2>
+            <p style="color:#94a3b8;margin:6px 0 0 0;font-size:13px;">Batch Client Portfolio Assignment Notification</p>
+          </div>
+          <div style="padding:28px;">
+            <p style="font-size:15px;margin-top:0;">Hello <strong>{new_admin.name or 'Admin'}</strong>,</p>
+            <p style="font-size:14px;color:#334155;">Super Admin <strong>{super_admin_name}</strong> has assigned <strong>{count} client(s)</strong> to your portfolio:</p>
+            <ul style="background-color:#f8fafc;border-left:4px solid #0284c7;padding:12px 16px 12px 32px;margin:20px 0;border-radius:6px;font-size:14px;">
+              {items_html}
+            </ul>
+            <p style="font-size:14px;color:#475569;">You can view and manage these clients in your Admin Dashboard.</p>
+            <div style="margin:28px 0 16px;">
+              <a href="{dashboard_link}" style="background-color:#0284c7;color:#ffffff;padding:12px 24px;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px;display:inline-block;">
+                Go to Admin Dashboard →
+              </a>
+            </div>
+          </div>
+          <div style="background-color:#f1f5f9;padding:16px 28px;border-top:1px solid #e2e8f0;font-size:12px;color:#64748b;">
+            This is an automated notification from the Admin Portal.
+          </div>
+        </div>
+        """
+        background.add_task(
+            send_email,
+            to=new_admin.email,
+            subject=f"{count} New Clients Assigned to Your Portfolio",
+            body=email_body,
+        )
+
+    return {
+        "success": True,
+        "count": count,
+        "assigned_admin_id": new_admin.id if new_admin else None,
+        "assigned_admin_name": new_admin.name if new_admin else None,
+        "message": f"Assigned {count} clients to {new_admin_name}",
+    }
+
 
 

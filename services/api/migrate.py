@@ -197,6 +197,29 @@ def upgrade():
             except Exception as e:
                 print(f"  [WARN] Template seed: {e}")
 
+            # -- v9: Assigned admin support for users --------------------------
+            _add_column(conn, "users", "assigned_admin_id", "INT NULL DEFAULT NULL")
+            try:
+                conn.execute(text("ALTER TABLE users ADD CONSTRAINT fk_users_assigned_admin FOREIGN KEY (assigned_admin_id) REFERENCES users(id) ON DELETE SET NULL;"))
+                print("  [OK] Added fk_users_assigned_admin constraint")
+            except Exception as e:
+                msg = str(e).lower()
+                if "duplicate" in msg or "already exists" in msg:
+                    print("  [SKIP] fk_users_assigned_admin already exists")
+                else:
+                    print(f"  [WARN] fk_users_assigned_admin: {e}")
+
+            try:
+                conn.execute(text("CREATE INDEX ix_users_assigned_admin_id ON users(assigned_admin_id);"))
+                print("  [OK] Added ix_users_assigned_admin_id index")
+            except Exception as e:
+                msg = str(e).lower()
+                if "duplicate" in msg or "already exists" in msg:
+                    print("  [SKIP] ix_users_assigned_admin_id already exists")
+                else:
+                    print(f"  [WARN] ix_users_assigned_admin_id: {e}")
+
+
 
         print("\nAll migrations complete.")
     except Exception as e:

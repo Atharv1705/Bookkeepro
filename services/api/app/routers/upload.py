@@ -266,12 +266,12 @@ def get_view_url(
 
 @router.post("/admin-documents")
 async def upload_admin_document(
+    background: BackgroundTasks,
     file: UploadFile = File(...),
     doc_key: str = Form(...),
     doc_label: str = Form(...),
     user_id: int = Form(...),
     tax_year: int | None = Form(None),
-    background: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
     _=Depends(require_admin),
@@ -325,12 +325,12 @@ async def upload_admin_document(
     background.add_task(
         send_email,
         to=target_user.email,
-        subject="New Document Uploaded — BookKeepro",
+        subject="New Document Uploaded",
         body=f"""
         <p>Dear {target_user.name or "Sir/Ma'am"},</p>
         <p>An admin has securely uploaded a new document (<strong>{doc_label}</strong>) to your account.</p>
-        <p>You can view this document by logging into your BookKeepro portal.</p>
-        <br><strong>BookKeepro Team</strong>
+        <p>You can view this document by logging into your portal.</p>
+        <br><strong>Support Team</strong>
         """,
     )
 
@@ -552,14 +552,14 @@ async def upload_personal_document(
         background.add_task(
             send_email,
             to=admin.email,
-            subject="New Personal Document Uploaded — BookKeepro",
+            subject="New Personal Document Uploaded",
             body=f"<p><strong>{current_user.email}</strong> uploaded a personal document: <strong>{file.filename}</strong> ({doc_type}).</p>",
         )
     
     background.add_task(
         send_email,
         to=current_user.email,
-        subject="Personal Document Upload Confirmation — BookKeepro",
+        subject="Personal Document Upload Confirmation",
         body=f"<p>We have successfully received your personal document: <strong>{file.filename}</strong> ({doc_type}).</p>",
     )
     background.add_task(
@@ -725,14 +725,14 @@ async def upload_business_document(
         background.add_task(
             send_email,
             to=admin.email,
-            subject="New Business Document Uploaded — BookKeepro",
+            subject="New Business Document Uploaded",
             body=f"<p><strong>{current_user.email}</strong> uploaded a business document: <strong>{file.filename}</strong> ({doc_type}).</p>",
         )
         
     background.add_task(
         send_email,
         to=current_user.email,
-        subject="Business Document Upload Confirmation — BookKeepro",
+        subject="Business Document Upload Confirmation",
         body=f"<p>We have successfully received your business document: <strong>{file.filename}</strong> ({doc_type}).</p>",
     )
     background.add_task(
@@ -825,14 +825,14 @@ async def set_personal_review_status(
             background.add_task(
                 send_email,
                 to=owner.email,
-                subject="Action Required: Document Rejected — BookKeepro",
+                subject="Action Required: Document Rejected",
                 body=f"""
                 <p>Dear {owner.name or 'Client'},</p>
                 <p>Your personal document <strong>{doc.filename}</strong> (Tax Year {doc.tax_year}) has been <strong style='color:#c0392b;'>rejected</strong> by our team.</p>
                 {note_html}
                 <p>Please log in to your dashboard, review the reason, and re-upload a corrected document.</p>
                 <p><a href='{FRONTEND_URL}/upload-personal' style='color:#0077c8;font-weight:600;'>Re-upload Personal Documents →</a></p>
-                <p style='margin-top:20px;'>Kind regards,<br><strong>BookKeepro Team</strong></p>
+                <p style='margin-top:20px;'>Kind regards,<br><strong>Support Team</strong></p>
                 """,
             )
 
@@ -889,14 +889,14 @@ async def set_business_review_status(
             background.add_task(
                 send_email,
                 to=owner.email,
-                subject="Action Required: Document Rejected — BookKeepro",
+                subject="Action Required: Document Rejected",
                 body=f"""
                 <p>Dear {owner.name or 'Client'},</p>
                 <p>Your business document <strong>{doc.filename}</strong> (Tax Year {doc.tax_year}) has been <strong style='color:#c0392b;'>rejected</strong> by our team.</p>
                 {note_html}
                 <p>Please log in to your dashboard, review the reason, and re-upload a corrected document.</p>
                 <p><a href='{FRONTEND_URL}/upload-business' style='color:#0077c8;font-weight:600;'>Re-upload Business Documents →</a></p>
-                <p style='margin-top:20px;'>Kind regards,<br><strong>BookKeepro Team</strong></p>
+                <p style='margin-top:20px;'>Kind regards,<br><strong>Support Team</strong></p>
                 """,
             )
 
@@ -1028,6 +1028,9 @@ def get_user_all_documents(
             "name":  user.name,
             "email": user.email,
             "role":  user.role.value if hasattr(user.role, "value") else str(user.role),
+            "assigned_admin_id": user.assigned_admin_id,
+            "assigned_admin_name": user.assigned_admin.name if user.assigned_admin else None,
+            "assigned_admin_email": user.assigned_admin.email if user.assigned_admin else None,
             "engagement_acknowledged_at": (
                 user.engagement_acknowledged_at.isoformat()
                 if user.engagement_acknowledged_at else None
@@ -1163,13 +1166,13 @@ async def notify_upload_complete(
     background.add_task(
         send_email,
         to=current_user.email,
-        subject=f"{category} Documents Uploaded — BookKeepro",
+        subject=f"{category} Documents Uploaded",
         body=f"""
         <p>Dear {current_user.name or "Sir/Ma'am"},</p>
         <p>We received <strong>{count}</strong> {category.lower()}
            document{"s" if count != 1 else ""} from you.</p>
         <p>Our team will review {"them" if count != 1 else "it"} and update you shortly.</p>
-        <br><strong>BookKeepro Team</strong>
+        <br><strong>Support Team</strong>
         """,
     )
     admins = db.query(User).filter(User.role.in_([UserRole.admin, UserRole.super_admin])).all()
@@ -1177,7 +1180,7 @@ async def notify_upload_complete(
         background.add_task(
             send_email,
             to=admin.email,
-            subject=f"New {category} Upload — BookKeepro",
+            subject=f"New {category} Upload",
             body=f"<p><strong>{current_user.email}</strong> uploaded "
                  f"{count} {category.lower()} document{'s' if count != 1 else ''}.</p>",
         )
@@ -1203,11 +1206,11 @@ async def notify_personal_approval(
     background.add_task(
         send_email,
         to=user.email,
-        subject="Personal Documents Approved — BookKeepro",
+        subject="Personal Documents Approved",
         body=f"""
         <p>Dear {user.name or "Sir/Ma'am"},</p>
         <p>Your personal documents have been successfully reviewed and approved.</p>
-        <br><strong>BookKeepro Team</strong>
+        <br><strong>Support Team</strong>
         """,
     )
     return {"status": "email_sent"}
@@ -1226,11 +1229,11 @@ async def notify_business_approval(
     background.add_task(
         send_email,
         to=user.email,
-        subject="Business Documents Approved — BookKeepro",
+        subject="Business Documents Approved",
         body=f"""
         <p>Dear {user.name or "Sir/Ma'am"},</p>
         <p>Your business documents have been successfully reviewed and approved.</p>
-        <br><strong>BookKeepro Team</strong>
+        <br><strong>Support Team</strong>
         """,
     )
     return {"status": "email_sent"}

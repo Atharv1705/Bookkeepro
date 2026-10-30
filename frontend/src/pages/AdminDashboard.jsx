@@ -6,7 +6,8 @@ import { useToast } from '../context/ToastContext';
 import ConfirmModal from '../components/ConfirmModal';
 
 export default function AdminDashboard() {
-  const { authFetch } = useAuth();
+  const { authFetch, user: currentUser } = useAuth();
+  const isSuperAdmin = currentUser?.role === 'super_admin';
   const { showToast } = useToast();
   const [confirmConfig, setConfirmConfig] = useState({
     isOpen: false, title: "", message: "", confirmText: "OK", isDestructive: false, onConfirm: () => {}
@@ -19,9 +20,54 @@ export default function AdminDashboard() {
   const [userFilter, setUserFilter] = useState("all");
   const [userSort, setUserSort] = useState("newest");
   const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
+  const [adminAssignmentFilter, setAdminAssignmentFilter] = useState("all");
+  const [staffList, setStaffList] = useState([]);
   const [tab, setTab] = useState("users");
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+
+  // --- Staff List Fetch ---
+  const fetchStaff = useCallback(async () => {
+    try {
+      const res = await authFetch('/api/auth/admin/staff');
+      if (res.ok) {
+        setStaffList(await res.json());
+      }
+    } catch (err) {
+      console.error("Failed to load staff list", err);
+    }
+  }, [authFetch]);
+
+  useEffect(() => {
+    fetchStaff();
+  }, [fetchStaff]);
+
+  const handleAssignAdmin = async (userId, newAdminId) => {
+    try {
+      const res = await authFetch(`/api/auth/admin/users/${userId}/assign-admin`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ admin_id: newAdminId ? parseInt(newAdminId, 10) : null }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        showToast(data.message || "Admin assigned", "success");
+        setUsers(prev => prev.map(u => u.id === userId ? {
+          ...u,
+          assigned_admin_id: data.assigned_admin_id,
+          assigned_admin_name: data.assigned_admin_name,
+          assigned_admin_email: data.assigned_admin_email,
+        } : u));
+        fetchStaff();
+      } else {
+        const err = await res.json();
+        showToast(err.detail || "Failed to assign admin", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Network error while assigning admin", "error");
+    }
+  };
 
   // --- Template Management State ---
   const [tplCategory, setTplCategory] = useState("personal");
@@ -41,16 +87,35 @@ export default function AdminDashboard() {
       if (res.ok) {
         const data = await res.json();
         setDigestHtml(data.digest);
+        showToast("Daily digest generated successfully!", "success");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showToast(err.detail || "Failed to generate daily digest", "error");
       }
-    } catch (err) { console.error(err); }
-    finally { setDigestLoading(false); }
-  }, [authFetch]);
+    } catch (err) {
+      console.error(err);
+      showToast("Network error while generating digest", "error");
+    } finally {
+      setDigestLoading(false);
+    }
+  }, [authFetch, showToast]);
 
   const fetchAdminData = useCallback(async () => {
     setLoading(true);
     try {
+      let usersUrl = `/api/auth/admin/users?tax_year=${filterYear}`;
+      if (isSuperAdmin) {
+        if (adminAssignmentFilter !== "all") {
+          usersUrl += `&assigned_admin_id=${adminAssignmentFilter}`;
+        }
+      } else {
+        if (adminAssignmentFilter === "unassigned") {
+          usersUrl += `&assigned_admin_id=unassigned`;
+        }
+      }
+
       const [usersRes, statsRes, bookmarksRes] = await Promise.all([
-        authFetch(`/api/auth/admin/users?tax_year=${filterYear}`),
+        authFetch(usersUrl),
         authFetch(`/api/chatbot/admin-status?tax_year=${filterYear}`),
         authFetch(`/api/upload/bookmarks`)
       ]);
@@ -90,7 +155,7 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [authFetch, filterYear]);
+  }, [authFetch, filterYear, adminAssignmentFilter, isSuperAdmin]);
 
   const loadTemplates = useCallback(async () => {
     setTplLoading(true);
@@ -219,8 +284,8 @@ export default function AdminDashboard() {
       </h1>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
       {tab === 'users' && (
-          <div style={{ display: 'flex', gap: '12px', width: '100%', maxWidth: '500px', flexWrap: 'wrap' }}>
-            <div className="search-wrap" style={{ flex: 1, minWidth: '200px', position: 'relative' }}>
+          <div style={{ display: 'flex', gap: '12px', width: '100%', maxWidth: '820px', flexWrap: 'wrap' }}>
+            <div className="search-wrap" style={{ flex: 1, minWidth: '180px', position: 'relative' }}>
               <span className="material-symbols-outlined search-icon" style={{position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', fontSize: '20px'}}>search</span>
               <input 
                 type="text" 
@@ -231,6 +296,38 @@ export default function AdminDashboard() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
+
+            {/* Admin Assignment Filter */}
+            {isSuperAdmin ? (
+              <select 
+                className="select-input" 
+                style={{ width: 'auto', padding: '10px 16px', borderRadius: 'var(--radius-pill)', border: '1px solid var(--border)', outline: 'none', background: 'white' }}
+                value={adminAssignmentFilter}
+                onChange={(e) => setAdminAssignmentFilter(e.target.value)}
+                title="Filter by assigned administrator"
+              >
+                <option value="all">👥 All Administrators</option>
+                <option value="unassigned">⚠️ Unassigned Clients</option>
+                <optgroup label="Staff Admins">
+                  {staffList.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.name || s.email} ({s.assigned_clients_count || 0} clients)
+                    </option>
+                  ))}
+                </optgroup>
+              </select>
+            ) : (
+              <select 
+                className="select-input" 
+                style={{ width: 'auto', padding: '10px 16px', borderRadius: 'var(--radius-pill)', border: '1px solid var(--border)', outline: 'none', background: 'white' }}
+                value={adminAssignmentFilter}
+                onChange={(e) => setAdminAssignmentFilter(e.target.value)}
+              >
+                <option value="all">My Assigned Clients</option>
+                <option value="unassigned">Unassigned Clients</option>
+              </select>
+            )}
+
             <select 
               className="select-input" 
               style={{ width: 'auto', padding: '10px 16px', borderRadius: 'var(--radius-pill)', border: '1px solid var(--border)', outline: 'none', background: 'white' }}
@@ -384,24 +481,67 @@ export default function AdminDashboard() {
                       <div className="u-email">{u.email || "—"}</div>
                     </div>
                   </div>
-                  <div className="user-bottom">
-                    <span className={`badge role-badge ${u.role === 'super_admin' ? 'badge-red' : u.role === 'admin' ? 'badge-orange' : 'badge-blue'}`}>
-                      {u.role}
-                    </span>
-                    {u.pending_personal > 0 && (
-                      <span className="badge badge-orange pulse" style={{ cursor: 'default' }}>
-                        <span className="material-symbols-outlined" style={{fontSize:'12px', verticalAlign:'middle'}}>description</span>
-                        {' '}{u.pending_personal} personal
+                  <div className="user-bottom" style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'stretch' }}>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                      <span className={`badge role-badge ${u.role === 'super_admin' ? 'badge-red' : u.role === 'admin' ? 'badge-orange' : 'badge-blue'}`}>
+                        {u.role}
                       </span>
-                    )}
-                    {u.pending_business > 0 && (
-                      <span className="badge badge-orange pulse" style={{ cursor: 'default' }}>
-                        <span className="material-symbols-outlined" style={{fontSize:'12px', verticalAlign:'middle'}}>business</span>
-                        {' '}{u.pending_business} business
-                      </span>
+                      {u.pending_personal > 0 && (
+                        <span className="badge badge-orange pulse" style={{ cursor: 'default' }}>
+                          <span className="material-symbols-outlined" style={{fontSize:'12px', verticalAlign:'middle'}}>description</span>
+                          {' '}{u.pending_personal} personal
+                        </span>
+                      )}
+                      {u.pending_business > 0 && (
+                        <span className="badge badge-orange pulse" style={{ cursor: 'default' }}>
+                          <span className="material-symbols-outlined" style={{fontSize:'12px', verticalAlign:'middle'}}>business</span>
+                          {' '}{u.pending_business} business
+                        </span>
+                      )}
+                    </div>
+
+                    {u.role === 'user' && (
+                      <div style={{ paddingTop: '8px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', fontSize: '12px' }}>
+                        <span style={{ color: u.assigned_admin_name ? 'var(--navy)' : 'var(--orange)', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 500 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: '15px', color: u.assigned_admin_name ? 'var(--blue)' : 'var(--orange)' }}>
+                            {u.assigned_admin_name ? 'assignment_ind' : 'person_alert'}
+                          </span>
+                          {u.assigned_admin_name ? u.assigned_admin_name : 'Unassigned'}
+                        </span>
+
+                        {isSuperAdmin && (
+                          <select
+                            className="select-input"
+                            style={{
+                              padding: '2px 8px',
+                              fontSize: '11px',
+                              borderRadius: 'var(--radius-sm)',
+                              background: 'white',
+                              border: '1px solid var(--border)',
+                              cursor: 'pointer',
+                              maxWidth: '135px',
+                              position: 'relative',
+                              zIndex: 5
+                            }}
+                            value={u.assigned_admin_id || ""}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              handleAssignAdmin(u.id, e.target.value);
+                            }}
+                            title="Assign client to admin"
+                          >
+                            <option value="">-- Unassigned --</option>
+                            {staffList.map(s => (
+                              <option key={s.id} value={s.id}>
+                                {s.name || s.email}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
                     )}
                   </div>
-                  <div className="click-layer"></div>
                 </div>
               ))
             )}

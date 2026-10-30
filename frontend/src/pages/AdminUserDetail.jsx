@@ -51,8 +51,44 @@ export default function AdminUserDetail() {
   const [auditLog, setAuditLog] = useState([]);
   const [auditLoaded, setAuditLoaded] = useState(false);
   const [deadlines, setDeadlines] = useState([]);
+  const [staffList, setStaffList] = useState([]);
 
   const adminDocInputRef = useRef(null);
+
+  useEffect(() => {
+    if (currentUser?.role === 'super_admin') {
+      authFetch('/api/auth/admin/staff')
+        .then(res => res.ok ? res.json() : [])
+        .then(data => setStaffList(data))
+        .catch(err => console.error("Failed to load staff list", err));
+    }
+  }, [authFetch, currentUser]);
+
+  const handleAssignAdmin = async (newAdminId) => {
+    try {
+      const res = await authFetch(`/api/auth/admin/users/${userId}/assign-admin`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ admin_id: newAdminId ? parseInt(newAdminId, 10) : null }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        showToast(data.message || "Admin assignment updated", "success");
+        setUserDetail(prev => ({
+          ...prev,
+          assigned_admin_id: data.assigned_admin_id,
+          assigned_admin_name: data.assigned_admin_name,
+          assigned_admin_email: data.assigned_admin_email,
+        }));
+      } else {
+        const err = await res.json();
+        showToast(err.detail || "Failed to assign admin", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Network error while assigning admin", "error");
+    }
+  };
 
   const fetchUserDetails = useCallback(async () => {
     setLoading(true);
@@ -61,7 +97,11 @@ export default function AdminUserDetail() {
       const res = await authFetch(url);
       
       if (!res.ok) {
-        if (res.status === 403) navigate('/admin-dashboard');
+        if (res.status === 403) {
+          const errData = await res.json().catch(() => ({}));
+          showToast(errData.detail || "Access denied. You are not assigned to handle this user.", "error");
+          navigate('/admin-dashboard');
+        }
         return;
       }
       
@@ -519,7 +559,7 @@ export default function AdminUserDetail() {
             <div>
               <h1 style={{fontWeight: 700, fontSize: "18px", color: "var(--navy)", margin: 0}}>{userDetail.name || "?"}</h1>
               <div style={{fontSize:'13px', color:'var(--muted)', marginTop:'2px'}}>{userDetail.email}</div>
-              <div style={{display:'flex', gap:'8px', marginTop:'6px', flexWrap:'wrap'}}>
+              <div style={{display:'flex', gap:'8px', marginTop:'6px', flexWrap:'wrap', alignItems:'center'}}>
                 {currentUser?.role === 'super_admin' && currentUser.id !== userDetail.id ? (
                   <select 
                     className="select-input" 
@@ -534,6 +574,34 @@ export default function AdminUserDetail() {
                 ) : (
                   <span className={`badge ${userDetail.role === 'super_admin' ? 'badge-red' : userDetail.role === 'admin' ? 'badge-orange' : 'badge-blue'}`}>{userDetail.role}</span>
                 )}
+
+                {/* Assigned Admin Selector for Super Admin or Badge for Standard Admin */}
+                {userDetail.role === 'user' && (
+                  currentUser?.role === 'super_admin' ? (
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '12px', color: 'var(--muted)', fontWeight: 600 }}>Assigned Admin:</span>
+                      <select
+                        className="select-input"
+                        style={{ padding: '2px 8px', fontSize: '12px', height: 'auto', borderRadius: 'var(--radius-pill)', background: 'white', border: '1px solid var(--border)' }}
+                        value={userDetail.assigned_admin_id || ""}
+                        onChange={(e) => handleAssignAdmin(e.target.value)}
+                      >
+                        <option value="">-- Unassigned --</option>
+                        {staffList.map(s => (
+                          <option key={s.id} value={s.id}>
+                            {s.name || s.email} ({s.role})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <span className={`badge ${userDetail.assigned_admin_id === currentUser?.id ? 'badge-green' : 'badge-gray'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>assignment_ind</span>
+                      {userDetail.assigned_admin_id === currentUser?.id ? 'Assigned to You' : (userDetail.assigned_admin_name ? `Assigned to: ${userDetail.assigned_admin_name}` : 'Unassigned')}
+                    </span>
+                  )
+                )}
+
                 {!userDetail.engagement_acknowledged_at && (
                   <span className="badge badge-yellow"><span className="material-symbols-outlined" style={{fontSize: '14px'}}>pending</span> Engagement not acknowledged</span>
                 )}

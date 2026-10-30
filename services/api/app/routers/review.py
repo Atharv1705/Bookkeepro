@@ -35,7 +35,7 @@ async def submit_review(
 
     email_sent = await send_email(
         to=user.email,
-        subject="Documents Ready for Review — BookKeepro",
+        subject="Documents Ready for Review",
         body=f"""
         <p>Dear {user.name or "Sir/Ma'am"},</p>
         <p>Your documents have been successfully submitted and are pending review.</p>
@@ -45,7 +45,7 @@ async def submit_review(
             👉 Go to Dashboard
           </a>
         </p>
-        <p style="margin-top:20px;">Kind regards,<br><strong>BookKeepro Team</strong></p>
+        <p style="margin-top:20px;">Kind regards,<br><strong>Support Team</strong></p>
         """
     )
 
@@ -88,10 +88,10 @@ async def notify_user_review(
       <li>Business Documents: {payload.business_timeline} days</li>
     </ul>
 
-    <p>Kind regards,<br><strong>BookKeepro Team</strong></p>
+    <p>Kind regards,<br><strong>Support Team</strong></p>
     """
 
-    await send_email(to=user.email, subject="Document Review Update — BookKeepro", body=body)
+    await send_email(to=user.email, subject="Document Review Update", body=body)
     logger.info(f"Admin {current_user.id} sent review notification to user {payload.user_id}")
 
     # Save / reset filing deadlines if timelines were provided
@@ -180,12 +180,12 @@ async def admin_doc_response(
         if payload.status == "rejected" and payload.reason:
             body += f"<p><strong>Reason:</strong></p><p>{payload.reason}</p>"
 
-        body += "<p style='margin-top:20px;'>BookKeepro System</p>"
+        body += "<p style='margin-top:20px;'>Admin Portal</p>"
 
         background.add_task(
             send_email,
             to=admin_email,
-            subject=f"Admin Return Status {payload.status.capitalize()} — BookKeepro",
+            subject=f"Admin Return Status {payload.status.capitalize()}",
             body=body,
         )
 
@@ -394,7 +394,7 @@ async def send_return_for_approval(
         background.add_task(
             send_email,
             to=client.email,
-            subject="Action Required: Please Review Your Tax Return — BookKeepro",
+            subject="Action Required: Please Review Your Tax Return",
             body=f"""
             <p>Dear {client.name or 'Client'},</p>
             <p>Your tax professional has prepared a document for your review:</p>
@@ -402,7 +402,7 @@ async def send_return_for_approval(
             {note_html}
             <p>Please log in to your dashboard to review, approve, or request changes.</p>
             <p><a href='{DASHBOARD_LINK}' style='color:#2c7a5b;font-weight:600;font-size:15px;'>Review Now →</a></p>
-            <p style='margin-top:20px;'>Kind regards,<br><strong>BookKeepro Team</strong></p>
+            <p style='margin-top:20px;'>Kind regards,<br><strong>Support Team</strong></p>
             """,
         )
 
@@ -462,7 +462,7 @@ async def mark_filing_complete(
         background.add_task(
             send_email,
             to=client.email,
-            subject=f"Your {payload.tax_year} Tax Return Has Been Filed — BookKeepro",
+            subject=f"Your {payload.tax_year} Tax Return Has Been Filed",
             body=f"""
             <p>Dear {client.name or 'Client'},</p>
             <p>Great news! Your <strong>{payload.tax_year}</strong> tax return has been successfully filed.</p>
@@ -470,7 +470,7 @@ async def mark_filing_complete(
             {note_html}
             <p>You can view the status in your dashboard at any time.</p>
             <p><a href='{DASHBOARD_LINK}' style='color:#2c7a5b;font-weight:600;'>Go to Dashboard →</a></p>
-            <p style='margin-top:20px;'>Thank you for choosing BookKeepro.<br><strong>BookKeepro Team</strong></p>
+            <p style='margin-top:20px;'>Thank you.<br><strong>Support Team</strong></p>
             """,
         )
 
