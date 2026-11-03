@@ -1,9 +1,9 @@
-﻿// Dynamic-UI runtime (tiny, dependency-free, CSP-safe: only classList + CSSOM property writes).
+// Dynamic-UI runtime (tiny, dependency-free, CSP-safe: only classList + CSSOM property writes).
 //  - html.motion        : opts in to scroll-reveal hiding (never set for reduced-motion users)
 //  - html[data-scrolled]: navbar / header react after 24px of scroll
 //  - --scroll           : 0..1 page progress, drives the brass progress rule
 //  - --mx / --my        : pointer position inside cards, drives the hover spotlight
-const SPOT = '.stat-card, .user-card, .service-card, .card';
+const SPOT = '.stat-card, .user-card, .service-card, .card, .artha-portal-card, .artha-vault-card, .artha-ticker-card';
 
 export function initMotion() {
   if (typeof window === 'undefined') return;

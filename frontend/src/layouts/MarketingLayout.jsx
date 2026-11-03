@@ -3,12 +3,14 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 
 export default function MarketingLayout() {
-  const { pathname } = useLocation();
+  const location = useLocation();
   return (
     <>
       <Navbar />
-      <main key={pathname} className="page-enter">
-        <Outlet />
+      <main>
+        <div className="page-enter" key={location.pathname}>
+          <Outlet />
+        </div>
       </main>
       <Footer />
     </>

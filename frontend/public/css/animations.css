@@ -10,8 +10,8 @@
 .btn:active { transform: translateY(1px) scale(0.97); }
 
 @keyframes pulse-brass {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(176,128,61,0.35); }
-  50%       { box-shadow: 0 0 0 5px rgba(176,128,61,0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(29, 78, 216, 0.35); }
+  50%       { box-shadow: 0 0 0 5px rgba(29, 78, 216, 0); }
 }
 .pulse { animation: pulse-brass 2s infinite; }
 
@@ -25,14 +25,14 @@
 .stagger > *:nth-child(5) { animation-delay: 0.24s; }
 .stagger > *:nth-child(6) { animation-delay: 0.30s; }
 
-input[type=checkbox] { accent-color: var(--emerald); width: 16px; height: 16px; cursor: pointer; }
+input[type=checkbox] { accent-color: var(--brass); width: 16px; height: 16px; cursor: pointer; }
 
 /* Ledger-rule underline — the signature link treatment: a brass
    rule draws itself in, like a line struck under a checked entry */
 .fancy-link {
   position: relative;
   text-decoration: none;
-  color: var(--emerald);
+  color: var(--brass);
 }
 .fancy-link::after {
   content: '';

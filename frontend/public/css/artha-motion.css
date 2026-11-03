@@ -1,0 +1,329 @@
+/* ============================================================
+   artha-motion.css  ·  motion layer for the ABC CPA "Ledger" UI
+   Load AFTER dynamic.css in index.html:
+     <link rel="stylesheet" href="/css/artha-motion.css" />
+
+   Motion language: calm, precise, "a ledger line being drawn".
+   - one easing curve (expo-out), 200-700ms, no bounce
+   - gold rule draws under / over things that matter
+   - only transform + opacity are animated
+   Palette (matches base.css):
+     ink #0A2540 · blue #1D4ED8 · emerald #047857 · page #F6F9FC
+   ============================================================ */
+
+/* ---------- 1. Fix colour drift (dynamic.css still uses the OLD palette) ---------- */
+:root {
+    --ink-rgb: 10, 37, 64;
+    --green-rgb: 29, 78, 216;
+    --gold-rgb: 245, 184, 61;
+    --brass-rgb: 245, 184, 61;
+    /* brass token override */
+    --emerald-rgb: 4, 120, 87;
+    /* emerald token override */
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+    /* shadows tinted with ink */
+    --shadow-xs: 0 1px 2px 0 rgba(var(--ink-rgb), 0.06);
+    --shadow-sm: 0 4px 10px -2px rgba(var(--ink-rgb), 0.10);
+    --shadow-md: 0 12px 28px -8px rgba(var(--ink-rgb), 0.16);
+    --shadow-lg: 0 24px 56px -12px rgba(var(--ink-rgb), 0.22);
+    --shadow-glow: 0 0 0 6px rgba(29, 78, 216, 0.16);
+}
+
+::selection {
+    background: rgba(29, 78, 216, 0.20);
+    color: #0A2540;
+}
+
+.scroll-progress {
+    background: linear-gradient(90deg, #1D4ED8, #14B8A6);
+}
+
+/* ---------- 2. Shared keyframes ---------- */
+@keyframes arthaRise {
+    from {
+        opacity: 0;
+        transform: translateY(18px);
+    }
+}
+
+@keyframes arthaPop {
+    from {
+        opacity: 0;
+        transform: scale(0.85);
+    }
+}
+
+@keyframes arthaRule {
+    to {
+        background-size: 100% 2px;
+    }
+}
+
+@keyframes arthaDrift {
+    from {
+        transform: translate3d(-3%, -2%, 0) scale(1);
+    }
+
+    to {
+        transform: translate3d(3%, 2%, 0) scale(1.1);
+    }
+}
+
+/* ---------- 3. Navbar: shadow + gold hairline on scroll, gold underline on links ---------- */
+.artha-navbar {
+    transition: box-shadow 0.3s, border-color 0.3s, background-color 0.3s;
+}
+
+html[data-scrolled] .artha-navbar {
+    box-shadow: 0 10px 30px -18px rgba(var(--ink-rgb), 0.45);
+    border-bottom-color: rgba(29, 78, 216, 0.35);
+}
+
+.artha-nav-links>a {
+    position: relative;
+}
+
+.artha-nav-links>a::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -6px;
+    height: 1.5px;
+    background: #1D4ED8;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.35s var(--ease-out);
+}
+
+.artha-nav-links>a:hover::after {
+    transform: scaleX(1);
+}
+
+/* ---------- 4. Hero: staged entrance, gold rule under the italic word, ambient light ---------- */
+.artha-hero {
+    position: relative;
+    isolation: isolate;
+}
+
+.artha-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+        radial-gradient(50% 55% at 12% 25%, rgba(20, 184, 166, 0.14), transparent 70%),
+        radial-gradient(45% 60% at 90% 85%, rgba(29, 78, 216, 0.16), transparent 70%);
+    animation: arthaDrift 22s ease-in-out infinite alternate;
+}
+
+.artha-hero-left>* {
+    animation: arthaRise 0.9s var(--ease-out) backwards;
+}
+
+.artha-hero-left> :nth-child(1) {
+    animation-delay: 0.05s;
+}
+
+.artha-hero-left> :nth-child(2) {
+    animation-delay: 0.15s;
+}
+
+.artha-hero-left> :nth-child(3) {
+    animation-delay: 0.28s;
+}
+
+.artha-hero-left> :nth-child(4) {
+    animation-delay: 0.40s;
+}
+
+.artha-hero-left> :nth-child(n+5) {
+    animation-delay: 0.52s;
+}
+
+.artha-hero-right {
+    animation: arthaRise 1.1s 0.3s var(--ease-out) backwards;
+}
+
+.artha-hero-title em {
+    font-style: italic;
+    background: var(--gradient-brand);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: 600;
+}
+
+/* ---------- 5. Cards: lift + gold top-edge rule that draws on hover ---------- */
+:is(.artha-portal-card, .artha-vault-card, .artha-ticker-card, .artha-trust-item, .artha-firm-stat-pill) {
+    position: relative;
+}
+
+:is(.artha-portal-card, .artha-vault-card, .artha-ticker-card)::after {
+    content: '';
+    position: absolute;
+    left: 18px;
+    right: 18px;
+    top: -1px;
+    height: 2px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, #1D4ED8, #14B8A6);
+    transform: scaleX(0);
+    transform-origin: left;
+    pointer-events: none;
+    transition: transform 0.5s var(--ease-out);
+}
+
+:is(.artha-portal-card, .artha-vault-card, .artha-ticker-card):hover::after {
+    transform: scaleX(1);
+}
+
+:is(.artha-vault-card, .artha-ticker-card) {
+    transition: transform 0.3s var(--ease-out), box-shadow 0.3s, border-color 0.3s;
+}
+
+:is(.artha-vault-card, .artha-ticker-card):hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md);
+}
+
+.artha-portal-card:hover {
+    transform: translateY(-2px);
+}
+
+/* pointer spotlight (needs the one-line SPOT change in motion.js) */
+:is(.artha-portal-card, .artha-vault-card, .artha-ticker-card):hover {
+    background-image: radial-gradient(380px circle at var(--mx, 50%) var(--my, 0%), rgba(29, 78, 216, 0.08), transparent 62%);
+}
+
+/* ---------- 6. Buttons: gold sheen on primary, soft press ---------- */
+.artha-pill-btn {
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s var(--ease-out), box-shadow 0.25s, background-color 0.25s, color 0.25s, border-color 0.25s;
+}
+
+.artha-pill-btn:not(:disabled):hover {
+    transform: translateY(-1px);
+}
+
+.artha-pill-btn:not(:disabled):active {
+    transform: translateY(1px) scale(0.97);
+}
+
+.artha-pill-primary::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.28) 50%, transparent 70%);
+    transform: translateX(-130%);
+    transition: transform 0.8s var(--ease-out);
+}
+
+.artha-pill-primary:not(:disabled):hover::before {
+    transform: translateX(130%);
+}
+
+/* ---------- 7. Status pills pop in (once) ---------- */
+.artha-status-pill {
+    animation: arthaPop 0.45s var(--ease-out) backwards;
+}
+
+/* ---------- 8. Grids: children rise in as they scroll into view ---------- */
+:is(.artha-vault-grid, .artha-ticker-cards, .artha-trust-inner, .artha-firm-stats-row, .artha-calc-option-grid)>* {
+    animation: arthaRise 0.7s var(--ease-out) backwards;
+}
+
+:is(.artha-vault-grid, .artha-ticker-cards, .artha-trust-inner, .artha-firm-stats-row, .artha-calc-option-grid)> :nth-child(2) {
+    animation-delay: 0.08s;
+}
+
+:is(.artha-vault-grid, .artha-ticker-cards, .artha-trust-inner, .artha-firm-stats-row, .artha-calc-option-grid)> :nth-child(3) {
+    animation-delay: 0.16s;
+}
+
+:is(.artha-vault-grid, .artha-ticker-cards, .artha-trust-inner, .artha-firm-stats-row, .artha-calc-option-grid)> :nth-child(4) {
+    animation-delay: 0.24s;
+}
+
+:is(.artha-vault-grid, .artha-ticker-cards, .artha-trust-inner, .artha-firm-stats-row, .artha-calc-option-grid)> :nth-child(n+5) {
+    animation-delay: 0.30s;
+}
+
+/* Where supported, tie the rise to scroll position instead of page load, so
+   below-the-fold grids animate when the visitor actually reaches them.
+   fill-mode stays `backwards` so hover transforms still work afterwards. */
+@supports (animation-timeline: view()) {
+    :is(.artha-vault-grid, .artha-ticker-cards, .artha-trust-inner, .artha-firm-stats-row, .artha-calc-option-grid)>* {
+        animation-timing-function: linear;
+        animation-delay: 0s;
+        animation-timeline: view();
+        animation-range: entry 0% entry 55%;
+    }
+}
+
+/* principle rows: number tints gold, row nudges right */
+.artha-principle-row {
+    transition: padding-left 0.35s var(--ease-out);
+}
+
+.artha-principle-row:hover {
+    padding-left: 8px;
+}
+
+.artha-principle-row:hover .artha-principle-num {
+    color: #1D4ED8;
+}
+
+.artha-principle-num {
+    transition: color 0.3s;
+}
+
+/* ---------- 9. Upload dropzone (add class `is-dragover` from JS on dragenter / dragover) ---------- */
+.artha-dropzone {
+    transition: border-color 0.25s, background-color 0.25s, transform 0.3s var(--ease-out), box-shadow 0.3s;
+}
+
+.artha-dropzone:hover .material-symbols-outlined {
+    transform: translateY(-3px);
+}
+
+.artha-dropzone .material-symbols-outlined {
+    transition: transform 0.3s var(--ease-out);
+    display: inline-block;
+}
+
+.artha-dropzone.is-dragover {
+    border-style: solid;
+    border-color: #1D4ED8;
+    background-color: rgba(29, 78, 216, 0.08);
+    transform: scale(1.012);
+    box-shadow: var(--shadow-glow);
+}
+
+/* ---------- 10. Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+    .artha-hero::before {
+        animation: none;
+    }
+
+    :is(.artha-vault-grid, .artha-ticker-cards, .artha-trust-inner, .artha-firm-stats-row, .artha-calc-option-grid)>* {
+        animation: none;
+    }
+}
+
+@media (max-width: 768px) {
+    .artha-hero::before {
+        animation: none;
+    }
+}
+
+@media (hover: none) {
+    :is(.artha-portal-card, .artha-vault-card, .artha-ticker-card):hover {
+        background-image: none;
+        transform: none;
+    }
+}

@@ -14,6 +14,7 @@ export default function UploadBusiness() {
   const [docs, setDocs] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRefs = useRef({});
   const extraFileRef = useRef(null);
 
@@ -61,7 +62,8 @@ export default function UploadBusiness() {
         const data = await res.json().catch(() => ({}));
         showToast(data.detail || "Upload failed", "error");
       }
-    } catch (err) { console.error(err);
+    } catch (err) {
+      console.error(err);
       showToast("Upload failed due to network error", "error");
     }
   };
@@ -70,7 +72,7 @@ export default function UploadBusiness() {
     setConfirmConfig({
       isOpen: true,
       title: "Delete Document",
-      message: "Delete this document?\nThis action cannot be undone.",
+      message: "Are you sure you want to delete this business document?\nThis action cannot be undone.",
       isDestructive: true,
       confirmText: "Delete",
       onConfirm: async () => {
@@ -83,7 +85,8 @@ export default function UploadBusiness() {
           } else {
             showToast("Delete failed", "error");
           }
-        } catch (err) { console.error(err);
+        } catch (err) {
+          console.error(err);
           showToast("Delete failed", "error");
         }
       }
@@ -99,7 +102,8 @@ export default function UploadBusiness() {
       } else {
         showToast("Could not generate view link", "error");
       }
-    } catch (err) { console.error(err);
+    } catch (err) {
+      console.error(err);
       showToast("Could not generate view link", "error");
     }
   };
@@ -132,16 +136,18 @@ export default function UploadBusiness() {
         body: JSON.stringify({ file_count: docs.length, doc_category: "Business" })
       });
       if (res.ok) {
-        showToast("Documents sent for approval", "success");
+        showToast("Business ledgers & statements transmitted to CPA squad", "success");
       } else {
-        showToast("Failed to send for approval", "error");
+        showToast("Failed to transmit for approval", "error");
       }
-    } catch (err) { console.error(err);
+    } catch (err) {
+      console.error(err);
       showToast("Error sending for approval", "error");
     }
   };
 
-  const years = [new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2];
+  const currentYear = new Date().getFullYear();
+  const years = [currentYear, currentYear - 1, currentYear - 2];
 
   return (
     <div>
@@ -149,45 +155,109 @@ export default function UploadBusiness() {
         {...confirmConfig} 
         onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))} 
       />
-      <div style={{marginBottom: '16px'}}>
-        <Link to="/dashboard" className="fancy-link" style={{fontSize: '14px', fontWeight: 500}}>← Back to Dashboard</Link>
-      </div>
-      <div className="page-heading">
-        <div>
-          <h1>Business Documents</h1>
-          <p className="page-meta">Upload your business tax documents securely</p>
-        </div>
-        <div style={{display:'flex', flexDirection:'column', alignItems:'flex-end', gap:'4px'}}>
-          <label htmlFor="taxYearSelect" className="form-label" style={{margin:0}}>Tax Year</label>
-          <select id="taxYearSelect" 
-            className="select-input" 
-            style={{width:'auto', padding:'8px 14px'}}
-            value={taxYear}
-            onChange={(e) => setTaxYear(e.target.value)}
-          >
-            {years.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
+
+      {/* Top Breadcrumb & Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
+        <Link
+          to="/dashboard"
+          className="artha-pill-btn artha-pill-outline"
+          style={{ padding: '6px 14px', fontSize: '12.5px' }}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>arrow_back</span>
+          Return to Dashboard
+        </Link>
+
+        {/* Tax Year Selector */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '13px', fontWeight: 600, color: '#0A2540' }}>Tax Filing Year:</span>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            {years.map(y => (
+              <button
+                key={y}
+                type="button"
+                className={`artha-pill-btn ${taxYear === y ? 'artha-pill-primary' : 'artha-pill-outline'}`}
+                style={{ padding: '6px 14px', fontSize: '12px' }}
+                onClick={() => setTaxYear(y)}
+              >
+                TY {y}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      <div className="card" style={{marginBottom: '20px'}}>
-        <h3 style={{marginBottom: '16px'}} className="card-title">Required Documents</h3>
-        <div id="docWrapper">
+      {/* Hero Banner */}
+      <div className="artha-portal-hero" style={{ padding: '24px 30px' }}>
+        <div className="artha-portal-hero-left">
+          <div className="artha-eyebrow-pill" style={{ marginBottom: '8px' }}>
+            <span className="dot"></span>
+            CORPORATE &amp; STATUTORY LEDGERS
+          </div>
+          <h1 style={{ fontSize: '26px' }}>Business Documents &amp; Statement Ingestion</h1>
+          <p style={{ fontSize: '14px' }}>
+            Upload raw bank statements, Form 1120-S / 1065 schedules, payroll summaries, and asset ledgers for Tax Year {taxYear}.
+          </p>
+        </div>
+
+        <div className="artha-portal-hero-badges">
+          <div className="artha-portal-badge green">
+            <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>smart_toy</span>
+            <span>AI Statement to P&amp;L Enabled</span>
+          </div>
+          <div className="artha-portal-badge gold">
+            <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>verified</span>
+            <span>{docs.length} File{docs.length === 1 ? '' : 's'} on Record</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Required Documents Section */}
+      <div className="artha-portal-card">
+        <div className="artha-portal-card-header">
+          <div>
+            <h3 className="artha-portal-card-title">
+              <span className="material-symbols-outlined" style={{ color: '#1D4ED8' }}>account_balance</span>
+              Required Business Schedules &amp; Ledgers
+            </h3>
+            <p style={{ fontSize: '13.5px', color: '#425466', margin: '4px 0 0' }}>
+              Standard corporate returns and verification documentation for Form 1120, 1120-S, and 1065 partnerships.
+            </p>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {loading ? (
-            <div className="empty-state">Loading templates...</div>
+            <div style={{ padding: '36px', textAlign: 'center', color: '#425466' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '28px', animation: 'spin 1s infinite' }}>sync</span>
+              <p style={{ marginTop: '8px', fontSize: '13.5px' }}>Loading business requirements for TY {taxYear}...</p>
+            </div>
           ) : templates.length === 0 ? (
-            <div className="empty-state">No required documents for this tax year.</div>
+            <div style={{ padding: '36px', textAlign: 'center', color: '#425466', background: '#F6F9FC', borderRadius: '14px' }}>
+              No statutory templates assigned for this business tax year yet. You can upload custom ledgers in the section below.
+            </div>
           ) : templates.map((dt, i) => {
             const uploaded = docs.filter(d => d.doc_type === dt.name);
             const latestDoc = uploaded[0] || null;
             const isRejected = latestDoc?.review_status === 'rejected';
             const isApproved = latestDoc?.review_status === 'approved';
             const isFiled = latestDoc?.review_status === 'filed';
+
             return (
-              <div 
-                className="doc-slot fade-up" 
-                key={i} 
-                style={{ animationDelay: `${i * 0.04}s`, borderLeft: isRejected ? '3px solid #dc3545' : isApproved || isFiled ? '3px solid #2c7a5b' : 'none' }}
+              <div
+                key={i}
+                style={{
+                  background: isRejected ? '#FFF9F9' : '#FFFFFF',
+                  border: isRejected ? '1px solid rgba(220,38,38,0.3)' : '1px solid rgba(10,37,64,0.08)',
+                  borderLeft: isRejected ? '4px solid #DC2626' : isApproved || isFiled ? '4px solid #047857' : '4px solid rgba(10,37,64,0.15)',
+                  borderRadius: '14px',
+                  padding: '16px 20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '16px',
+                  flexWrap: 'wrap',
+                  transition: 'all 0.2s ease'
+                }}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => {
                   e.preventDefault();
@@ -200,42 +270,60 @@ export default function UploadBusiness() {
                   }
                 }}
               >
-                <div className="doc-slot-info">
-                  <div className="doc-slot-name">{i+1}. {dt.name}</div>
-                  <div className="doc-slot-status">
+                <div style={{ flex: 1, minWidth: '240px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '14.5px', fontWeight: 600, color: '#0A2540' }}>
+                      {i + 1}. {dt.name}
+                    </span>
+                  </div>
+
+                  <div style={{ marginTop: '6px' }}>
                     {isRejected ? (
                       <div>
-                        <span style={{display:'inline-flex', alignItems:'center', gap:'5px', background:'#fdecea', color:'#c0392b', padding:'3px 10px', borderRadius:'20px', fontSize:'12px', fontWeight:700}}>
-                          <span className="material-symbols-outlined" style={{fontSize:'13px'}}>cancel</span> REJECTED
+                        <span className="artha-status-pill artha-status-rejected">
+                          <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>cancel</span>
+                          Rejected by CPA
                         </span>
                         {latestDoc.review_note && (
-                          <div style={{fontSize:'12px', color:'#c0392b', marginTop:'5px', fontStyle:'italic', maxWidth:'260px'}}>
-                            ⚠️ Reason: "{latestDoc.review_note}"
+                          <div style={{ fontSize: '12px', color: '#DC2626', marginTop: '4px', fontStyle: 'italic' }}>
+                            Reason: &ldquo;{latestDoc.review_note}&rdquo;
                           </div>
                         )}
-                        <div style={{fontSize:'11px', color:'var(--muted)', marginTop:'3px'}}>Please correct and re-upload below.</div>
                       </div>
                     ) : isApproved ? (
-                      <span style={{display:'inline-flex', alignItems:'center', gap:'5px', background:'#edf7f2', color:'#2c7a5b', padding:'3px 10px', borderRadius:'20px', fontSize:'12px', fontWeight:700}}>
-                        <span className="material-symbols-outlined" style={{fontSize:'13px'}}>check_circle</span> APPROVED
+                      <span className="artha-status-pill artha-status-approved">
+                        <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>check_circle</span>
+                        Verified &amp; Approved
                       </span>
                     ) : isFiled ? (
-                      <span style={{display:'inline-flex', alignItems:'center', gap:'5px', background:'#edf7f2', color:'#2c7a5b', padding:'3px 10px', borderRadius:'20px', fontSize:'12px', fontWeight:700}}>
-                        <span className="material-symbols-outlined" style={{fontSize:'13px'}}>inventory_2</span> FILED
+                      <span className="artha-status-pill artha-status-approved">
+                        <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>inventory_2</span>
+                        Filed with IRS
                       </span>
                     ) : uploaded.length ? (
-                      <span className="pill-pending"><span className="material-symbols-outlined">pending</span> Pending Review</span>
+                      <span className="artha-status-pill artha-status-pending">
+                        <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>hourglass_top</span>
+                        Under CPA Review
+                      </span>
                     ) : dt.download ? (
-                      <a href={dt.download} target="_blank" rel="noopener noreferrer" className="btn-link" style={{ fontSize: '14px', color: 'var(--emerald)', textDecoration: 'underline' }}>View Template</a>
+                      <a
+                        href={dt.download}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ fontSize: '12.5px', color: '#1D4ED8', textDecoration: 'underline', fontWeight: 500 }}
+                      >
+                        Download Blank Template &rarr;
+                      </a>
                     ) : (
-                      "Missing"
+                      <span style={{ fontSize: '12px', color: '#425466' }}>Pending business upload</span>
                     )}
                   </div>
                 </div>
-                <div className="doc-slot-actions">
-                  <input 
-                    type="file" 
-                    hidden 
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <input
+                    type="file"
+                    hidden
                     accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx,.zip"
                     ref={el => fileInputRefs.current[dt.name] = el}
                     onChange={(e) => {
@@ -245,31 +333,50 @@ export default function UploadBusiness() {
                       }
                     }}
                   />
-                  <div style={{display: 'flex', gap: '8px', alignItems: 'center', flexWrap:'wrap'}}>
-                    {dt.download && (
-                      <a href={dt.download} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm" style={{borderRadius: 'var(--radius-pill)', padding: '4px 12px', display: 'flex', alignItems: 'center', gap: '4px'}}>
-                        <span className="material-symbols-outlined" style={{fontSize: '16px'}}>download</span> Template
-                      </a>
-                    )}
-                    {/* Show Upload button if no doc OR doc is rejected (re-upload allowed) */}
-                    {(!uploaded.length || isRejected) && (
-                      <button
-                        className={`btn btn-sm ${isRejected ? 'btn-primary' : 'btn-upload-pill'}`}
-                        style={isRejected ? {background:'#2c7a5b', borderColor:'#2c7a5b', color:'#fff', borderRadius:'var(--radius-pill)'} : {}}
-                        onClick={() => fileInputRefs.current[dt.name].click()}
-                      >
-                        {isRejected ? '🔄 Re-upload' : 'Upload'}
-                      </button>
-                    )}
-                  </div>
+
+                  {dt.download && (
+                    <a
+                      href={dt.download}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="artha-pill-btn artha-pill-outline"
+                      style={{ padding: '6px 12px', fontSize: '12px' }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>download</span>
+                      Template
+                    </a>
+                  )}
+
+                  {(!uploaded.length || isRejected) && (
+                    <button
+                      className="artha-pill-btn artha-pill-primary"
+                      style={{ padding: '6px 14px', fontSize: '12px' }}
+                      onClick={() => fileInputRefs.current[dt.name].click()}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>upload</span>
+                      {isRejected ? 'Re-upload Schedule' : 'Upload Schedule'}
+                    </button>
+                  )}
+
                   {uploaded.map(doc => (
-                    <div key={doc.id} style={{display:'flex', flexDirection:'column', gap:'8px', alignItems:'flex-end', marginTop:'4px'}}>
-                      <div style={{display:'flex', gap:'8px'}}>
-                        <button className="btn btn-secondary btn-xs" style={{borderRadius:'var(--radius-sm)'}} onClick={() => viewDoc(doc.storage_key)}>View</button>
-                        {!isApproved && !isFiled && (
-                          <button className="btn btn-danger btn-xs" style={{borderRadius:'var(--radius-sm)'}} onClick={() => deleteDoc(doc.id)}>Delete</button>
-                        )}
-                      </div>
+                    <div key={doc.id} style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        className="artha-pill-btn artha-pill-outline"
+                        style={{ padding: '5px 10px', fontSize: '11.5px' }}
+                        onClick={() => viewDoc(doc.storage_key)}
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>visibility</span>
+                        View
+                      </button>
+                      {!isApproved && !isFiled && (
+                        <button
+                          className="artha-pill-btn artha-pill-outline"
+                          style={{ padding: '5px 10px', fontSize: '11.5px', color: '#DC2626', borderColor: 'rgba(220,38,38,0.3)' }}
+                          onClick={() => deleteDoc(doc.id)}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>delete</span>
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -279,83 +386,152 @@ export default function UploadBusiness() {
         </div>
       </div>
 
-      <div className="card">
-        <div className="flex-between" style={{marginBottom: '16px'}}>
+      {/* Additional Business Documents & Bank Statements Dropzone */}
+      <div className="artha-portal-card">
+        <div className="artha-portal-card-header">
           <div>
-            <h3 className="card-title">Additional Documents</h3>
-            <p className="text-sm" style={{marginTop:'2px'}}>Upload any supplementary business documents</p>
+            <h3 className="artha-portal-card-title">
+              <span className="material-symbols-outlined" style={{ color: '#1D4ED8' }}>receipt_long</span>
+              Bank Statements, Ledgers &amp; Receipts Vault
+            </h3>
+            <p style={{ fontSize: '13.5px', color: '#425466', margin: '4px 0 0' }}>
+              Upload raw PDF checking statements, credit card logs, or payroll reports for automated reconciliation.
+            </p>
           </div>
-          <label 
-            className="btn btn-secondary btn-sm" 
-            style={{borderRadius:'var(--radius-sm)', cursor:'pointer'}}
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                extraFileRef.current?.click();
-              }
-            }}
+
+          <label
+            className="artha-pill-btn artha-pill-primary"
+            style={{ padding: '7px 16px', fontSize: '12.5px', cursor: 'pointer' }}
           >
-            + Choose Files
-            <input type="file" multiple hidden accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx,.zip" onChange={handleExtraUpload} />
+            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>add</span>
+            Browse &amp; Add Ledgers
+            <input
+              type="file"
+              multiple
+              hidden
+              accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx,.zip"
+              onChange={handleExtraUpload}
+            />
           </label>
         </div>
 
-        <div 
-          className="drop-area" 
-          style={{ border:'2px dashed #cfc7ad', borderRadius:'var(--radius-md)', padding:'28px 20px', textAlign:'center', cursor:'pointer', background:'var(--card)' }} 
+        {/* Drag Area */}
+        <div
+          className={`artha-dropzone ${isDragOver ? 'is-dragover' : ''}`}
           onClick={() => extraFileRef.current?.click()}
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              extraFileRef.current?.click();
-            }
-          }}
-          onDragOver={(e) => e.preventDefault()}
+          onDragEnter={(e) => { e.preventDefault(); setIsDragOver(true); }}
+          onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+          onDragLeave={() => setIsDragOver(false)}
           onDrop={(e) => {
             e.preventDefault();
+            setIsDragOver(false);
             if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
               const fakeEvent = { target: { files: e.dataTransfer.files } };
               handleExtraUpload(fakeEvent);
             }
           }}
         >
-          <div className="da-icon"><span className="material-symbols-outlined" style={{color: 'var(--brass)', fontSize: '32px'}}>folder</span></div>
-          <div className="da-title" style={{fontWeight: 600, color: 'var(--navy)', fontSize: '14px'}}>Drag & drop files here</div>
-          <div className="da-hint" style={{fontSize: '12px', color: 'var(--muted)'}}>or click to browse · PDF, JPG, PNG, WEBP, DOC, EXCEL · Max 10MB</div>
+          <div
+            style={{
+              width: '52px',
+              height: '52px',
+              borderRadius: '50%',
+              background: 'rgba(29, 78, 216, 0.08)',
+              color: '#1D4ED8',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: '12px'
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '28px' }}>cloud_upload</span>
+          </div>
+          <div style={{ fontSize: '15px', fontWeight: 600, color: '#0A2540', marginBottom: '4px' }}>
+            Drag and drop business ledgers &amp; bank statements here
+          </div>
+          <div style={{ fontSize: '12.5px', color: '#425466' }}>
+            PDF, Excel (XLS/XLSX), CSV, PNG, JPG, ZIP &bull; Max 10MB per file
+          </div>
         </div>
         <input type="file" multiple hidden ref={extraFileRef} onChange={handleExtraUpload} />
 
-        <div className="upload-track mt-12">
-          {docs.filter(d => d.doc_type.startsWith("other")).map(doc => (
-            <div key={doc.id} style={{marginBottom:'6px'}}>
-              <div className="upload-track-item" style={{display:'flex', alignItems:'center', gap:'10px', padding:'8px 12px', borderRadius:'var(--radius-sm)', background:'var(--paper)', fontSize:'13px'}}>
-                <span className="material-symbols-outlined" style={{color:'var(--green)', fontSize:'18px'}}>check_circle</span>
-                <div className="uti-name" style={{flex:1}}>{doc.filename}</div>
-                <button className="btn btn-secondary btn-sm" style={{padding:'4px'}} onClick={() => viewDoc(doc.storage_key)}>
-                  <span className="material-symbols-outlined" style={{fontSize:'16px'}}>visibility</span>
-                </button>
-                <button className="btn btn-danger btn-sm" style={{padding:'4px'}} onClick={() => deleteDoc(doc.id)}>
-                  <span className="material-symbols-outlined" style={{fontSize:'16px'}}>delete</span>
-                </button>
+        {/* Uploaded Extra Documents Tracker */}
+        {docs.filter(d => d.doc_type.startsWith("other")).length > 0 && (
+          <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <h5 style={{ fontSize: '12.5px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#425466', margin: '0 0 6px' }}>
+              Uploaded Supplementary Ledgers ({docs.filter(d => d.doc_type.startsWith("other")).length}):
+            </h5>
+            {docs.filter(d => d.doc_type.startsWith("other")).map(doc => (
+              <div
+                key={doc.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '10px 16px',
+                  borderRadius: '12px',
+                  background: '#F6F9FC',
+                  border: '1px solid rgba(10, 37, 64, 0.07)',
+                  fontSize: '13px'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                  <span className="material-symbols-outlined" style={{ color: '#047857', fontSize: '18px' }}>check_circle</span>
+                  <span style={{ fontWeight: 500, color: '#0A2540', wordBreak: 'break-all' }}>{doc.filename}</span>
+                </div>
+
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button
+                    className="artha-pill-btn artha-pill-outline"
+                    style={{ padding: '4px 10px', fontSize: '11px' }}
+                    onClick={() => viewDoc(doc.storage_key)}
+                  >
+                    View
+                  </button>
+                  <button
+                    className="artha-pill-btn artha-pill-outline"
+                    style={{ padding: '4px 10px', fontSize: '11px', color: '#DC2626', borderColor: 'rgba(220,38,38,0.25)' }}
+                    onClick={() => deleteDoc(doc.id)}
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      <div className="card mt-20" style={{marginTop: '20px'}}>
-        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'16px'}}>
-          <div>
-            <h3 style={{marginBottom:'4px'}} className="card-title">Finished Uploading?</h3>
-            <p className="text-sm" style={{margin:0}}>Send your business documents for review.</p>
-          </div>
-          <button className="btn btn-primary" onClick={notifyComplete}>
-            <span className="material-symbols-outlined">send</span>
-            Send for Approval
-          </button>
+      {/* Completion & Submit Banner */}
+      <div
+        className="artha-portal-card"
+        style={{
+          background: '#0A2540',
+          color: '#FFFFFF',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '18px'
+        }}
+      >
+        <div>
+          <h3 style={{ fontSize: '18px', color: '#FFFFFF', margin: '0 0 4px', fontFamily: 'var(--font-display)' }}>
+            Finished Uploading Business Records?
+          </h3>
+          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', margin: 0 }}>
+            Notify your advisory team that all corporate schedules and bank statements have been uploaded for TY {taxYear}.
+          </p>
         </div>
+
+        <button
+          className="artha-pill-btn artha-pill-primary"
+          style={{ background: '#1D4ED8', borderColor: '#1D4ED8', padding: '10px 22px' }}
+          onClick={notifyComplete}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>send</span>
+          Transmit for CPA Processing
+        </button>
       </div>
     </div>
   );

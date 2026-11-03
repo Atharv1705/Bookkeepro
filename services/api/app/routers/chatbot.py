@@ -22,7 +22,7 @@ from app.models import (
     ChatMessage as DBChatMessage,
 )
 from app.db import get_db
-from app.auth.security import get_current_user, require_admin
+from app.auth.security import get_current_user, require_admin, assert_admin_can_access
 
 logger = logging.getLogger(__name__)
 
@@ -282,6 +282,7 @@ def admin_bulk_action(
     user = db.query(User).filter(User.id == payload.user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    assert_admin_can_access(current_user, user)
 
     action_parts = payload.action.split("_")
     if len(action_parts) != 2 or action_parts[0] not in ("approve", "reject") \

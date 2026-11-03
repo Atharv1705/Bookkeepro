@@ -161,8 +161,37 @@ async def upload_to_storage(file: UploadFile) -> str:
             detail=f"File type not allowed or could not be verified. Allowed: PDF, JPG, PNG, WEBP, DOC, DOCX, XLS, XLSX."
         )
 
-    ext = os.path.splitext(file.filename or "file")[1].lower()
-    object_key = f"{uuid.uuid4().hex}{ext}"
+    MIME_TO_EXT = {
+        "application/pdf": ".pdf",
+        "image/jpeg": ".jpg",
+        "image/png": ".png",
+        "image/webp": ".webp",
+        "application/msword": ".doc",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+        "application/vnd.ms-excel": ".xls",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
+        "application/zip": ".zip",
+        "application/x-zip-compressed": ".zip",
+    }
+    
+    SAFE_EXT_BY_MIME = {
+        "application/pdf": {".pdf"},
+        "image/jpeg": {".jpg", ".jpeg"},
+        "image/png": {".png"},
+        "image/webp": {".webp"},
+        "application/msword": {".doc"},
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": {".docx"},
+        "application/vnd.ms-excel": {".xls"},
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {".xlsx"},
+        "application/zip": {".zip"},
+        "application/x-zip-compressed": {".zip"},
+    }
+
+    safe_ext = MIME_TO_EXT.get(sniffed_mime, ".bin")
+    if ext in SAFE_EXT_BY_MIME.get(sniffed_mime, set()):
+        safe_ext = ext
+
+    object_key = f"{uuid.uuid4().hex}{safe_ext}"
     file_path = UPLOAD_DIR / object_key
 
     try:
@@ -220,7 +249,11 @@ def stream_file(storage_key: str, token: str = Query(...)):
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
 
-    return FileResponse(file_path)
+    headers = {
+        "Content-Disposition": f'attachment; filename="{Path(storage_key).name}"',
+        "X-Content-Type-Options": "nosniff",
+    }
+    return FileResponse(file_path, headers=headers)
 
 
 # ─────────────────────────────────────────────
@@ -355,6 +388,8 @@ def list_admin_documents(
     if current_user.role in [UserRole.admin, UserRole.super_admin]:
         if not user_id:
             raise HTTPException(status_code=400, detail="user_id is required for admin")
+        target_user = crud.get_user_by_id(db, user_id)
+        assert_admin_can_access(current_user, target_user)
         docs = (
             db.query(AdminDocument)
             .filter(AdminDocument.user_id == user_id, AdminDocument.deleted_at == None)
@@ -408,15 +443,7 @@ def delete_admin_document(
         raise HTTPException(status_code=404, detail="Document not found")
 
     target_user = db.query(User).filter(User.id == doc.user_id).first()
-    if not target_user:
-        raise HTTPException(status_code=404, detail="Target user not found")
-
-    # Scope restriction: standard admins can only delete documents for base users
-    if current_user.role == UserRole.admin and target_user.role != UserRole.user:
-        raise HTTPException(
-            status_code=403, 
-            detail="Standard admins can only manage documents for standard users"
-        )
+    assert_admin_can_access(current_user, target_user)
 
     if doc.review_status == "approved":
         raise HTTPException(
@@ -425,10 +452,12 @@ def delete_admin_document(
         )
 
     logger.info(f"Admin {current_user.id} deleting admin document {doc_id}")
-    delete_from_storage(doc.storage_key)
+    storage_key = doc.storage_key
     doc.deleted_at = datetime.utcnow()
     db.commit()
     crud.log_action(db, "delete_admin_doc", user_id=current_user.id, target=f"admin_doc:{doc_id}")
+    if storage_key:
+        delete_from_storage(storage_key)
     return {"deleted": True}
 
 
@@ -789,6 +818,9 @@ async def set_personal_review_status(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
+    target_user = crud.get_user_by_id(db, doc.user_id)
+    assert_admin_can_access(current_user, target_user)
+
     prev_status = doc.review_status
     doc.review_status = payload.status
     doc.review_note   = payload.note
@@ -853,6 +885,9 @@ async def set_business_review_status(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
+    target_user = crud.get_user_by_id(db, doc.user_id)
+    assert_admin_can_access(current_user, target_user)
+
     prev_status = doc.review_status
     doc.review_status = payload.status
     doc.review_note   = payload.note
@@ -915,6 +950,9 @@ def update_personal_extracted_data(
     doc = db.query(PersonalDocument).filter_by(id=doc_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
+
+    target_user = crud.get_user_by_id(db, doc.user_id)
+    assert_admin_can_access(current_user, target_user)
     
     doc.extracted_data = payload.extracted_data
     db.commit()
@@ -935,6 +973,9 @@ def update_business_extracted_data(
     doc = db.query(BusinessDocument).filter_by(id=doc_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
+
+    target_user = crud.get_user_by_id(db, doc.user_id)
+    assert_admin_can_access(current_user, target_user)
     
     doc.extracted_data = payload.extracted_data
     db.commit()
@@ -1073,21 +1114,29 @@ def delete_user_completely(
 
     logger.info(f"Admin {current_user.id} deleting user {user_id}")
 
-    try:
-        for doc in db.query(AdminDocument).filter(AdminDocument.user_id == user_id).all():
-            delete_from_storage(doc.storage_key)
-            db.delete(doc)
+    keys_to_delete = []
 
-        for doc in db.query(AdminDocument).filter(AdminDocument.uploaded_by == user_id).all():
-            delete_from_storage(doc.storage_key)
+    try:
+        # If deleted user is an admin who uploaded documents for other clients, disassociate them rather than deleting client deliverables!
+        db.query(AdminDocument).filter(
+            AdminDocument.uploaded_by == user_id,
+            AdminDocument.user_id != user_id
+        ).update({AdminDocument.uploaded_by: None}, synchronize_session=False)
+
+        # Admin documents belonging to this user
+        for doc in db.query(AdminDocument).filter(AdminDocument.user_id == user_id).all():
+            if doc.storage_key:
+                keys_to_delete.append(doc.storage_key)
             db.delete(doc)
 
         for doc in db.query(PersonalDocument).filter(PersonalDocument.user_id == user_id).all():
-            delete_from_storage(doc.storage_key)
+            if doc.storage_key:
+                keys_to_delete.append(doc.storage_key)
             db.delete(doc)
 
         for doc in db.query(BusinessDocument).filter(BusinessDocument.user_id == user_id).all():
-            delete_from_storage(doc.storage_key)
+            if doc.storage_key:
+                keys_to_delete.append(doc.storage_key)
             db.delete(doc)
 
         # Clean up legacy uploaded_files rows to avoid FK constraint errors on db.delete(user)
@@ -1133,6 +1182,10 @@ def delete_user_completely(
 
         db.delete(user)
         db.commit()
+
+        # Delete physical files ONLY after successful DB commit
+        for k in keys_to_delete:
+            delete_from_storage(k)
     except Exception as e:
         db.rollback()
         logger.error(f"User deletion failed for {user_id}: {e}")
@@ -1345,11 +1398,11 @@ def delete_template(
         except (IndexError, AttributeError):
             key_to_delete = None
 
-    if key_to_delete:
-        delete_from_storage(key_to_delete)
-
     db.delete(record)
     db.commit()
+
+    if key_to_delete:
+        delete_from_storage(key_to_delete)
     return {"deleted": True}
 
 from fastapi.responses import StreamingResponse
@@ -1372,10 +1425,7 @@ def export_user_documents_excel(
     from openpyxl.styles import Font, PatternFill, Alignment
 
     user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    if current_user.role == UserRole.admin and user.role != UserRole.user:
-        raise HTTPException(status_code=403, detail="Admins can only export documents for regular user accounts")
+    assert_admin_can_access(current_user, user)
 
     personal_docs = db.query(PersonalDocument).filter(
         PersonalDocument.user_id == user_id, PersonalDocument.deleted_at == None

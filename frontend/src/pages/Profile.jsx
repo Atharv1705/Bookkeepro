@@ -65,73 +65,206 @@ export default function Profile() {
     }
   };
 
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+
   return (
-    <div style={{ maxWidth: '680px', margin: '0 auto' }}>
-      <button 
-        className="btn btn-secondary btn-sm" 
-        style={{ marginBottom: '16px', display: 'inline-flex', alignItems: 'center', gap: '4px', borderRadius: 'var(--radius-sm)' }} 
-        onClick={() => navigate((user?.role === 'admin' || user?.role === 'super_admin') ? '/admin-dashboard' : '/dashboard')}
-      >
-        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>arrow_back</span>
-        Back to Dashboard
-      </button>
-      <div className="page-heading">
-        <div>
-          <h1>My Profile</h1>
-          <p className="page-meta">Update your name, phone number, or password</p>
+    <div style={{ maxWidth: '720px', margin: '0 auto' }}>
+      {/* Back Button */}
+      <div style={{ marginBottom: '20px' }}>
+        <button
+          className="artha-pill-btn artha-pill-outline"
+          style={{ padding: '6px 14px', fontSize: '12.5px' }}
+          onClick={() => navigate(isAdmin ? '/admin-dashboard' : '/dashboard')}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>arrow_back</span>
+          Return to {isAdmin ? 'Admin Portal' : 'Client Overview'}
+        </button>
+      </div>
+
+      {/* Hero Card */}
+      <div className="artha-portal-hero" style={{ padding: '24px 28px', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div
+            style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #1D4ED8 0%, #14B8A6 100%)',
+              color: '#FFFFFF',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '22px',
+              fontWeight: 700,
+              flexShrink: 0
+            }}
+          >
+            {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <div className="artha-eyebrow-pill" style={{ marginBottom: '4px' }}>
+              <span className="dot"></span>
+              ACCOUNT SETTINGS
+            </div>
+            <h1 style={{ fontSize: '24px', margin: '2px 0 0' }}>{user?.name || 'Account Profile'}</h1>
+            <p style={{ fontSize: '13px', margin: '2px 0 0', color: '#425466' }}>{user?.email}</p>
+          </div>
+        </div>
+
+        <span className={`artha-status-pill ${isAdmin ? 'artha-status-rejected' : 'artha-status-approved'}`}>
+          {user?.role === 'super_admin' ? 'Super Admin' : user?.role === 'admin' ? 'Staff CPA' : 'Verified Client'}
+        </span>
+      </div>
+
+      {/* Account Info Form Card */}
+      <div className="artha-portal-card">
+        <div className="artha-portal-card-header">
+          <h3 className="artha-portal-card-title">
+            <span className="material-symbols-outlined" style={{ color: '#1D4ED8' }}>badge</span>
+            Contact &amp; Identity Information
+          </h3>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#0A2540', marginBottom: '6px' }}>
+              Email Address <span style={{ color: '#425466', fontWeight: 400 }}>(Permanent identifier)</span>
+            </label>
+            <input
+              type="email"
+              readOnly
+              value={user?.email || ''}
+              style={{
+                width: '100%',
+                padding: '11px 14px',
+                borderRadius: '12px',
+                border: '1px solid rgba(10, 37, 64,0.1)',
+                background: '#F6F9FC',
+                color: '#425466',
+                fontSize: '13.5px',
+                outline: 'none',
+                cursor: 'not-allowed'
+              }}
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#0A2540', marginBottom: '6px' }}>
+                Full Legal Name
+              </label>
+              <input
+                type="text"
+                placeholder="First and Last Name"
+                value={formData.name}
+                onChange={e => setFormData({ ...formData, name: e.target.value })}
+                className="artha-form-input"
+                style={{ width: '100%', padding: '11px 14px', fontSize: '13.5px' }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#0A2540', marginBottom: '6px' }}>
+                Primary Phone Number
+              </label>
+              <input
+                type="tel"
+                placeholder="Phone Number"
+                value={formData.phone}
+                onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                className="artha-form-input"
+                style={{ width: '100%', padding: '11px 14px', fontSize: '13.5px' }}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="card" style={{ marginBottom: '20px' }}>
-        <h3 style={{ marginBottom: '20px', paddingBottom: '12px', borderBottom: '1px solid var(--border)' }} className="card-title">Account Info</h3>
-        <div className="form-group">
-          <label className="form-label">Email Address <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(cannot be changed)</span></label>
-          <input type="email" className="input" readOnly value={user?.email || ''} />
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-          <div className="form-group">
-            <label className="form-label">Full Name</label>
-            <input type="text" className="input" placeholder="Your full name" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
+      {/* Security & Password Accordion */}
+      <div className="artha-portal-card">
+        <div
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
+          onClick={() => setShowPwSection(!showPwSection)}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span className="material-symbols-outlined" style={{ color: '#1D4ED8' }}>password</span>
+            <div>
+              <h4 style={{ fontSize: '16px', color: '#0A2540', margin: 0, fontWeight: 600 }}>Security &amp; Password</h4>
+              <p style={{ fontSize: '12.5px', color: '#425466', margin: '2px 0 0' }}>
+                Update your account password or review login credentials
+              </p>
+            </div>
           </div>
-          <div className="form-group">
-            <label className="form-label">Phone Number</label>
-            <input type="tel" className="input" placeholder="+1 (555) 000-0000" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
-          </div>
+          <span className="material-symbols-outlined" style={{ color: '#425466', transition: 'transform 0.2s', transform: showPwSection ? 'rotate(180deg)' : 'none' }}>
+            expand_more
+          </span>
         </div>
-      </div>
-
-      <div className="card" style={{ marginBottom: '24px' }}>
-        <div className="flex-between" style={{ marginBottom: '4px', cursor: 'pointer' }} onClick={() => setShowPwSection(!showPwSection)}>
-          <h3 className="card-title">Change Password</h3>
-          <span style={{ color: 'var(--muted)', fontSize: '18px' }}>{showPwSection ? '▼' : '▶'}</span>
-        </div>
-        <p className="text-sm" style={{ marginBottom: 0 }}>Click to expand and update your password</p>
 
         {showPwSection && (
-          <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid var(--border)' }}>
-            <div className="form-group">
-              <label className="form-label">Current Password</label>
-              <input type="password" className="input" placeholder="Enter current password" value={pwData.currentPw} onChange={e => setPwData({ ...pwData, currentPw: e.target.value })} />
+          <div style={{ marginTop: '18px', paddingTop: '18px', borderTop: '1px solid rgba(10, 37, 64,0.08)', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#0A2540', marginBottom: '4px' }}>
+                Current Password
+              </label>
+              <input
+                type="password"
+                placeholder="Enter current password"
+                value={pwData.currentPw}
+                onChange={e => setPwData({ ...pwData, currentPw: e.target.value })}
+                className="artha-form-input"
+                style={{ width: '100%', padding: '10px 14px', fontSize: '13px' }}
+              />
             </div>
-            <div className="form-group">
-              <label className="form-label">New Password</label>
-              <div className="password-wrap">
-                <input type={showNewPw ? 'text' : 'password'} className="input" placeholder="At least 8 characters" style={{ paddingRight: '56px' }} value={pwData.newPw} onChange={e => setPwData({ ...pwData, newPw: e.target.value })} />
-                <button type="button" className="password-toggle" onClick={() => setShowNewPw(!showNewPw)}>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#0A2540', marginBottom: '4px' }}>
+                New Password (minimum 8 characters)
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showNewPw ? 'text' : 'password'}
+                  placeholder="New secure password"
+                  value={pwData.newPw}
+                  onChange={e => setPwData({ ...pwData, newPw: e.target.value })}
+                  className="artha-form-input"
+                  style={{ width: '100%', padding: '10px 50px 10px 14px', fontSize: '13px' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPw(!showNewPw)}
+                  style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#425466', fontSize: '12px', cursor: 'pointer' }}
+                >
                   {showNewPw ? 'Hide' : 'Show'}
                 </button>
               </div>
             </div>
-            <div className="form-group">
-              <label className="form-label">Confirm New Password</label>
-              <input type="password" className="input" placeholder="Repeat new password" value={pwData.confirmPw} onChange={e => setPwData({ ...pwData, confirmPw: e.target.value })} />
+
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#0A2540', marginBottom: '4px' }}>
+                Confirm New Password
+              </label>
+              <input
+                type="password"
+                placeholder="Repeat new password"
+                value={pwData.confirmPw}
+                onChange={e => setPwData({ ...pwData, confirmPw: e.target.value })}
+                className="artha-form-input"
+                style={{ width: '100%', padding: '10px 14px', fontSize: '13px' }}
+              />
             </div>
           </div>
         )}
       </div>
 
-      <button className="btn btn-primary w-full" style={{ borderRadius: 'var(--radius-sm)' }} onClick={handleSave} disabled={loading}>
-        {loading ? 'Saving...' : 'Save Changes'}
+      {/* Save Button */}
+      <button
+        className="artha-pill-btn artha-pill-primary"
+        style={{ width: '100%', padding: '12px 24px', fontSize: '14px', justifyContent: 'center' }}
+        onClick={handleSave}
+        disabled={loading}
+      >
+        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>save</span>
+        {loading ? 'Saving Profile...' : 'Save Profile Changes'}
       </button>
     </div>
   );

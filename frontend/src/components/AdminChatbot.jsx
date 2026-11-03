@@ -186,7 +186,7 @@ export default function AdminChatbot() {
     } finally {
       setIsTyping(false);
     }
-  }, [messages, authFetch]);
+  }, [messages, authFetch, sessionId]);
 
   const handleSendMessage = (e) => { e.preventDefault(); if (inputText.trim()) sendMessage(inputText.trim()); };
   const handleMenuAsk = (e) => { e.preventDefault(); if (menuInput.trim()) sendMessage(menuInput.trim(), []); };
@@ -278,7 +278,7 @@ export default function AdminChatbot() {
                 {/* Bulk action confirmation card */}
                 {pendingBulk && (
                   <div style={{ background: 'var(--warn-bg)', border: '1px solid var(--warn)', borderRadius: 'var(--radius-sm)', padding: '12px', margin: '8px 0' }}>
-                    <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--warn)', marginBottom: '8px' }}>
+                    <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--amber-text)', marginBottom: '8px' }}>
                       ⚠️ Confirm bulk action
                     </div>
                     <div style={{ fontSize: '13px', marginBottom: '10px' }}>

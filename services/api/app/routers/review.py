@@ -7,7 +7,7 @@ from app.models import AdminDocument, User, UserRole, FilingDeadline
 from app.db import get_db
 from app.utils.emailer import send_email
 from app import crud
-from app.auth.security import get_current_user, require_admin
+from app.auth.security import get_current_user, require_admin, assert_admin_can_access
 from app.schemas import SubmitReviewRequest, NotifyUserRequest, AdminDocResponseRequest
 
 logger = logging.getLogger(__name__)
@@ -32,6 +32,7 @@ async def submit_review(
     user = crud.get_user_by_id(db, payload.user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    assert_admin_can_access(current_user, user)
 
     email_sent = await send_email(
         to=user.email,
@@ -68,6 +69,7 @@ async def notify_user_review(
     user = crud.get_user_by_id(db, payload.user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    assert_admin_can_access(current_user, user)
 
     approved_html = "".join(f"<li>{item}</li>" for item in payload.approved) or "<li>None</li>"
     rejected_html = "".join(f"<li>{item}</li>" for item in payload.rejected) or "<li>None</li>"
@@ -146,6 +148,15 @@ async def admin_doc_response(
             f"belonging to user {doc.user_id}"
         )
         raise HTTPException(status_code=403, detail="Not authorized")
+
+    if doc.review_status != "sent_for_approval":
+        raise HTTPException(
+            status_code=400,
+            detail="Document is not ready for client review. Status must be 'sent_for_approval'."
+        )
+
+    if payload.status not in ("approved", "rejected"):
+        raise HTTPException(status_code=400, detail="Status must be 'approved' or 'rejected'")
         
     doc.review_status = payload.status
     doc.reviewed_at = datetime.utcnow()
@@ -249,10 +260,20 @@ def update_document_status(
     if doc_kind not in model_map:
         raise HTTPException(status_code=400, detail="Invalid doc_kind")
         
+    ALLOWED_STATUSES = {"approved", "rejected", "pending", "sent_for_approval", "uploaded", "filed"}
+    if payload.status not in ALLOWED_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid status '{payload.status}'. Must be one of: {', '.join(sorted(ALLOWED_STATUSES))}"
+        )
+
     doc = db.query(model_map[doc_kind]).filter_by(id=doc_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
-        
+
+    target_user = crud.get_user_by_id(db, doc.user_id)
+    assert_admin_can_access(current_user, target_user)
+
     doc.review_status = payload.status
     if payload.note is not None:
         doc.review_note = payload.note
@@ -313,7 +334,10 @@ def get_filing_deadlines(
     is_admin = current_user.role in ("admin", "super_admin") or (
         hasattr(current_user.role, "value") and current_user.role.value in ("admin", "super_admin")
     )
-    if not is_admin and current_user.id != user_id:
+    if is_admin:
+        target_user = crud.get_user_by_id(db, user_id)
+        assert_admin_can_access(current_user, target_user)
+    elif current_user.id != user_id:
         raise HTTPException(status_code=403, detail="Not authorized to view these deadlines")
 
     from app.models import FilingDeadline
@@ -360,6 +384,9 @@ async def send_return_for_approval(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
+    client = crud.get_user_by_id(db, doc.user_id)
+    assert_admin_can_access(current_user, client)
+
     doc.review_status = "sent_for_approval"
     if payload.note:
         doc.review_note = payload.note
@@ -388,7 +415,6 @@ async def send_return_for_approval(
     db.add(event)
     db.commit()
 
-    client = db.query(User).filter_by(id=doc.user_id).first()
     if client:
         note_html = f"<p><em>{payload.note}</em></p>" if payload.note else ""
         background.add_task(
@@ -428,6 +454,11 @@ async def mark_filing_complete(
     _=Depends(require_admin),
 ):
     """Admin marks all approved docs for a user/year as 'filed'. Sends confirmation email."""
+    client = crud.get_user_by_id(db, payload.user_id)
+    if not client:
+        raise HTTPException(status_code=404, detail="User not found")
+    assert_admin_can_access(current_user, client)
+
     from app.models import PersonalDocument, BusinessDocument
 
     personal_docs = db.query(PersonalDocument).filter(
@@ -455,8 +486,6 @@ async def mark_filing_complete(
         target=f"user:{payload.user_id}",
         detail=f"tax_year:{payload.tax_year} personal:{len(personal_docs)} business:{len(business_docs)}",
     )
-
-    client = crud.get_user_by_id(db, payload.user_id)
     if client:
         note_html = f"<p><em>{payload.note}</em></p>" if payload.note else ""
         background.add_task(

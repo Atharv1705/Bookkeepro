@@ -4,8 +4,8 @@ import ExpandableValue from './ExpandableValue';
 
 const CONFIDENCE_STYLES = {
   high:    { icon: '🟢', color: 'var(--success)',  bg: 'var(--success-bg)' },
-  medium:  { icon: '🟡', color: 'var(--warn)',     bg: 'var(--warn-bg)'    },
-  low:     { icon: '🟠', color: '#d97706',         bg: '#fff7ed'           },
+  medium:  { icon: '🟡', color: 'var(--amber-text)', bg: 'var(--warn-bg)'    },
+  low:     { icon: '🟠', color: '#92600A',         bg: '#FFF8E6'           },
   unknown: { icon: '⚪', color: 'var(--muted)',    bg: 'var(--paper)'      },
 };
 

@@ -11,7 +11,7 @@ body { background: var(--bg); overflow-x: hidden; }
   z-index: 100;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  background: rgba(23, 33, 29, 0.28);
+  background: rgba(10, 37, 64, 0.28);
   border-bottom: 1px solid rgba(255,255,255,0.08);
   transition: background 0.3s ease;
 }
@@ -28,18 +28,18 @@ body { background: var(--bg); overflow-x: hidden; }
 .nav-container {
   width: min(1200px, 96%);
   margin: auto;
-  padding: 18px 12px;
+  padding: 12px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
-#logos { height: clamp(34px, 4.4vw, 44px); width: auto; object-fit: contain; }
+#logos { height: clamp(28px, 3.2vw, 36px); width: auto; object-fit: contain; }
 
-.nav-menu { display: flex; gap: 30px; align-items: center; }
+.nav-menu { display: flex; gap: 24px; align-items: center; }
 .nav-menu a {
   text-decoration: none;
   color: #fff;
-  font-size: 14.5px;
+  font-size: 13.5px;
   font-weight: 500;
   position: relative;
   letter-spacing: 0.01em;
@@ -48,7 +48,7 @@ body { background: var(--bg); overflow-x: hidden; }
   content: '';
   position: absolute;
   width: 0; height: 1.5px;
-  bottom: -5px; left: 0;
+  bottom: -4px; left: 0;
   background-color: var(--brass);
   transition: width 0.25s ease;
 }
@@ -56,17 +56,17 @@ body { background: var(--bg); overflow-x: hidden; }
 .nav-menu a:hover::after { width: 100%; }
 
 .login-btn {
-  padding: 10px 20px;
-  background: var(--brass-dark, #8F6528);
+  padding: 8px 18px;
+  background: var(--brass);
   color: #fff;
   border-radius: var(--radius-sm);
   border: none;
   font-weight: 600;
-  font-size: 13.5px;
+  font-size: 12.5px;
   cursor: pointer;
   transition: background var(--transition), transform 0.12s ease;
 }
-.login-btn:hover { background: #7A5520; }
+.login-btn:hover { background: var(--brass-dark); }
 .login-btn:active { transform: translateY(1px) scale(0.96); }
 
 .desktop-login { display: inline-block; }
@@ -115,7 +115,7 @@ body { background: var(--bg); overflow-x: hidden; }
   align-items: center;
   color: #fff;
   background:
-    linear-gradient(180deg, rgba(15,20,17,0.55) 0%, rgba(15,20,17,0.78) 100%),
+    linear-gradient(180deg, rgba(10,37,64,0.65) 0%, rgba(10,37,64,0.85) 100%),
     url("/images/home-background.webp");
   background-size: cover;
   background-position: center;
@@ -139,7 +139,7 @@ body { background: var(--bg); overflow-x: hidden; }
   font-size: 12.5px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #E4C98A;
+  color: #F5B83D;
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -154,7 +154,7 @@ body { background: var(--bg); overflow-x: hidden; }
   max-width: 780px;
   letter-spacing: -0.01em;
 }
-.hero h1 em { font-style: italic; color: #E4C98A; font-weight: 500; }
+.hero h1 em { font-style: italic; color: var(--blue-bright, #3B82F6); font-weight: 500; }
 .hero p.hero-sub {
   font-size: clamp(16px, 1.6vw, 19px);
   color: rgba(255,255,255,0.78);
@@ -256,7 +256,7 @@ body { background: var(--bg); overflow-x: hidden; }
   overflow: hidden;
   transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
 }
-.service-card:hover { transform: translateY(-5px); box-shadow: var(--shadow-md); border-color: #cfc7ad; }
+.service-card:hover { transform: translateY(-5px); box-shadow: var(--shadow-md); border-color: rgba(29, 78, 216, 0.3); }
 .service-card .service-media { height: 200px; overflow: hidden; }
 .service-card .service-media img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s ease; }
 .service-card:hover .service-media img { transform: scale(1.06); }
@@ -275,6 +275,7 @@ body { background: var(--bg); overflow-x: hidden; }
 
 /* ================= CTA BAND ================= */
 .cta-band {
+  position: relative;
   width: 100%;
   background: var(--ink);
   background-image: var(--ruled);
@@ -282,6 +283,13 @@ body { background: var(--bg); overflow-x: hidden; }
   padding: 70px 24px;
   text-align: center;
   margin-top: 100px;
+}
+.cta-band::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--gradient-brand);
 }
 .cta-band h2 { color: #fff; font-weight: 500; }
 .cta-band p { color: rgba(255,255,255,0.7); max-width: 480px; margin: 14px auto 30px; }
@@ -298,14 +306,14 @@ body { background: var(--bg); overflow-x: hidden; }
   justify-content: center;
   text-align: center;
   background:
-    linear-gradient(180deg, rgba(15,20,17,0.5) 0%, rgba(15,20,17,0.8) 100%),
+    linear-gradient(180deg, rgba(10,37,64,0.6) 0%, rgba(10,37,64,0.85) 100%),
     var(--hero-img, url("/images/home-background.webp"));
   background-size: cover;
   background-position: center;
 }
 .page-hero::before { content: ''; position: absolute; inset: 0; background-image: var(--ruled); opacity: 0.4; }
 .page-hero-inner { position: relative; z-index: 2; }
-.page-hero .eyebrow { color: #E4C98A; justify-content: center; }
+.page-hero .eyebrow { color: #F5B83D; justify-content: center; }
 .page-hero h1 { font-size: clamp(26px, 4.6vw, 44px); font-weight: 500; color: #fff !important; margin-top: 14px; }
 .page-hero p { color: rgba(255,255,255,0.78) !important; margin-top: 12px; max-width: 520px; margin-left: auto; margin-right: auto; }
 
@@ -346,7 +354,7 @@ body { background: var(--bg); overflow-x: hidden; }
 .service-text h2 { font-size: clamp(19px, 2.6vw, 24px); margin-bottom: 14px; }
 .service-text p { line-height: 1.8; font-size: 15px; }
 .list-items { margin-top: 14px; }
-.list-items li { margin-left: 24px; margin-bottom: 6px; color: #3E463F; }
+.list-items li { margin-left: 24px; margin-bottom: 6px; color: #425466; }
 .service-img, .service-img-bl-3 { width: 380px; max-width: 100%; height: 270px; border-radius: var(--radius-md); object-fit: cover; flex-shrink: 0; }
 @media (max-width: 992px) {
   .service-block, .service-block.reverse { flex-direction: column; }
@@ -390,7 +398,7 @@ body { background: var(--bg); overflow-x: hidden; }
   transition: border-color var(--transition), box-shadow var(--transition);
 }
 .contact-form input:focus, .contact-form textarea:focus {
-  outline: none; border-color: var(--emerald); box-shadow: 0 0 0 3px rgba(31,93,70,0.10);
+  outline: none; border-color: var(--emerald); box-shadow: 0 0 0 3px rgba(29, 78, 216,0.10);
 }
 .contact-form button { margin-top: 6px; }
 .email-box { display: flex; align-items: center; margin-top: 18px; gap: 10px; font-size: 14px; color: var(--muted); }
@@ -418,7 +426,7 @@ body { background: var(--bg); overflow-x: hidden; }
 
 .footer-links, .mkt-footer-links { display: flex; flex-direction: column; gap: 10px; }
 .footer-links h3, .footer-contact h3, .mkt-footer-links h3 {
-  color: #E4C98A; margin-bottom: 6px; font-size: 12.5px;
+  color: #F5B83D; margin-bottom: 6px; font-size: 12.5px;
   text-transform: uppercase; letter-spacing: 0.1em; font-family: var(--font-mono); font-weight: 600;
 }
 .footer-links a, .mkt-footer-links a { color: rgba(255,255,255,0.75); font-size: 14.5px; font-weight: 400; transition: color var(--transition); }
@@ -508,4 +516,1765 @@ body { background: var(--bg); overflow-x: hidden; }
     font-size: 10px;
     margin-top: 2px;
   }
+}
+
+/* ============================================================
+   ARTHATAXES DESIGN SYSTEM & SIGNATURE ANIMATIONS
+   Reference: https://arthataxes.com/
+   Color scheme: Warm Eggshell (#F6F9FC), Midnight Navy (#0A2540),
+   Forest/Sage Green (#1D4ED8), Fine Slate (#425466)
+   ============================================================ */
+
+/* --- Pill Buttons --- */
+.artha-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 9999px;
+  padding: 10px 22px;
+  font-family: var(--font-body, 'Inter', sans-serif);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+}
+.artha-pill-primary {
+  background: #1D4ED8;
+  color: #FFFFFF !important;
+  border: 1px solid #1D4ED8;
+  box-shadow: 0 2px 8px rgba(29, 78, 216, 0.24);
+}
+.artha-pill-primary:hover {
+  background: #1E40AF;
+  border-color: #1E40AF;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(29, 78, 216, 0.32);
+}
+.artha-pill-outline {
+  background: #FFFFFF;
+  color: #0A2540 !important;
+  border: 1px solid rgba(10, 37, 64, 0.18);
+  box-shadow: 0 1px 3px rgba(10, 37, 64, 0.04);
+}
+.artha-pill-outline:hover {
+  border-color: #0A2540;
+  background: #F6F9FC;
+  transform: translateY(-1px);
+}
+.artha-pill-dark {
+  background: #0A2540;
+  color: #FFFFFF !important;
+  border: 1px solid #0A2540;
+}
+.artha-pill-dark:hover {
+  background: var(--ink-soft);
+  transform: translateY(-1px);
+}
+.artha-phone-btn {
+  font-family: var(--font-mono, monospace);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* --- Artha Sticky Glass Navbar --- */
+.artha-navbar {
+  position: sticky;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 999;
+  background: rgba(246, 249, 252, 0.94);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(10, 37, 64, 0.08);
+  transition: box-shadow 0.25s ease, border-color 0.25s ease, background-color 0.25s ease, transform 0.25s ease;
+}
+.artha-navbar-solid {
+  background: #F6F9FC !important;
+}
+.artha-nav-container {
+  width: min(1280px, 94%);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+}
+.artha-brand-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
+}
+.artha-brand-mark {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  background: #1D4ED8;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(29, 78, 216, 0.28);
+}
+.artha-brand-logo-img {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  object-fit: cover;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(10, 37, 64, 0.25);
+  transition: transform 0.2s ease;
+}
+.artha-brand-wrap:hover .artha-brand-logo-img {
+  transform: scale(1.05);
+}
+.artha-brand-mark-dark {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.artha-brand-text {
+  display: flex;
+  flex-direction: column;
+}
+.artha-brand-title {
+  font-family: var(--font-display, 'Playfair Display', serif);
+  font-size: 18px;
+  font-weight: 600;
+  color: #0A2540;
+  line-height: 1.15;
+}
+.artha-brand-sub {
+  font-family: var(--font-body, 'Inter', sans-serif);
+  font-size: 11px;
+  color: #425466;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+}
+.artha-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+.artha-nav-links a {
+  text-decoration: none;
+  color: #0A2540;
+  font-size: 14.5px;
+  font-weight: 500;
+  position: relative;
+  transition: color 0.2s ease;
+}
+.artha-nav-links a::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: #1D4ED8;
+  transition: width 0.22s ease;
+}
+.artha-nav-links a:hover {
+  color: #1D4ED8;
+}
+.artha-nav-links a:hover::after {
+  width: 100%;
+}
+.artha-mobile-actions {
+  display: none;
+}
+.artha-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.artha-hamburger {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  flex-direction: column;
+  gap: 5px;
+  padding: 6px;
+}
+.artha-hamburger span {
+  display: block;
+  width: 24px;
+  height: 2px;
+  background: #0A2540;
+  border-radius: 2px;
+  transition: all 0.25s ease;
+}
+.artha-hamburger.open span:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+.artha-hamburger.open span:nth-child(2) {
+  opacity: 0;
+}
+.artha-hamburger.open span:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+@media (max-width: 980px) {
+  .artha-nav-links {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    background: #F6F9FC;
+    border-bottom: 1px solid rgba(10, 37, 64, 0.12);
+    padding: 24px 20px;
+    flex-direction: column;
+    gap: 18px;
+    box-shadow: 0 12px 24px rgba(10, 37, 64, 0.08);
+  }
+  .artha-nav-links.active {
+    display: flex;
+  }
+  .artha-mobile-actions {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: 10px;
+    margin-top: 12px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(10, 37, 64, 0.08);
+  }
+  .artha-mobile-actions .artha-pill-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .artha-nav-actions {
+    display: none;
+  }
+  .artha-hamburger {
+    display: flex;
+  }
+}
+
+/* --- Artha Hero 2-Column Section --- */
+.artha-hero {
+  background: var(--paper, #F6F9FC);
+  padding: 30px 0 40px;
+  position: relative;
+  overflow: hidden;
+}
+.artha-hero-grid {
+  width: min(1280px, 94%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 40px;
+  align-items: center;
+}
+.artha-eyebrow-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  background: rgba(29, 78, 216, 0.09);
+  color: #1D4ED8;
+  font-family: var(--font-body, 'Inter', sans-serif);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 12px;
+}
+.artha-eyebrow-pill .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gradient-brand);
+}
+.artha-hero-title {
+  font-family: var(--font-display, 'Playfair Display', serif);
+  font-size: clamp(23px, 2.3vw, 33px);
+  font-weight: 600;
+  line-height: 1.2;
+  color: #0A2540;
+  letter-spacing: -0.015em;
+  margin-bottom: 14px;
+}
+.artha-hero-title em {
+  font-style: italic;
+  background: var(--gradient-brand);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 600;
+}
+.artha-hero-desc {
+  font-size: 13.5px;
+  color: #425466;
+  line-height: 1.55;
+  max-width: 520px;
+  margin-bottom: 20px;
+}
+.artha-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.artha-hero-contact-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #425466;
+}
+.artha-hero-contact-note a {
+  color: #0A2540;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* --- What We Do Interactive Ticker Card Stack --- */
+.artha-ticker-wrap {
+  background: #FFFFFF;
+  border: 1px solid rgba(10, 37, 64, 0.08);
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: 0 4px 20px -2px rgba(10, 37, 64, 0.04);
+}
+.artha-ticker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(10, 37, 64, 0.06);
+}
+.artha-ticker-tag {
+  font-family: var(--font-mono, monospace);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #1D4ED8;
+}
+.artha-ticker-sub {
+  font-size: 11.5px;
+  color: #425466;
+}
+.artha-ticker-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.artha-ticker-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 14px;
+  border-radius: 12px;
+  background: #F6F9FC;
+  border: 1px solid rgba(10, 37, 64, 0.06);
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.artha-ticker-card:hover {
+  transform: translateY(-2px);
+  background: #FFFFFF;
+  border-color: #1D4ED8;
+  box-shadow: 0 6px 16px -3px rgba(29, 78, 216, 0.1);
+}
+.artha-ticker-card-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.artha-ticker-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: rgba(29, 78, 216, 0.09);
+  color: #1D4ED8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.artha-ticker-icon span.material-symbols-outlined {
+  font-size: 18px;
+}
+.artha-ticker-card:hover .artha-ticker-icon {
+  background: #1D4ED8;
+  color: #FFFFFF;
+}
+.artha-ticker-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #0A2540;
+  margin-bottom: 2px;
+}
+.artha-ticker-desc {
+  font-size: 11.5px;
+  color: #425466;
+  line-height: 1.35;
+}
+.artha-ticker-arrow {
+  color: #8C9BA5;
+  font-size: 18px;
+  transition: transform 0.2s ease, color 0.2s ease;
+  margin-left: 10px;
+  flex-shrink: 0;
+}
+.artha-ticker-card:hover .artha-ticker-arrow {
+  transform: translateX(4px);
+  color: #1D4ED8;
+}
+
+@media (max-width: 980px) {
+  .artha-hero-grid {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+}
+
+/* --- Trust Ribbon --- */
+.artha-trust-strip {
+  background: rgba(255, 255, 255, 0.7);
+  border-top: 1px solid rgba(10, 37, 64, 0.07);
+  border-bottom: 1px solid rgba(10, 37, 64, 0.07);
+  padding: 14px 0;
+}
+.artha-trust-inner {
+  width: min(1280px, 94%);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.artha-trust-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #0A2540;
+}
+.artha-trust-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #ECFDF5;
+  color: #047857;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+}
+
+/* --- Philosophy Dark Split Section --- */
+.artha-philosophy-wrap {
+  width: min(1280px, 94%);
+  margin: 48px auto;
+}
+.artha-philosophy-card {
+  background: #0A2540;
+  border-radius: 22px;
+  padding: clamp(26px, 3vw, 42px);
+  color: #FFFFFF;
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 40px;
+  align-items: center;
+  box-shadow: 0 16px 36px -8px rgba(10, 37, 64, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+.artha-philosophy-card::before {
+  content: '';
+  position: absolute;
+  top: -120px;
+  right: -120px;
+  width: 320px;
+  height: 320px;
+  background: radial-gradient(circle, rgba(29, 78, 216, 0.4) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+.artha-philosophy-tag {
+  font-family: var(--font-mono, monospace);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #3B82F6;
+  font-weight: 600;
+  margin-bottom: 14px;
+  display: block;
+}
+.artha-philosophy-quote {
+  font-family: var(--font-display, 'Playfair Display', serif);
+  font-size: clamp(18px, 1.9vw, 25px);
+  font-style: italic;
+  font-weight: 500;
+  line-height: 1.25;
+  color: #FFFFFF;
+  margin-bottom: 16px;
+}
+.artha-philosophy-desc {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.78);
+  max-width: 520px;
+}
+.artha-principles-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.artha-principle-row {
+  display: flex;
+  gap: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.artha-principle-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.artha-principle-num {
+  font-family: var(--font-mono, monospace);
+  font-size: 14px;
+  font-weight: 600;
+  color: #3B82F6;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+.artha-principle-body h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #FFFFFF;
+  margin: 0 0 3px 0;
+}
+.artha-principle-body p {
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.68);
+  line-height: 1.45;
+  margin: 0;
+}
+
+@media (max-width: 980px) {
+  .artha-philosophy-card {
+    grid-template-columns: 1fr;
+    gap: 36px;
+    padding: 36px 24px;
+  }
+}
+
+/* --- Services Showcase --- */
+.artha-services-section {
+  width: min(1280px, 94%);
+  margin: 48px auto;
+}
+.artha-section-header {
+  text-align: center;
+  max-width: 620px;
+  margin: 0 auto 36px;
+}
+.artha-section-header h2 {
+  font-family: var(--font-display, 'Playfair Display', serif);
+  font-size: clamp(21px, 2.1vw, 28px);
+  font-weight: 600;
+  color: #0A2540;
+  line-height: 1.2;
+  margin-top: 8px;
+}
+.artha-section-header p {
+  font-size: 13.5px;
+  color: #425466;
+  line-height: 1.55;
+  margin-top: 8px;
+}
+.artha-services-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+.artha-service-box {
+  background: #FFFFFF;
+  border: 1px solid rgba(10, 37, 64, 0.08);
+  border-radius: 18px;
+  padding: 22px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 16px -2px rgba(10, 37, 64, 0.03);
+}
+.artha-service-box:hover {
+  transform: translateY(-4px);
+  border-color: rgba(29, 78, 216, 0.4);
+  box-shadow: 0 12px 28px -6px rgba(10, 37, 64, 0.08);
+}
+.artha-service-top {
+  margin-bottom: 18px;
+}
+.artha-service-icon-box {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(29, 78, 216, 0.09);
+  color: #1D4ED8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+.artha-service-box:hover .artha-service-icon-box {
+  background: #1D4ED8;
+  color: #FFFFFF;
+}
+.artha-service-pill-tag {
+  display: inline-block;
+  font-family: var(--font-mono, monospace);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #1D4ED8;
+  background: rgba(29, 78, 216, 0.08);
+  padding: 3px 9px;
+  border-radius: 9999px;
+  margin-bottom: 10px;
+}
+.artha-service-box h3 {
+  font-size: 16.5px;
+  font-weight: 600;
+  color: #0A2540;
+  line-height: 1.3;
+  margin-bottom: 8px;
+}
+.artha-service-box p {
+  font-size: 13px;
+  color: #425466;
+  line-height: 1.55;
+}
+.artha-service-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #1D4ED8;
+  text-decoration: none;
+  transition: gap 0.2s ease;
+  margin-top: 10px;
+}
+.artha-service-box:hover .artha-service-link {
+  gap: 10px;
+}
+
+/* --- Consultation Strategy Booking Block --- */
+.artha-booking-wrap {
+  width: min(1280px, 94%);
+  margin: 48px auto 56px;
+}
+.artha-booking-card {
+  position: relative;
+  overflow: hidden;
+  background: #FFFFFF;
+  border: 1px solid rgba(10, 37, 64, 0.09);
+  border-radius: 22px;
+  padding: clamp(24px, 2.8vw, 38px);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  align-items: center;
+  box-shadow: 0 10px 30px -6px rgba(10, 37, 64, 0.05);
+}
+.artha-booking-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--gradient-brand);
+}
+.artha-booking-left h3 {
+  font-family: var(--font-display, 'Playfair Display', serif);
+  font-size: clamp(20px, 2.1vw, 27px);
+  font-weight: 600;
+  color: #0A2540;
+  line-height: 1.2;
+  margin-bottom: 12px;
+}
+.artha-booking-left p {
+  font-size: 13.5px;
+  color: #425466;
+  line-height: 1.6;
+  margin-bottom: 18px;
+}
+.artha-booking-checklist {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.artha-booking-checklist li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #0A2540;
+  font-weight: 500;
+}
+.artha-booking-checklist .check-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ECFDF5;
+  color: #047857;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.artha-booking-right {
+  background: #F6F9FC;
+  border: 1px solid rgba(10, 37, 64, 0.08);
+  border-radius: 16px;
+  padding: 24px 20px;
+}
+.artha-booking-right h4 {
+  font-size: 15px;
+  font-weight: 600;
+  color: #0A2540;
+  margin-bottom: 4px;
+}
+.artha-booking-right p {
+  font-size: 12px;
+  color: #425466;
+  margin-bottom: 16px;
+}
+.artha-input-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.artha-form-input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(10, 37, 64, 0.15);
+  background: #FFFFFF;
+  font-family: inherit;
+  font-size: 14px;
+  color: #0A2540;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  margin-bottom: 12px;
+}
+.artha-form-input:focus {
+  border-color: #1D4ED8;
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.12);
+}
+
+@media (max-width: 900px) {
+  .artha-booking-card {
+    grid-template-columns: 1fr;
+    gap: 36px;
+    padding: 30px 20px;
+  }
+}
+
+/* --- Artha Midnight 4-Column Footer --- */
+.artha-footer {
+  background: #0A2540;
+  color: #FFFFFF;
+  padding-top: 64px;
+  border-top: 3px solid #1D4ED8;
+}
+.artha-footer-inner {
+  width: min(1280px, 94%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1.35fr 0.9fr 0.85fr 1fr;
+  gap: 44px;
+  padding-bottom: 54px;
+}
+.artha-footer-logo-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.artha-footer-title {
+  font-family: var(--font-display, 'Playfair Display', serif);
+  font-size: 19px;
+  font-weight: 600;
+  color: #FFFFFF;
+  line-height: 1.15;
+}
+.artha-footer-subtitle {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #3B82F6;
+}
+.artha-footer-desc {
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.6;
+  margin-bottom: 20px;
+  max-width: 320px;
+}
+.artha-footer-contact-info p {
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.68);
+  margin-bottom: 6px;
+  line-height: 1.45;
+}
+.artha-footer-contact-info a {
+  color: #FFFFFF;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.artha-footer-heading {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #3B82F6;
+  margin-bottom: 18px;
+}
+.artha-footer-links {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.artha-footer-links a {
+  color: rgba(255, 255, 255, 0.72);
+  text-decoration: none;
+  font-size: 13.5px;
+  transition: color 0.2s ease, transform 0.2s ease;
+  display: inline-block;
+}
+.artha-footer-links a:hover {
+  color: #FFFFFF;
+  transform: translateX(3px);
+}
+.artha-footer-action-col {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.artha-footer-cta-btn {
+  width: 100%;
+}
+.artha-footer-hours {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 16px;
+}
+.artha-hours-phone {
+  font-family: var(--font-mono, monospace);
+  font-size: 15px;
+  font-weight: 600;
+  color: #FFFFFF;
+  margin-bottom: 2px;
+}
+.artha-hours-email {
+  font-size: 12.5px;
+  color: #3B82F6;
+  margin-bottom: 8px;
+}
+.artha-hours-timing {
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.55);
+}
+.artha-footer-bottom {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 20px 0;
+  background: rgba(0, 0, 0, 0.2);
+}
+.artha-footer-bottom-inner {
+  width: min(1280px, 94%);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+}
+.artha-footer-bottom-links {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+
+@media (max-width: 980px) {
+  .artha-footer-inner {
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+  }
+}
+@media (max-width: 640px) {
+  .artha-footer-inner {
+    grid-template-columns: 1fr;
+  }
+  .artha-footer-bottom-inner {
+    flex-direction: column;
+    text-align: center;
+  }
+}
+
+/* --- Editorial Image Containers & Firm Feature --- */
+.artha-service-img-wrap {
+  width: 100%;
+  height: 180px;
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 18px;
+  position: relative;
+  background: #EEF3F9;
+}
+.artha-service-img-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.artha-service-img-wrap::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(10, 37, 64, 0.10) 0%, rgba(10, 37, 64, 0.20) 100%);
+  pointer-events: none;
+}
+.artha-service-box:hover .artha-service-img-wrap img {
+  transform: scale(1.06);
+}
+
+.artha-firm-feature-wrap {
+  width: min(1280px, 94%);
+  margin: 48px auto;
+}
+.artha-firm-feature-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(10, 37, 64, 0.08);
+  border-radius: 22px;
+  padding: clamp(24px, 2.8vw, 38px);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  align-items: center;
+  box-shadow: 0 8px 24px -4px rgba(10, 37, 64, 0.04);
+}
+.artha-firm-img-container {
+  position: relative;
+  width: 100%;
+  height: clamp(260px, 30vw, 360px);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 10px 24px -6px rgba(10, 37, 64, 0.1);
+}
+.artha-firm-img-container::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(10, 37, 64, 0.12) 0%, rgba(10, 37, 64, 0.22) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+.artha-firm-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s ease;
+}
+.artha-firm-img-container:hover .artha-firm-img {
+  transform: scale(1.04);
+}
+.artha-firm-img-badge {
+  position: absolute;
+  z-index: 2;
+  bottom: 14px;
+  left: 14px;
+  background: rgba(10, 37, 64, 0.88);
+  backdrop-filter: blur(8px);
+  color: #FFFFFF;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.artha-firm-img-badge span.material-symbols-outlined {
+  color: #10B981;
+  font-size: 16px;
+}
+.artha-firm-content h2 {
+  font-family: var(--font-display, 'Playfair Display', serif);
+  font-size: clamp(20px, 2vw, 26px);
+  font-weight: 600;
+  color: #0A2540;
+  line-height: 1.2;
+  margin: 8px 0 12px;
+}
+.artha-firm-content p {
+  font-size: 13.5px;
+  color: #425466;
+  line-height: 1.6;
+  margin-bottom: 18px;
+}
+.artha-firm-stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.artha-firm-stat-pill {
+  background: #F6F9FC;
+  border: 1px solid rgba(10, 37, 64, 0.08);
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+}
+.artha-firm-stat-pill strong {
+  font-family: var(--font-mono, monospace);
+  font-size: 20px;
+  color: #1D4ED8;
+  font-weight: 700;
+}
+.artha-firm-stat-pill span {
+  font-size: 11px;
+  color: #425466;
+  margin-top: 2px;
+}
+
+@media (max-width: 900px) {
+  .artha-firm-feature-card {
+    grid-template-columns: 1fr;
+    gap: 36px;
+  }
+}
+
+/* ============================================================
+   ANIMATION KEYFRAMES & INTERACTIVE CPA MODULES
+   ============================================================ */
+
+/* Top Alert Bar */
+.artha-top-alert {
+  background: #0A2540;
+  color: #FFFFFF;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+  padding: 8px 16px;
+  position: relative;
+  z-index: 1001;
+}
+.artha-top-alert-inner {
+  width: min(1280px, 94%);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  text-align: center;
+}
+.artha-alert-badge {
+  background: #1D4ED8;
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  padding: 3px 8px;
+  border-radius: 9999px;
+}
+.artha-top-alert-link {
+  color: #3B82F6;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-weight: 600;
+  transition: color 0.2s ease;
+}
+.artha-top-alert-link:hover {
+  color: #FFFFFF;
+}
+
+/* Floating Animation */
+@keyframes float-gentle {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+.artha-float {
+  animation: float-gentle 4s ease-in-out infinite;
+}
+
+.artha-pill-primary {
+  position: relative;
+  overflow: hidden;
+}
+
+/* --- Interactive Practice Tabs --- */
+.artha-tabs-wrapper {
+  width: min(1280px, 94%);
+  margin: 48px auto;
+}
+.artha-tabs-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+.artha-tab-btn {
+  padding: 8px 18px;
+  border-radius: 9999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid rgba(10, 37, 64, 0.12);
+  background: #FFFFFF;
+  color: #0A2540;
+  transition: all 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.artha-tab-btn:hover {
+  border-color: #1D4ED8;
+  background: #F6F9FC;
+  transform: translateY(-1px);
+}
+.artha-tab-btn.active {
+  background: #0A2540;
+  color: #FFFFFF;
+  border-color: #0A2540;
+  box-shadow: 0 4px 14px rgba(10, 37, 64, 0.2);
+}
+.artha-tab-panel {
+  background: #FFFFFF;
+  border: 1px solid rgba(10, 37, 64, 0.08);
+  border-radius: 22px;
+  padding: clamp(24px, 2.8vw, 38px);
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 36px;
+  align-items: center;
+  box-shadow: 0 12px 32px -8px rgba(10, 37, 64, 0.05);
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.artha-tab-panel-img {
+  width: 100%;
+  height: clamp(240px, 26vw, 320px);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 20px rgba(10, 37, 64, 0.08);
+}
+.artha-tab-panel-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s ease;
+}
+.artha-tab-panel-img:hover img {
+  transform: scale(1.04);
+}
+
+@media (max-width: 900px) {
+  .artha-tab-panel {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+}
+
+/* --- Interactive Tax Diagnostic & Savings Estimator --- */
+.artha-calc-wrapper {
+  width: min(1280px, 94%);
+  margin: 48px auto;
+}
+.artha-calc-card {
+  background: #0A2540;
+  color: #FFFFFF;
+  border-radius: 22px;
+  padding: clamp(26px, 3.2vw, 42px);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 38px;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 20px 42px -10px rgba(10, 37, 64, 0.32);
+}
+.artha-calc-card::before {
+  content: '';
+  position: absolute;
+  top: -100px;
+  right: -100px;
+  width: 320px;
+  height: 320px;
+  background: radial-gradient(circle, rgba(29, 78, 216, 0.45) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+.artha-calc-option-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.artha-calc-pill-opt {
+  padding: 7px 11px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.85);
+  transition: all 0.2s ease;
+}
+.artha-calc-pill-opt:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #FFFFFF;
+}
+.artha-calc-pill-opt.active {
+  background: #1D4ED8;
+  border-color: #1D4ED8;
+  color: #FFFFFF;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(29, 78, 216, 0.4);
+}
+.artha-calc-results {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  padding: 24px 20px;
+  backdrop-filter: blur(8px);
+}
+.artha-calc-stat-figure {
+  font-family: var(--font-mono, monospace);
+  font-size: clamp(24px, 2.8vw, 34px);
+  font-weight: 700;
+  color: #10B981;
+  line-height: 1.1;
+  margin: 8px 0 4px;
+}
+
+@media (max-width: 900px) {
+  .artha-calc-card {
+    grid-template-columns: 1fr;
+    gap: 36px;
+  }
+}
+
+/* --- Interactive FAQ Accordion --- */
+.artha-faq-wrapper {
+  width: min(940px, 94%);
+  margin: 48px auto;
+}
+.artha-faq-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.artha-faq-item {
+  background: #FFFFFF;
+  border: 1px solid rgba(10, 37, 64, 0.08);
+  border-radius: 14px;
+  overflow: hidden;
+  transition: all 0.25s ease;
+  box-shadow: 0 2px 8px rgba(10, 37, 64, 0.03);
+}
+.artha-faq-item.open {
+  border-color: #1D4ED8;
+  box-shadow: 0 6px 18px -4px rgba(29, 78, 216, 0.09);
+}
+.artha-faq-question {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0A2540;
+  user-select: none;
+}
+.artha-faq-chevron {
+  transition: transform 0.25s ease;
+  color: #425466;
+  font-size: 20px;
+}
+.artha-faq-item.open .artha-faq-chevron {
+  transform: rotate(180deg);
+  color: #1D4ED8;
+}
+.artha-faq-answer {
+  padding: 0 20px 16px;
+  font-size: 13px;
+  color: #425466;
+  line-height: 1.6;
+}
+
+/* --- Verified Client Testimonials --- */
+.artha-testimonials-wrapper {
+  width: min(1280px, 94%);
+  margin: 48px auto;
+}
+.artha-testimonials-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+.artha-testimonial-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(10, 37, 64, 0.08);
+  border-radius: 18px;
+  padding: 22px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 4px 14px -2px rgba(10, 37, 64, 0.03);
+  transition: all 0.28s ease;
+}
+.artha-testimonial-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(29, 78, 216, 0.3);
+  box-shadow: 0 12px 24px -6px rgba(10, 37, 64, 0.07);
+}
+.artha-stars {
+  color: #F5B83D;
+  font-size: 14px;
+  letter-spacing: 2px;
+  margin-bottom: 10px;
+}
+.artha-testimonial-quote {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #0A2540;
+  font-style: italic;
+  margin-bottom: 16px;
+}
+.artha-testimonial-author {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.artha-author-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(29, 78, 216, 0.1);
+  color: #1D4ED8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+}
+.artha-author-info h5 {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #0A2540;
+  margin: 0;
+}
+.artha-author-info p {
+  font-size: 11.5px;
+  color: #425466;
+  margin: 2px 0 0;
+}
+
+/* ============================================================
+   ARTHA CPA PORTAL DESIGN SYSTEM (USER & ADMIN END)
+   ============================================================ */
+
+/* --- Executive Portal Sub-Navigation --- */
+.artha-portal-subnav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 4px 0 8px;
+  border-top: 1px solid rgba(10, 37, 64, 0.06);
+  margin-top: 10px;
+}
+.artha-portal-subnav::-webkit-scrollbar {
+  display: none;
+}
+.artha-subnav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #425466;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+.artha-subnav-link:hover {
+  color: #0A2540;
+  background: rgba(10, 37, 64, 0.04);
+}
+.artha-subnav-link.active {
+  color: #1D4ED8;
+  background: rgba(29, 78, 216, 0.09);
+  font-weight: 600;
+}
+
+/* --- Portal Hero Header --- */
+.artha-portal-hero {
+  background: #FFFFFF;
+  border: 1px solid rgba(10, 37, 64, 0.08);
+  border-radius: 18px;
+  padding: clamp(18px, 2.8vw, 28px);
+  margin-bottom: 20px;
+  box-shadow: 0 4px 18px -2px rgba(10, 37, 64, 0.03);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.artha-portal-hero-left h1 {
+  font-family: var(--font-display, 'Playfair Display', serif);
+  font-size: clamp(21px, 2.2vw, 28px);
+  color: #0A2540;
+  margin: 4px 0 2px;
+  line-height: 1.2;
+}
+.artha-portal-hero-left p {
+  color: #425466;
+  font-size: 13.5px;
+  margin: 0;
+}
+.artha-portal-hero-badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.artha-portal-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: #F6F9FC;
+  border: 1px solid rgba(10, 37, 64, 0.1);
+  color: #0A2540;
+}
+.artha-portal-badge.green {
+  background: #ECFDF5;
+  border-color: rgba(4, 120, 87, 0.2);
+  color: #047857;
+}
+.artha-portal-badge.gold {
+  background: #FFF8E6;
+  border-color: rgba(245, 184, 61, 0.3);
+  color: #92600A;
+}
+
+/* --- Portal Cards --- */
+.artha-portal-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(10, 37, 64, 0.08);
+  border-radius: 18px;
+  padding: clamp(18px, 2.6vw, 26px);
+  box-shadow: 0 4px 18px -2px rgba(10, 37, 64, 0.03);
+  transition: box-shadow 0.24s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.24s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.24s cubic-bezier(0.16, 1, 0.3, 1), transform 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  margin-bottom: 20px;
+}
+.artha-portal-card:hover {
+  border-color: rgba(29, 78, 216, 0.25);
+  box-shadow: 0 8px 24px -4px rgba(10, 37, 64, 0.06);
+}
+.artha-portal-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(10, 37, 64, 0.07);
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.artha-portal-card-title {
+  font-family: var(--font-display, 'Playfair Display', serif);
+  font-size: 17.5px;
+  color: #0A2540;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* --- Engagement Agreement Card --- */
+.artha-engagement-box {
+  border-left: 4px solid #1D4ED8;
+  background: #F6F9FC;
+  border-radius: 14px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  border-top: 1px solid rgba(10, 37, 64, 0.07);
+  border-right: 1px solid rgba(10, 37, 64, 0.07);
+  border-bottom: 1px solid rgba(10, 37, 64, 0.07);
+}
+.artha-engagement-check {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+.artha-engagement-check input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #1D4ED8;
+  cursor: pointer;
+}
+
+/* --- Practice Vault Action Hub Cards --- */
+.artha-vault-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 18px;
+  margin-bottom: 22px;
+}
+.artha-vault-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(10, 37, 64, 0.08);
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: 0 4px 16px -2px rgba(10, 37, 64, 0.04);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: all 0.28s ease;
+}
+.artha-vault-card:hover {
+  transform: translateY(-3px);
+  border-color: #1D4ED8;
+  box-shadow: 0 10px 24px -6px rgba(29, 78, 216, 0.1);
+}
+.artha-vault-top {
+  margin-bottom: 16px;
+}
+.artha-vault-icon-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.artha-vault-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: rgba(29, 78, 216, 0.09);
+  color: #1D4ED8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.artha-vault-title {
+  font-family: var(--font-display, 'Playfair Display', serif);
+  font-size: 18px;
+  font-weight: 600;
+  color: #0A2540;
+  margin: 0 0 6px;
+}
+.artha-vault-desc {
+  font-size: 13px;
+  color: #425466;
+  line-height: 1.55;
+  margin-bottom: 14px;
+}
+.artha-vault-bullets {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.artha-vault-bullets li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #0A2540;
+}
+.artha-vault-bullets li span.material-symbols-outlined {
+  color: #047857;
+  font-size: 15px;
+}
+
+/* --- Executive Data Table --- */
+.artha-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid rgba(10, 37, 64, 0.08);
+  border-radius: 14px;
+  background: #FFFFFF;
+}
+.artha-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.artha-table th {
+  background: #F6F9FC;
+  color: #425466;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 11px 14px;
+  border-bottom: 1px solid rgba(10, 37, 64, 0.08);
+  white-space: nowrap;
+}
+.artha-table td {
+  padding: 13px 14px;
+  border-bottom: 1px solid rgba(10, 37, 64, 0.06);
+  font-size: 13px;
+  color: #0A2540;
+  vertical-align: middle;
+}
+.artha-table tr:last-child td {
+  border-bottom: none;
+}
+.artha-table tr:hover td {
+  background: #F6F9FC;
+}
+
+/* --- Status Pills --- */
+.artha-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.artha-status-approved {
+  background: #ECFDF5;
+  color: #047857;
+  border: 1px solid rgba(4, 120, 87, 0.25);
+}
+.artha-status-pending {
+  background: #FFF8E6;
+  color: #92600A;
+  border: 1px solid rgba(245, 184, 61, 0.3);
+}
+.artha-status-sent,
+.artha-status-uploaded {
+  background: #EFF6FF;
+  color: #1D4ED8;
+  border: 1px solid rgba(29, 78, 216, 0.2);
+}
+.artha-status-rejected {
+  background: #FEF2F2;
+  color: #DC2626;
+  border: 1px solid rgba(220, 38, 38, 0.25);
+}
+
+/* --- Modern Stepper for Admin Review --- */
+.artha-stepper-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  background: #F6F9FC;
+  border: 1px solid rgba(10, 37, 64, 0.08);
+  border-radius: 16px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+}
+.artha-step-node {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 9999px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+.artha-step-node.active {
+  background: #1D4ED8;
+  color: #FFFFFF;
+}
+.artha-step-node.completed {
+  background: #ECFDF5;
+  color: #047857;
+}
+.artha-step-circle {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: currentColor;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+}
+.artha-step-node.active .artha-step-circle {
+  background: #FFFFFF;
+  color: #1D4ED8;
+}
+.artha-step-divider {
+  flex: 1;
+  height: 2px;
+  background: rgba(10, 37, 64, 0.1);
+  min-width: 16px;
 }

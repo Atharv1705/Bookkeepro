@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import DOMPurify from 'dompurify';
 import { useToast } from '../context/ToastContext';
 import ConfirmModal from '../components/ConfirmModal';
+import CountUp from '../components/CountUp';
 
 export default function AdminDashboard() {
   const { authFetch, user: currentUser } = useAuth();
@@ -12,7 +13,7 @@ export default function AdminDashboard() {
   const [confirmConfig, setConfirmConfig] = useState({
     isOpen: false, title: "", message: "", confirmText: "OK", isDestructive: false, onConfirm: () => {}
   });
-  // activeTab state removed (unused)
+
   const [stats, setStats] = useState({ total_users: 0, pending_personal: 0, pending_business: 0, admins: 0 });
   const [bookmarks, setBookmarks] = useState([]);
   const [users, setUsers] = useState([]);
@@ -77,7 +78,7 @@ export default function AdminDashboard() {
   const [tplFile, setTplFile] = useState(null);
   const [tplLoading, setTplLoading] = useState(false);
 
-  const [digestHtml, setDigestHtml]   = useState(null);
+  const [digestHtml, setDigestHtml] = useState(null);
   const [digestLoading, setDigestLoading] = useState(false);
 
   const fetchDigest = useCallback(async () => {
@@ -87,7 +88,7 @@ export default function AdminDashboard() {
       if (res.ok) {
         const data = await res.json();
         setDigestHtml(data.digest);
-        showToast("Daily digest generated successfully!", "success");
+        showToast("AI Daily briefing generated successfully!", "success");
       } else {
         const err = await res.json().catch(() => ({}));
         showToast(err.detail || "Failed to generate daily digest", "error");
@@ -125,8 +126,8 @@ export default function AdminDashboard() {
         setBookmarks(payload.bookmarks || []);
       }
       
-      let newUsersArray = users;
-      let adminsCount = stats.admins;
+      let newUsersArray = [];
+      let adminsCount = 0;
       
       if (usersRes.ok) {
         const payload = await usersRes.json();
@@ -144,8 +145,7 @@ export default function AdminDashboard() {
           admins: statsData.admin_accounts 
         });
       } else {
-        // Fallback to local computation if admin-status fails
-        const total    = newUsersArray.length;
+        const total = newUsersArray.length;
         const pendingP = newUsersArray.reduce((acc, u) => acc + (u.pending_personal || 0), 0);
         const pendingB = newUsersArray.reduce((acc, u) => acc + (u.pending_business || 0), 0);
         setStats({ total_users: total, pending_personal: pendingP, pending_business: pendingB, admins: adminsCount });
@@ -202,7 +202,8 @@ export default function AdminDashboard() {
       if (res.ok) {
         setTplName("");
         setTplFile(null);
-        document.getElementById("tplFile").value = "";
+        const fileInput = document.getElementById("tplFile");
+        if (fileInput) fileInput.value = "";
         loadTemplates();
         showToast("Template uploaded successfully", "success");
       } else {
@@ -243,7 +244,6 @@ export default function AdminDashboard() {
   const yearOptions = [currentYear - 1, currentYear, currentYear + 1];
 
   const filteredUsers = users.filter(u => {
-    // Stat Card Filters
     if (userFilter === 'admin' && u.role !== 'admin' && u.role !== 'super_admin') return false;
     if (userFilter === 'pending_personal' && !(u.pending_personal > 0)) return false;
     if (userFilter === 'pending_business' && !(u.pending_business > 0)) return false;
@@ -259,56 +259,254 @@ export default function AdminDashboard() {
       const bPending = (b.pending_personal || 0) + (b.pending_business || 0);
       return bPending - aPending;
     }
-    // Default fallback to ID if created_at is missing
     if (userSort === 'newest') return (b.id || 0) - (a.id || 0);
     if (userSort === 'oldest') return (a.id || 0) - (b.id || 0);
     return 0;
   });
 
   return (
-    <div className="">
+    <div>
       <ConfirmModal 
         {...confirmConfig} 
         onCancel={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))} 
       />
-      <h1 style={{ 
-        margin: '0 0 32px 0', 
-        fontSize: '42px', 
-        fontFamily: 'var(--font-display)',
-        fontWeight: '800', 
-        color: 'var(--ink)', 
-        textAlign: 'center',
-        letterSpacing: '-0.5px'
-      }}>
-        Admin Dashboard <span style={{ color: 'var(--brass)', fontWeight: 600, fontSize: '32px' }}>{tab === 'templates' ? '| Templates' : ''}</span>
-      </h1>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+
+      {/* ================= EXECUTIVE ADMIN HERO ================= */}
+      <section className="dash-hero dash-rise" style={{ '--i': 0, marginBottom: '24px' }}>
+        <div className="dash-hero-content">
+          <div className="dash-hero-eyebrow">
+            <span className="material-symbols-outlined" style={{ fontSize: '15px' }}>verified_user</span>
+            PARTNER &amp; STAFF PRACTICE CONSOLE
+          </div>
+          <h1 className="dash-hero-title">Client Management &amp; Tax Review</h1>
+          <p className="dash-hero-sub">
+            Monitor client document vaults, allocate staff CPAs, review AI statement ingestion, and finalize returns for TY {filterYear}.
+          </p>
+
+          <div className="dash-hero-badges" style={{ marginTop: '18px' }}>
+            <span className="dash-glass-pill">
+              <span className="material-symbols-outlined" style={{ fontSize: '15px', color: '#60A5FA' }}>shield</span>
+              Executive Control
+            </span>
+            <span className="dash-glass-pill">
+              <span className="material-symbols-outlined" style={{ fontSize: '15px', color: '#34D399' }}>verified</span>
+              CPA Workpapers
+            </span>
+            <span className="dash-glass-pill">
+              <span className="material-symbols-outlined" style={{ fontSize: '15px', color: '#C4B5FD' }}>auto_awesome</span>
+              AI Ingestion Active
+            </span>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', zIndex: 1 }}>
+          {/* Tax Year Glass Select */}
+          <select
+            value={filterYear}
+            onChange={(e) => setFilterYear(e.target.value)}
+            className="dash-glass-select dash-focusable"
+            aria-label="Filter Tax Year"
+          >
+            {yearOptions.map(y => (
+              <option key={y} value={y}>Tax Year {y}</option>
+            ))}
+          </select>
+
+          {/* AI Daily Briefing Button */}
+          <button
+            className="dash-hero-ai-btn dash-focusable"
+            onClick={fetchDigest}
+            disabled={digestLoading}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>auto_awesome</span>
+            {digestLoading ? 'Analyzing...' : 'AI Daily Briefing'}
+          </button>
+        </div>
+      </section>
+
+      {/* Daily Digest Drawer / Box */}
+      {digestHtml && (
+        <section className="dash-card dash-digest-drawer" style={{ marginBottom: '24px' }}>
+          <div className="dash-digest-header">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div className="dash-chip dash-chip--violet" style={{ width: '32px', height: '32px' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>auto_awesome</span>
+              </div>
+              <div>
+                <strong style={{ fontSize: '14px', color: '#0A2540' }}>AI Executive Daily Briefing</strong>
+                <span style={{ fontSize: '12px', color: '#6D28D9', marginLeft: '8px', fontWeight: 600 }}>TY {filterYear} Digest</span>
+              </div>
+            </div>
+            <button
+              className="dash-table-action-btn dash-focusable"
+              onClick={() => setDigestHtml(null)}
+              title="Dismiss Briefing"
+              aria-label="Dismiss Briefing"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>close</span>
+            </button>
+          </div>
+          <div
+            style={{ padding: '20px 24px', fontSize: '13.5px', color: '#0A2540', lineHeight: 1.7 }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(digestHtml) }}
+          />
+        </section>
+      )}
+
+      {/* ================= EXECUTIVE KPI METRICS BAR ================= */}
+      <div className="dash-kpis dash-rise" style={{ '--i': 1, marginTop: 0, marginBottom: '24px' }}>
+        {/* Total Clients */}
+        <div
+          className={`dash-card dash-kpi-card dash-kpi-card--blue ${userFilter === 'all' ? 'dash-kpi-card--active' : ''}`}
+          style={{ cursor: 'pointer' }}
+          onClick={() => setUserFilter('all')}
+        >
+          <div className="dash-kpi-bar dash-kpi-bar--blue" />
+          <div className="dash-kpi-top">
+            <span className="dash-kpi-label">Total Clients</span>
+            <div className="dash-chip dash-chip--blue">
+              <span className="material-symbols-outlined">group</span>
+            </div>
+          </div>
+          <div className="dash-kpi-value">
+            <CountUp value={stats.total_users} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px' }}>
+            <span style={{ color: userFilter === 'all' ? '#1D4ED8' : '#425466', fontWeight: 600 }}>
+              {userFilter === 'all' ? 'Active Filter: All' : 'Click to filter all'}
+            </span>
+          </div>
+        </div>
+
+        {/* Pending Personal */}
+        <div
+          className={`dash-card dash-kpi-card dash-kpi-card--amber ${userFilter === 'pending_personal' ? 'dash-kpi-card--active' : ''}`}
+          style={{ cursor: 'pointer' }}
+          onClick={() => setUserFilter('pending_personal')}
+        >
+          <div className="dash-kpi-bar dash-kpi-bar--amber" />
+          <div className="dash-kpi-top">
+            <span className="dash-kpi-label">Pending Personal</span>
+            <div className="dash-chip dash-chip--amber">
+              <span className="material-symbols-outlined">person_search</span>
+            </div>
+          </div>
+          <div className="dash-kpi-value" style={{ color: '#92600A' }}>
+            <CountUp value={stats.pending_personal} />
+            {stats.pending_personal > 0 && <span className="dash-pulse-dot dash-pulse-dot--amber" />}
+          </div>
+          <div style={{ fontSize: '12px', color: '#425466' }}>
+            Awaiting CPA Form Review
+          </div>
+        </div>
+
+        {/* Pending Business */}
+        <div
+          className={`dash-card dash-kpi-card dash-kpi-card--teal ${userFilter === 'pending_business' ? 'dash-kpi-card--active' : ''}`}
+          style={{ cursor: 'pointer' }}
+          onClick={() => setUserFilter('pending_business')}
+        >
+          <div className="dash-kpi-bar dash-kpi-bar--teal" />
+          <div className="dash-kpi-top">
+            <span className="dash-kpi-label">Pending Business</span>
+            <div className="dash-chip dash-chip--teal">
+              <span className="material-symbols-outlined">business_center</span>
+            </div>
+          </div>
+          <div className="dash-kpi-value" style={{ color: '#0D9488' }}>
+            <CountUp value={stats.pending_business} />
+            {stats.pending_business > 0 && <span className="dash-pulse-dot dash-pulse-dot--teal" />}
+          </div>
+          <div style={{ fontSize: '12px', color: '#425466' }}>
+            Bank Statements &amp; Ledgers
+          </div>
+        </div>
+
+        {/* Staff Admins */}
+        <div
+          className={`dash-card dash-kpi-card dash-kpi-card--slate ${userFilter === 'admin' ? 'dash-kpi-card--active' : ''}`}
+          style={{ cursor: 'pointer' }}
+          onClick={() => setUserFilter('admin')}
+        >
+          <div className="dash-kpi-bar dash-kpi-bar--slate" />
+          <div className="dash-kpi-top">
+            <span className="dash-kpi-label">Staff Admins</span>
+            <div className="dash-chip dash-chip--slate">
+              <span className="material-symbols-outlined">admin_panel_settings</span>
+            </div>
+          </div>
+          <div className="dash-kpi-value" style={{ color: '#425466' }}>
+            <CountUp value={stats.admins} />
+          </div>
+          <div style={{ fontSize: '12px', color: '#425466' }}>
+            Active Advisory Accounts
+          </div>
+        </div>
+      </div>
+
+      {/* ================= TAB CONTROLS ================= */}
+      <div className="dash-rise" style={{ '--i': 2, marginBottom: '20px' }}>
+        <div className="dash-tabs" role="tablist">
+          <button
+            role="tab"
+            aria-selected={tab === 'users'}
+            className={`dash-tab-btn ${tab === 'users' ? 'active' : ''}`}
+            onClick={() => setTab('users')}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '17px' }}>group</span>
+            Client Dossiers ({filteredUsers.length})
+          </button>
+
+          <button
+            role="tab"
+            aria-selected={tab === 'bookmarks'}
+            className={`dash-tab-btn ${tab === 'bookmarks' ? 'active' : ''}`}
+            onClick={() => setTab('bookmarks')}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '17px', color: tab === 'bookmarks' ? '#B7791F' : 'inherit' }}>star</span>
+            Bookmarked Vault Documents ({bookmarks.length})
+          </button>
+
+          <button
+            role="tab"
+            aria-selected={tab === 'templates'}
+            className={`dash-tab-btn ${tab === 'templates' ? 'active' : ''}`}
+            onClick={() => setTab('templates')}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '17px' }}>description</span>
+            Statutory Templates &amp; Organizers
+          </button>
+        </div>
+      </div>
+
+      {/* ================= USERS OVERVIEW TAB ================= */}
       {tab === 'users' && (
-          <div style={{ display: 'flex', gap: '12px', width: '100%', maxWidth: '820px', flexWrap: 'wrap' }}>
-            <div className="search-wrap" style={{ flex: 1, minWidth: '180px', position: 'relative' }}>
-              <span className="material-symbols-outlined search-icon" style={{position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', fontSize: '20px'}}>search</span>
-              <input 
-                type="text" 
-                className="search-input" 
-                style={{ width: '100%', padding: '10px 12px 10px 40px', border: '1px solid var(--border)', borderRadius: 'var(--radius-pill)', outline: 'none' }}
-                placeholder="Search by name or email" 
+        <div className="dash-tab-panel">
+          {/* Search & Filter Bar */}
+          <div className="dash-toolbar" style={{ marginBottom: '20px' }}>
+            {/* Search Input */}
+            <div className="dash-input-wrap">
+              <span className="material-symbols-outlined search-icon">search</span>
+              <input
+                type="text"
+                placeholder="Search clients by name, business, or email..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                className="dash-input dash-focusable"
               />
             </div>
 
             {/* Admin Assignment Filter */}
             {isSuperAdmin ? (
-              <select 
-                className="select-input" 
-                style={{ width: 'auto', padding: '10px 16px', borderRadius: 'var(--radius-pill)', border: '1px solid var(--border)', outline: 'none', background: 'white' }}
+              <select
                 value={adminAssignmentFilter}
                 onChange={(e) => setAdminAssignmentFilter(e.target.value)}
-                title="Filter by assigned administrator"
+                className="dash-select dash-focusable"
+                aria-label="Filter by assigned staff administrator"
               >
-                <option value="all">👥 All Administrators</option>
+                <option value="all">👥 All Staff Administrators</option>
                 <option value="unassigned">⚠️ Unassigned Clients</option>
-                <optgroup label="Staff Admins">
+                <optgroup label="Staff CPAs">
                   {staffList.map(s => (
                     <option key={s.id} value={s.id}>
                       {s.name || s.email} ({s.assigned_clients_count || 0} clients)
@@ -317,297 +515,360 @@ export default function AdminDashboard() {
                 </optgroup>
               </select>
             ) : (
-              <select 
-                className="select-input" 
-                style={{ width: 'auto', padding: '10px 16px', borderRadius: 'var(--radius-pill)', border: '1px solid var(--border)', outline: 'none', background: 'white' }}
+              <select
                 value={adminAssignmentFilter}
                 onChange={(e) => setAdminAssignmentFilter(e.target.value)}
+                className="dash-select dash-focusable"
+                aria-label="Filter by assigned administrator"
               >
                 <option value="all">My Assigned Clients</option>
                 <option value="unassigned">Unassigned Clients</option>
               </select>
             )}
 
-            <select 
-              className="select-input" 
-              style={{ width: 'auto', padding: '10px 16px', borderRadius: 'var(--radius-pill)', border: '1px solid var(--border)', outline: 'none', background: 'white' }}
+            {/* Sort Dropdown */}
+            <select
               value={userSort}
               onChange={(e) => setUserSort(e.target.value)}
+              className="dash-select dash-focusable"
+              aria-label="Sort clients"
             >
               <option value="newest">Newest First</option>
               <option value="oldest">Oldest First</option>
-              <option value="highest_pending">Highest Pending</option>
-              <option value="asc">Name (A-Z)</option>
-              <option value="desc">Name (Z-A)</option>
-            </select>
-            <select
-              className="select-input"
-              style={{ width: 'auto', padding: '10px 16px', borderRadius: 'var(--radius-pill)', border: '1px solid var(--border)', outline: 'none', background: 'white' }}
-              value={filterYear}
-              onChange={(e) => setFilterYear(e.target.value)}
-            >
-              <option value={currentYear - 1}>TY {currentYear - 1}</option>
-              <option value={currentYear}>TY {currentYear}</option>
-              <option value={currentYear + 1}>TY {currentYear + 1}</option>
+              <option value="highest_pending">Highest Pending Filings</option>
+              <option value="asc">Name (A &rarr; Z)</option>
+              <option value="desc">Name (Z &rarr; A)</option>
             </select>
           </div>
-        )}
-      </div>
 
-      <div className="tab-bar">
-        <button className={`tab-btn ${tab === 'users' ? 'active' : ''}`} onClick={() => setTab('users')}>
-          <span className="material-symbols-outlined">group</span> Users Overview
-        </button>
-        <button className={`tab-btn ${tab === 'bookmarks' ? 'active' : ''}`} onClick={() => setTab('bookmarks')}>
-          <span className="material-symbols-outlined">star</span> Bookmarks
-        </button>
-        <button className={`tab-btn ${tab === 'templates' ? 'active' : ''}`} onClick={() => setTab('templates')}>
-          <span className="material-symbols-outlined">description</span> Templates
-        </button>
-      </div>
-
-      {/* Users Tab */}
-      
-      {tab === 'bookmarks' && (
-        <div style={{marginTop: '16px'}}>
-          <h2 style={{fontFamily: 'var(--font-display)', fontSize:'28px', fontWeight:700, color:'var(--navy)', marginBottom:'24px', display:'flex', alignItems:'center', gap:'12px', letterSpacing: '-0.5px'}}>
-            <span className="material-symbols-outlined" style={{color:'var(--orange)', fontSize:'32px'}}>star</span>
-            Bookmarked Documents
-          </h2>
-          {bookmarks.length === 0 ? (
-            <div className="card shadow-sm p-lg" style={{textAlign: 'center', padding: '48px 24px'}}>
-              <span className="material-symbols-outlined" style={{fontSize: '48px', color: 'var(--border)'}}>star_border</span>
-              <p style={{color:'var(--text-light)', marginTop: '16px', fontSize: '16px'}}>No bookmarked documents found.</p>
-            </div>
-          ) : (
-            <div className="users-grid" style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px'}}>
-              {bookmarks.map((b) => (
-                <div key={`${b.type}-${b.id}`} className="user-card stagger fade-up" style={{background: 'var(--surface)', padding: '24px', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s', display: 'flex', flexDirection: 'column'}} onClick={() => navigate(`/admin-user-detail?user_id=${b.user_id}`)}
-                onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.1)'; }}
-                onMouseOut={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.05)'; }}
-                >
-                  <div className="user-top" style={{alignItems: 'flex-start', display: 'flex', gap: '16px'}}>
-                    <div className="user-avatar" style={{background: 'var(--orange-light)', color: 'var(--orange)', borderRadius: '12px', width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0}}>
-                      <span className="material-symbols-outlined" style={{fontSize: '24px'}}>description</span>
-                    </div>
-                    <div className="user-info" style={{flex: 1}}>
-                      <div className="u-name" style={{fontSize: '16px', fontWeight: 700, color: 'var(--navy)', wordBreak: 'break-word'}}>{b.filename || b.doc_name}</div>
-                      <div className="u-email" style={{fontSize: '14px', color: 'var(--muted)', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px'}}>
-                         <span className="material-symbols-outlined" style={{fontSize:'16px'}}>person</span> {b.user_name}
-                      </div>
+          {/* Client Cards Grid */}
+          {loading ? (
+            <div className="dash-clients-grid">
+              {[1, 2, 3, 4, 5, 6].map(n => (
+                <div key={n} className="dash-card dash-client-card" style={{ height: '180px' }}>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <div className="dash-skeleton" style={{ width: '44px', height: '44px', borderRadius: '50%' }} />
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div className="dash-skeleton" style={{ height: '16px', width: '60%' }} />
+                      <div className="dash-skeleton" style={{ height: '13px', width: '80%' }} />
                     </div>
                   </div>
-                  <div className="user-bottom" style={{marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px'}}>
-                    <span className={`badge ${b.type === 'personal' ? 'badge-blue' : b.type === 'business' ? 'badge-green' : 'badge-gray'}`} style={{textTransform:'uppercase', fontSize: '12px'}}>
-                      {b.type}
-                    </span>
-                    <span className="badge badge-gray" style={{fontSize: '12px', background: 'white', border: '1px solid var(--border)', color: 'var(--text-light)'}}>
-                       <span className="material-symbols-outlined" style={{fontSize:'14px', verticalAlign:'middle', marginRight: '4px'}}>calendar_today</span>
-                       {new Date(b.uploaded_at).toLocaleDateString()}
-                    </span>
-                    <span style={{flex: 1}}></span>
-                    <span className="material-symbols-outlined" style={{color: 'var(--orange)', fontSize: '20px'}}>arrow_forward</span>
-                  </div>
+                  <div className="dash-skeleton" style={{ height: '32px', width: '100%', borderRadius: '8px' }} />
                 </div>
               ))}
             </div>
-          )}
-        </div>
-      )}
-      {tab === 'users' && (
-        <>
-          {/* Daily Digest */}
-          <div className="card" style={{ marginBottom: '20px', background: 'var(--emerald-light)', border: '1px solid rgba(31,93,70,0.2)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span className="material-symbols-outlined" style={{ color: 'var(--emerald)', fontSize: '22px' }}>auto_awesome</span>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--navy)' }}>AI Daily Digest</div>
-                  <div style={{ fontSize: '12px', color: 'var(--muted)' }}>Plain-English summary of today's activity</div>
-                </div>
+          ) : filteredUsers.length === 0 ? (
+            <div className="dash-card dash-empty-state">
+              <div className="dash-empty-icon">
+                <span className="material-symbols-outlined" style={{ fontSize: '28px' }}>search_off</span>
               </div>
-              <button className="btn btn-secondary btn-sm" onClick={fetchDigest} disabled={digestLoading} style={{ borderRadius: 'var(--radius-sm)' }}>
-                {digestLoading ? 'Generating…' : '✨ Generate Digest'}
-              </button>
+              <h4 style={{ fontSize: '16px', color: '#0A2540', margin: 0 }}>No matching clients found</h4>
+              <p style={{ fontSize: '13px', color: '#425466', maxWidth: '440px', margin: 0 }}>
+                Try adjusting your search criteria, tax year, or staff filter.
+              </p>
             </div>
-            {digestHtml && (
-              <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(31,93,70,0.2)', fontSize: '13px', color: 'var(--navy)', lineHeight: '1.7' }}
-                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(digestHtml) }} />
-            )}
-          </div>
+          ) : (
+            <div className="dash-clients-grid">
+              {filteredUsers.map((u, idx) => {
+                const avatarVariant = (u.id || 0) % 4;
+                const avatarClasses = [
+                  'dash-avatar--brand',
+                  'dash-avatar--success',
+                  'dash-avatar--ai',
+                  'dash-avatar--warm'
+                ];
+                const avatarClass = avatarClasses[avatarVariant];
 
-          {/* Stats Bar */}
-          <div className="admin-stats">
-            <div className={`stat-card accent-blue ${userFilter === 'all' ? 'active-filter' : ''}`} onClick={() => setUserFilter('all')} style={{ cursor: 'pointer', border: userFilter === 'all' ? '2px solid var(--blue)' : 'none' }}>
-              <div className="stat-icon"><span className="material-symbols-outlined">group</span></div>
-              <div className="stat-value">{stats.total_users}</div>
-              <div className="stat-label">Total Users</div>
-            </div>
-            <div className={`stat-card accent-green ${userFilter === 'admin' ? 'active-filter' : ''}`} onClick={() => setUserFilter('admin')} style={{ cursor: 'pointer', border: userFilter === 'admin' ? '2px solid var(--green)' : 'none' }}>
-              <div className="stat-icon"><span className="material-symbols-outlined">security</span></div>
-              <div className="stat-value">{stats.admins}</div>
-              <div className="stat-label">Admin Accounts</div>
-            </div>
-            <div className={`stat-card accent-orange ${userFilter === 'pending_personal' ? 'active-filter' : ''}`} onClick={() => setUserFilter('pending_personal')} style={{ cursor: 'pointer', border: userFilter === 'pending_personal' ? '2px solid var(--orange)' : 'none' }}>
-              <div className="stat-icon"><span className="material-symbols-outlined">description</span></div>
-              <div className="stat-value">{stats.pending_personal}</div>
-              <div className="stat-label">Pending Personal</div>
-            </div>
-            <div className={`stat-card accent-orange ${userFilter === 'pending_business' ? 'active-filter' : ''}`} onClick={() => setUserFilter('pending_business')} style={{ cursor: 'pointer', border: userFilter === 'pending_business' ? '2px solid var(--orange)' : 'none' }}>
-              <div className="stat-icon"><span className="material-symbols-outlined">business</span></div>
-              <div className="stat-value">{stats.pending_business}</div>
-              <div className="stat-label">Pending Business</div>
-            </div>
-          </div>
+                return (
+                  <div
+                    key={u.id}
+                    className="dash-card dash-client-card dash-rise"
+                    style={{ '--i': idx, cursor: 'pointer' }}
+                    onClick={() => navigate(`/admin-user-detail?user_id=${u.id}`)}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+                      <div className={`dash-avatar ${avatarClass}`}>
+                        {(u.name || "U").charAt(0).toUpperCase()}
+                      </div>
 
-          {/* User Grid */}
-          <div className="users-grid">
-            {loading ? (
-              <div className="empty-state" style={{ gridColumn: '1/-1' }}>
-                <div className="empty-icon"><span className="material-symbols-outlined">pending</span></div>
-                <div className="empty-title">Loading users...</div>
-              </div>
-            ) : filteredUsers.length === 0 ? (
-              <div className="empty-state" style={{ gridColumn: '1/-1' }}>
-                <div className="empty-title">No users found</div>
-              </div>
-            ) : (
-              filteredUsers.map(u => (
-                <div key={u.id} className="user-card stagger fade-up" onClick={() => navigate(`/admin-user-detail?user_id=${u.id}`)}>
-                  <div className="user-top">
-                    <div className="user-avatar">{(u.name || "U").charAt(0).toUpperCase()}</div>
-                    <div className="user-info">
-                      <div className="u-name">{u.name || "—"}</div>
-                      <div className="u-email">{u.email || "—"}</div>
-                    </div>
-                  </div>
-                  <div className="user-bottom" style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'stretch' }}>
-                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-                      <span className={`badge role-badge ${u.role === 'super_admin' ? 'badge-red' : u.role === 'admin' ? 'badge-orange' : 'badge-blue'}`}>
-                        {u.role}
-                      </span>
-                      {u.pending_personal > 0 && (
-                        <span className="badge badge-orange pulse" style={{ cursor: 'default' }}>
-                          <span className="material-symbols-outlined" style={{fontSize:'12px', verticalAlign:'middle'}}>description</span>
-                          {' '}{u.pending_personal} personal
-                        </span>
-                      )}
-                      {u.pending_business > 0 && (
-                        <span className="badge badge-orange pulse" style={{ cursor: 'default' }}>
-                          <span className="material-symbols-outlined" style={{fontSize:'12px', verticalAlign:'middle'}}>business</span>
-                          {' '}{u.pending_business} business
-                        </span>
-                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: '15px', color: '#0A2540', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {u.name || "Unnamed Client"}
+                        </div>
+                        <div style={{ fontSize: '13px', color: '#425466', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '2px' }}>
+                          {u.email}
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '10px' }}>
+                          <span className={`dash-pill ${u.role === 'super_admin' ? 'dash-pill--rejected' : u.role === 'admin' ? 'dash-pill--pending' : 'dash-pill--approved'}`}>
+                            {u.role === 'super_admin' ? 'Super Admin' : u.role === 'admin' ? 'Staff CPA' : 'Client'}
+                          </span>
+
+                          {u.pending_personal > 0 && (
+                            <span className="dash-pill dash-pill--pending">
+                              {u.pending_personal} Personal
+                            </span>
+                          )}
+                          {u.pending_business > 0 && (
+                            <span className="dash-pill" style={{ background: 'rgba(20, 184, 166, 0.12)', color: '#0D9488', border: '1px solid rgba(20, 184, 166, 0.28)' }}>
+                              {u.pending_business} Business
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
-                    {u.role === 'user' && (
-                      <div style={{ paddingTop: '8px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', fontSize: '12px' }}>
-                        <span style={{ color: u.assigned_admin_name ? 'var(--navy)' : 'var(--orange)', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 500 }}>
-                          <span className="material-symbols-outlined" style={{ fontSize: '15px', color: u.assigned_admin_name ? 'var(--blue)' : 'var(--orange)' }}>
+                    {/* Card Bottom: Assigned CPA + Action Link */}
+                    <div className="dash-client-footer">
+                      {isSuperAdmin ? (
+                        <div className="dash-cpa-assign" onClick={(e) => e.stopPropagation()}>
+                          <span
+                            className="material-symbols-outlined dash-cpa-icon"
+                            style={{ color: u.assigned_admin_name ? '#047857' : '#B7791F' }}
+                            title={u.assigned_admin_name ? `Assigned to ${u.assigned_admin_name}` : 'Unassigned'}
+                          >
                             {u.assigned_admin_name ? 'assignment_ind' : 'person_alert'}
                           </span>
-                          {u.assigned_admin_name ? u.assigned_admin_name : 'Unassigned'}
-                        </span>
-
-                        {isSuperAdmin && (
                           <select
-                            className="select-input"
-                            style={{
-                              padding: '2px 8px',
-                              fontSize: '11px',
-                              borderRadius: 'var(--radius-sm)',
-                              background: 'white',
-                              border: '1px solid var(--border)',
-                              cursor: 'pointer',
-                              maxWidth: '135px',
-                              position: 'relative',
-                              zIndex: 5
-                            }}
                             value={u.assigned_admin_id || ""}
-                            onClick={(e) => e.stopPropagation()}
                             onChange={(e) => {
                               e.stopPropagation();
                               handleAssignAdmin(u.id, e.target.value);
                             }}
-                            title="Assign client to admin"
+                            className="dash-cpa-select dash-focusable"
+                            aria-label={`Assign CPA for ${u.name || u.email}`}
                           >
-                            <option value="">-- Unassigned --</option>
+                            <option value="">Unassigned</option>
                             {staffList.map(s => (
                               <option key={s.id} value={s.id}>
                                 {s.name || s.email}
                               </option>
                             ))}
                           </select>
-                        )}
-                      </div>
-                    )}
+                        </div>
+                      ) : (
+                        <div className="dash-cpa-badge">
+                          <span
+                            className="material-symbols-outlined dash-cpa-icon"
+                            style={{ color: u.assigned_admin_name ? '#047857' : '#B7791F' }}
+                          >
+                            {u.assigned_admin_name ? 'assignment_ind' : 'person_alert'}
+                          </span>
+                          <span
+                            className="dash-cpa-label"
+                            style={{ color: u.assigned_admin_name ? '#0A2540' : '#92600A' }}
+                          >
+                            {u.assigned_admin_name || 'Unassigned'}
+                          </span>
+                        </div>
+                      )}
+
+                      <span className="dash-open-btn">
+                        <span>Open</span>
+                        <span className="material-symbols-outlined dash-open-arrow">arrow_forward</span>
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))
-            )}
-          </div>
-        </>
+                );
+              })}
+            </div>
+          )}
+        </div>
       )}
 
-      {/* Templates Tab */}
-      {tab === 'templates' && (
-        <div className="card" style={{ marginTop: '20px' }}>
-          <h3>Manage Required Templates</h3>
-          <p className="text-sm" style={{ color: 'var(--muted)', marginBottom: '20px' }}>Upload new templates for users to download.</p>
-          
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
-            <select className="select-input" style={{ width: 'auto' }} value={tplCategory} onChange={(e) => setTplCategory(e.target.value)}>
-              <option value="personal">Personal</option>
-              <option value="business">Business</option>
-            </select>
-            <select className="select-input" style={{ width: 'auto' }} value={tplYear} onChange={(e) => setTplYear(e.target.value)}>
-              {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
-          </div>
+      {/* ================= BOOKMARKS TAB ================= */}
+      {tab === 'bookmarks' && (
+        <div className="dash-tab-panel">
+          <div className="dash-card" style={{ padding: '24px 26px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap', marginBottom: '20px' }}>
+              <div>
+                <h3 style={{ fontFamily: "var(--font-display, 'Playfair Display', serif)", fontSize: '18px', color: '#0A2540', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="material-symbols-outlined" style={{ color: '#B7791F', fontSize: '22px' }}>star</span>
+                  Bookmarked Vault Documents
+                </h3>
+                <span style={{ fontSize: '13px', color: '#425466' }}>
+                  Starred items across all active client returns
+                </span>
+              </div>
+              <div style={{ fontSize: '12px', color: '#425466', fontFamily: 'var(--font-mono, monospace)', fontWeight: 600 }}>
+                {bookmarks.length} starred document{bookmarks.length === 1 ? '' : 's'}
+              </div>
+            </div>
 
-          <div style={{ marginTop: '20px', minHeight: '150px' }}>
-            {tplLoading ? (
-              <div className="text-muted">Loading templates...</div>
-            ) : templates.length === 0 ? (
-              <p className="text-muted">No templates found for {tplCategory} {tplYear}.</p>
-            ) : (
-              templates.map(t => (
-                <div key={t.id} className="card-flat" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <div>
-                    <h5 style={{ marginBottom: '4px' }}>{t.name}</h5>
-                    {t.download ? (
-                      <a href={t.download} target="_blank" rel="noreferrer" className="text-sm" style={{ color: 'var(--blue)' }}>View File</a>
-                    ) : (
-                      <span className="text-sm text-muted">No file</span>
-                    )}
-                  </div>
-                  <button className="btn btn-danger btn-sm" onClick={() => deleteTemplate(t.id)}>Delete</button>
+            {bookmarks.length === 0 ? (
+              <div className="dash-empty-state">
+                <div className="dash-empty-icon" style={{ color: '#B7791F', background: '#FFF8E6' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '28px' }}>star_border</span>
                 </div>
-              ))
+                <h4 style={{ fontSize: '16px', color: '#0A2540', margin: 0 }}>No Documents Starred</h4>
+                <p style={{ fontSize: '13px', color: '#425466', maxWidth: '440px', margin: 0 }}>
+                  Bookmark critical schedules in any client dossier for rapid access.
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+                {bookmarks.map((b) => (
+                  <div
+                    key={`${b.type}-${b.id}`}
+                    className="dash-row-card"
+                    style={{ cursor: 'pointer', flexDirection: 'column', alignItems: 'stretch', gap: '12px' }}
+                    onClick={() => navigate(`/admin-user-detail?user_id=${b.user_id}`)}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                      <div className="dash-chip dash-chip--blue" style={{ width: '32px', height: '32px' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>description</span>
+                      </div>
+                      <span style={{ fontWeight: 600, fontSize: '13.5px', color: '#0A2540', wordBreak: 'break-word', flex: 1 }}>
+                        {b.filename || b.doc_name}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#425466' }}>
+                      Client: <strong style={{ color: '#0A2540' }}>{b.user_name}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #E2E8F0', paddingTop: '10px', marginTop: '4px' }}>
+                      <span className="dash-pill dash-pill--info">{b.type}</span>
+                      <span className="dash-open-btn">
+                        <span>Open</span>
+                        <span className="material-symbols-outlined dash-open-arrow">arrow_forward</span>
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
+        </div>
+      )}
 
-          <hr style={{ margin: '24px 0', borderTop: '1px solid var(--border)' }} />
+      {/* ================= TEMPLATES TAB ================= */}
+      {tab === 'templates' && (
+        <div className="dash-tab-panel">
+          <div className="dash-card" style={{ padding: '24px 26px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap', marginBottom: '24px' }}>
+              <div>
+                <h3 style={{ fontFamily: "var(--font-display, 'Playfair Display', serif)", fontSize: '18px', color: '#0A2540', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="material-symbols-outlined" style={{ color: '#1D4ED8', fontSize: '22px' }}>description</span>
+                  Official Statutory Templates &amp; Worksheets
+                </h3>
+                <p style={{ fontSize: '13px', color: '#425466', margin: 0 }}>
+                  Upload blank organizers, deduction checklists, and engagement PDFs available to all active clients.
+                </p>
+              </div>
 
-          <h4 style={{ marginBottom: '12px' }}>Upload New Template</h4>
-          <form onSubmit={handleTplUpload} style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '400px' }}>
-            <input 
-              type="text" 
-              className="input" 
-              placeholder="Template Name (e.g. Individual Tax Organizer)" 
-              value={tplName}
-              onChange={(e) => setTplName(e.target.value)}
-              required 
-            />
-            <input 
-              type="file" 
-              id="tplFile"
-              className="input" 
-              accept=".pdf,.doc,.docx"
-              onChange={(e) => setTplFile(e.target.files[0])}
-            />
-            <button type="submit" className="btn btn-primary" style={{borderRadius: 'var(--radius-sm)'}}>Upload Template</button>
-          </form>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <select
+                  value={tplCategory}
+                  onChange={(e) => setTplCategory(e.target.value)}
+                  className="dash-select dash-focusable"
+                  style={{ height: '38px', fontSize: '12.5px' }}
+                >
+                  <option value="personal">Personal Documents</option>
+                  <option value="business">Business Documents</option>
+                </select>
+
+                <select
+                  value={tplYear}
+                  onChange={(e) => setTplYear(e.target.value)}
+                  className="dash-select dash-focusable"
+                  style={{ height: '38px', fontSize: '12.5px' }}
+                >
+                  {yearOptions.map(y => (
+                    <option key={y} value={y}>Tax Year {y}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Active Templates List */}
+            <div style={{ marginBottom: '28px' }}>
+              <h5 style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#425466', marginBottom: '12px', fontWeight: 600 }}>
+                Active Templates on File:
+              </h5>
+
+              {tplLoading ? (
+                <div style={{ padding: '24px', textAlign: 'center', color: '#425466' }}>
+                  <div className="dash-skeleton" style={{ height: '48px', width: '100%', marginBottom: '8px' }} />
+                  <div className="dash-skeleton" style={{ height: '48px', width: '100%' }} />
+                </div>
+              ) : templates.length === 0 ? (
+                <div className="dash-empty-state" style={{ padding: '28px 16px', background: '#F6F9FC', borderRadius: '12px' }}>
+                  <p style={{ fontSize: '13.5px', color: '#425466', margin: 0 }}>
+                    No templates configured for {tplCategory} TY {tplYear}.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {templates.map(t => (
+                    <div
+                      key={t.id}
+                      className="dash-row-card"
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div className="dash-chip dash-chip--blue" style={{ width: '36px', height: '36px' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>picture_as_pdf</span>
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: '14px', color: '#0A2540' }}>{t.name}</div>
+                          {t.download ? (
+                            <a href={t.download} target="_blank" rel="noreferrer" style={{ fontSize: '12px', color: '#1D4ED8', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                              <span>View Current PDF</span>
+                              <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>open_in_new</span>
+                            </a>
+                          ) : (
+                            <span style={{ fontSize: '12px', color: '#425466' }}>No file attached</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        className="dash-table-action-btn dash-focusable"
+                        style={{ color: '#DC2626', borderColor: 'rgba(220,38,38,0.25)', borderRadius: '8px' }}
+                        onClick={() => deleteTemplate(t.id)}
+                        title="Delete Template"
+                        aria-label={`Delete ${t.name}`}
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>delete</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Upload New Template Form */}
+            <div style={{ background: '#F6F9FC', border: '1px solid #E2E8F0', borderRadius: '16px', padding: '22px' }}>
+              <h4 style={{ fontSize: '15px', color: '#0A2540', margin: '0 0 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="material-symbols-outlined" style={{ color: '#1D4ED8', fontSize: '18px' }}>cloud_upload</span>
+                Upload New Template Worksheet
+              </h4>
+              <form onSubmit={handleTplUpload} style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxWidth: '440px' }}>
+                <input
+                  type="text"
+                  placeholder="Template Title (e.g. Schedule C Expense Organizer)"
+                  value={tplName}
+                  onChange={(e) => setTplName(e.target.value)}
+                  required
+                  className="dash-input dash-focusable"
+                  style={{ padding: '0 14px', height: '42px' }}
+                />
+                <input
+                  type="file"
+                  id="tplFile"
+                  accept=".pdf,.doc,.docx"
+                  onChange={(e) => setTplFile(e.target.files[0])}
+                  className="dash-input dash-focusable"
+                  style={{ padding: '8px 12px', height: 'auto', background: '#FFFFFF' }}
+                />
+                <button
+                  type="submit"
+                  className="artha-pill-btn artha-pill-primary dash-focusable"
+                  style={{ width: 'fit-content', padding: '10px 22px', fontSize: '13px' }}
+                >
+                  Upload &amp; Publish Template
+                </button>
+              </form>
+            </div>
+          </div>
         </div>
       )}
     </div>

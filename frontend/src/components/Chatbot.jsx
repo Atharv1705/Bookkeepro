@@ -7,7 +7,7 @@ const STORAGE_KEY = 'user_chat_session_id';
 const FAQ_DATA = {
   "Account": [
     { q: "How do I reset my password?", a: 'Go to the login page and click "Forgot Password". Enter your email and we\'ll send a reset link.' },
-    { q: "How do I verify my email?", a: 'Check your inbox for a verification email from BookKeepPro. Click the link inside to verify.' },
+    { q: "How do I verify my email?", a: 'Check your inbox for a verification email from ABC CPA. Click the link inside to verify.' },
     { q: "How do I update my profile?", a: 'Go to your Profile page to update your name, phone number, or change your password.' },
   ],
   "Documents": [
@@ -173,7 +173,7 @@ export default function Chatbot() {
     } finally {
       setIsTyping(false);
     }
-  }, [messages, authFetch]);
+  }, [messages, authFetch, sessionId]);
 
   const handleSendMessage = (e) => { e.preventDefault(); if (inputText.trim()) sendMessage(inputText.trim()); };
   const handleMenuAsk = (e) => { e.preventDefault(); if (menuInput.trim()) sendMessage(menuInput.trim(), []); };

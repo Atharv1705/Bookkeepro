@@ -1,6 +1,6 @@
-﻿/* ============================================================
+/* ============================================================
    dynamic.css — Ledger motion layer
-   Uses ONLY existing tokens (colours, Fraunces / IBM Plex fonts).
+   Uses ONLY existing tokens (colours, fonts).
    Concept: a brass rule is "struck under" a checked entry; numbers
    tick like a ledger counter. Load AFTER animations.css.
    Rules: animate transform/opacity only; entrance animations use
@@ -10,31 +10,24 @@
 :root {
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --brass-rgb: 176, 128, 61;      /* = original brass, for rgba() */
-  --emerald-rgb: 31, 93, 70;
+  --brass-rgb: 29, 78, 216;
+  --emerald-rgb: 4, 120, 87;
 }
 
 /* ---------- Global polish ---------- */
 ::selection { background: rgba(var(--brass-rgb), 0.28); color: var(--ink); }
 h1, h2, h3 { text-wrap: balance; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-:focus-visible { outline: 2px solid var(--emerald); outline-offset: 3px; }
+:focus-visible { outline: 2px solid var(--brass); outline-offset: 3px; }
 .btn:focus-visible, .tab-btn:focus-visible { outline-offset: 2px; }
 
 /* ---------- Scroll progress rule (width driven by --scroll, set in motion.js) ---------- */
 .scroll-progress {
   position: fixed; top: 0; left: 0; width: 100%; height: 3px; z-index: 10000;
-  background: linear-gradient(90deg, var(--emerald), rgb(var(--brass-rgb)));
+  background: linear-gradient(90deg, #1D4ED8, #14B8A6);
   transform: scaleX(var(--scroll, 0)); transform-origin: 0 50%; pointer-events: none;
 }
 
-/* ---------- Header / navbar respond to scroll ---------- */
-.navbar:not(.navbar-solid) { position: fixed; transition: background 0.35s, box-shadow 0.35s, border-color 0.35s; }
-html[data-scrolled] .navbar:not(.navbar-solid) {
-  background: rgba(23, 33, 29, 0.92);
-  box-shadow: 0 10px 28px -14px rgba(23, 33, 29, 0.6);
-  border-bottom-color: rgba(var(--brass-rgb), 0.35);
-}
 .app-header { transition: box-shadow 0.3s, background 0.3s; }
 html[data-scrolled] .app-header { box-shadow: var(--shadow-sm); }
 
@@ -43,47 +36,22 @@ html[data-scrolled] .app-header { box-shadow: var(--shadow-sm); }
 @keyframes pageIn { from { opacity: 0; transform: translateY(10px); } }
 .page-enter { animation: pageIn 0.5s var(--ease-out) backwards; }
 
-:is(.admin-stats, .users-grid, .services-grid, .return-cards, .stat-row) > * {
-  animation: rise 0.65s var(--ease-out) backwards;
-  animation-delay: var(--d, 0ms);
-}
-/* beat the older `fade-up` (fill-mode both) which froze the hover-lift transform */
-.fade-up, .service-card.fade-up, .user-card.fade-up { animation-name: rise; animation-duration: 0.65s; animation-timing-function: var(--ease-out); animation-fill-mode: backwards; }
-:is(.admin-stats, .users-grid, .services-grid, .return-cards, .stat-row) > :nth-child(1)  { --d: 40ms; }
-:is(.admin-stats, .users-grid, .services-grid, .return-cards, .stat-row) > :nth-child(2)  { --d: 110ms; }
-:is(.admin-stats, .users-grid, .services-grid, .return-cards, .stat-row) > :nth-child(3)  { --d: 180ms; }
-:is(.admin-stats, .users-grid, .services-grid, .return-cards, .stat-row) > :nth-child(4)  { --d: 250ms; }
-:is(.admin-stats, .users-grid, .services-grid, .return-cards, .stat-row) > :nth-child(5)  { --d: 320ms; }
-:is(.admin-stats, .users-grid, .services-grid, .return-cards, .stat-row) > :nth-child(6)  { --d: 380ms; }
-:is(.admin-stats, .users-grid, .services-grid, .return-cards, .stat-row) > :nth-child(7)  { --d: 430ms; }
-:is(.admin-stats, .users-grid, .services-grid, .return-cards, .stat-row) > :nth-child(8)  { --d: 480ms; }
-:is(.admin-stats, .users-grid, .services-grid, .return-cards, .stat-row) > :nth-child(n+9) { --d: 520ms; }
-
 /* ---------- Cards: lift + pointer spotlight (vars set in motion.js) ---------- */
-:is(.stat-card, .user-card, .service-card, .card) { position: relative; }
-:is(.stat-card, .user-card, .service-card, .card):hover {
+.card { position: relative; }
+.card:hover {
   background-image: radial-gradient(420px circle at var(--mx, 50%) var(--my, 0%), rgba(var(--brass-rgb), 0.10), transparent 62%);
 }
-.stat-icon { display: inline-flex; transition: transform 0.5s var(--ease-spring); }
-.stat-card:hover .stat-icon { transform: translateY(-3px) rotate(-6deg) scale(1.08); }
-.stat-card.active-filter { animation: rise 0.65s var(--ease-out) backwards, ringPulse 2.6s 1s ease-out infinite; animation-delay: var(--d, 0ms), 1s; }
-@keyframes ringPulse { 0% { box-shadow: 0 0 0 0 rgba(var(--emerald-rgb), 0.28); } 70%, 100% { box-shadow: 0 0 0 10px rgba(var(--emerald-rgb), 0); } }
-.user-avatar { transition: transform 0.4s var(--ease-spring), box-shadow 0.3s; }
-.user-card:hover .user-avatar { transform: scale(1.1); box-shadow: 0 0 0 4px rgba(var(--brass-rgb), 0.22); }
-.service-card img { transition: transform 0.9s var(--ease-out); }
-.service-card:hover img { transform: scale(1.06); }
 
 /* ---------- Buttons: lift, brass sheen, press ---------- */
 .btn { position: relative; overflow: hidden; transition: transform 0.18s var(--ease-out), box-shadow 0.25s, background-color 0.25s, color 0.25s, border-color 0.25s; }
 .btn:not(:disabled):hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
 .btn:not(:disabled):active { transform: translateY(1px) scale(0.97); box-shadow: none; }
-.btn-primary::before, .login-btn::before {
+.btn-primary::before {
   content: ''; position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.26) 50%, transparent 70%);
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.28) 50%, transparent 70%);
   transform: translateX(-130%); transition: transform 0.8s var(--ease-out);
 }
-.btn-primary:not(:disabled):hover::before, .login-btn:hover::before { transform: translateX(130%); }
-.login-btn { position: relative; overflow: hidden; }
+.btn-primary:not(:disabled):hover::before { transform: translateX(130%); }
 
 /* ---------- Status chips: attention dot / stamp ---------- */
 @keyframes pop     { 0% { opacity: 0; transform: scale(0.6); } 100% { opacity: 1; transform: scale(1); } }
@@ -97,7 +65,7 @@ html[data-scrolled] .app-header { box-shadow: var(--shadow-sm); }
 .status-chip-container .badge-green::before { content: '✓' / ''; font-weight: 700; display: inline-block; animation: stamp 0.55s 0.15s var(--ease-spring) backwards; }
 .status-chip-container .badge-red::before   { content: '!' / ''; font-weight: 700; display: inline-block; animation: stamp 0.55s 0.15s var(--ease-spring) backwards; }
 
-/* ---------- Tabs, inputs, toasts, skeletons ---------- */
+/* ---------- Tabs, inputs, toasts ---------- */
 .tab-btn { border-radius: var(--radius-xs) var(--radius-xs) 0 0; }
 .tab-btn:hover { background: rgba(var(--brass-rgb), 0.08); color: var(--ink); }
 .tab-btn.active { background: linear-gradient(180deg, transparent, rgba(var(--brass-rgb), 0.07)); }
@@ -106,58 +74,19 @@ input, select, textarea { transition: border-color 0.2s, box-shadow 0.25s; }
 input:focus-visible, select:focus-visible, textarea:focus-visible { outline-offset: 1px; border-color: rgb(var(--brass-rgb)); box-shadow: var(--shadow-glow); }
 @keyframes toastIn { from { opacity: 0; transform: translateX(28px) scale(0.96); } }
 .toast { animation: toastIn 0.5s var(--ease-spring) backwards; }
-@keyframes shimmer { to { transform: translateX(100%); } }
-.skeleton { position: relative; overflow: hidden; background: var(--border); border-radius: var(--radius-md); }
-.skeleton::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent); animation: shimmer 1.4s infinite; }
-.skeleton-card { height: 128px; }
 
-/* ---------- Upload drop zone ---------- */
-@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
-.drop-zone { transition: border-color 0.25s, background 0.25s, transform 0.3s var(--ease-spring), box-shadow 0.3s; }
-.drop-zone:hover .material-symbols-outlined { animation: bob 1.3s ease-in-out infinite; }
-.drop-zone.drag-over { border-style: solid; border-color: rgb(var(--brass-rgb)); background: rgba(var(--brass-rgb), 0.10); transform: scale(1.015); box-shadow: var(--shadow-glow); }
-.drop-zone.drag-over .material-symbols-outlined { animation: bob 0.7s ease-in-out infinite; }
-
-/* ---------- Chatbot + banners ---------- */
+/* ---------- Chatbot ---------- */
 @keyframes ring { 0% { transform: scale(1); opacity: 0.7; } 80%, 100% { transform: scale(1.6); opacity: 0; } }
 .chatbot-fab::before { content: ''; position: absolute; inset: 0; border-radius: 50%; border: 2px solid rgba(var(--brass-rgb), 0.6); animation: ring 2.8s ease-out infinite; pointer-events: none; }
 .chatbot-fab.open::before { animation: none; opacity: 0; }
 .chatbot-fab:not(.open):hover { transform: scale(1.08) rotate(-4deg); }
 .chatbot-window { transform-origin: bottom right; transition: opacity 0.3s, transform 0.4s var(--ease-spring); }
-@keyframes glowNudge { 0%, 100% { box-shadow: 0 0 0 0 rgba(var(--brass-rgb), 0); } 50% { box-shadow: 0 0 0 6px rgba(var(--brass-rgb), 0.18); } }
-.engagement-banner:not(.acknowledged) { animation: glowNudge 3.2s 1s ease-in-out 3; }
-
-/* ---------- Marketing: hero + reveals ---------- */
-/* Ambient light: soft brass + emerald glows drift over the (static) photo. Gradients only — no image scaling, so it stays cheap. */
-.hero { isolation: isolate; }
-.hero::after {
-  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-  background:
-    radial-gradient(55% 50% at 18% 28%, rgba(var(--brass-rgb), 0.20), transparent 70%),
-    radial-gradient(50% 60% at 86% 82%, rgba(var(--emerald-rgb), 0.30), transparent 70%);
-  animation: drift 20s ease-in-out infinite alternate;
-}
-@keyframes drift { from { transform: translate3d(-4%, -3%, 0) scale(1); } to { transform: translate3d(4%, 3%, 0) scale(1.12); } }
-@media (max-width: 768px) { .hero::after { animation: none; } }
-.hero-eyebrow, .hero h1, .hero-sub, .hero-actions { animation: rise 1s var(--ease-out) backwards; }
-.hero-eyebrow { animation-delay: 0.1s; } .hero h1 { animation-delay: 0.22s; } .hero-sub { animation-delay: 0.4s; } .hero-actions { animation-delay: 0.55s; }
-.hero h1 em { background: linear-gradient(rgb(var(--brass-rgb)), rgb(var(--brass-rgb))) no-repeat 0 100% / 0 2px; padding-bottom: 0.08em; animation: drawRule 1.2s 1.1s var(--ease-out) forwards; }
-@keyframes drawRule { to { background-size: 100% 2px; } }
-.hero-stats { animation: rise 1.1s 0.7s var(--ease-out) backwards; }
-.stat-block { transition: background 0.3s; }
-.stat-block:hover { background: rgba(var(--brass-rgb), 0.08); }
-.stat-figure { transition: color 0.3s, transform 0.4s var(--ease-spring); }
-.stat-block:hover .stat-figure { color: var(--emerald); transform: scale(1.06); }
 
 /* Reveal: hidden ONLY when JS has opted in (html.motion) — never blank without JS / reduced motion */
 .reveal { opacity: 1; transform: none; }
 html.motion .reveal:not(.in-view) { opacity: 0; transform: translateY(26px); }
 html.motion .reveal .eyebrow::before { transform: scaleX(0); transform-origin: left; transition: transform 0.9s 0.25s var(--ease-out); }
 html.motion .reveal.in-view .eyebrow::before { transform: scaleX(1); }
-@supports (animation-timeline: view()) {
-  @keyframes parallaxY { from { transform: translateY(-18px) scale(1.04); } to { transform: translateY(18px) scale(1.04); } }
-  .about-media img { animation: parallaxY linear both; animation-timeline: view(); animation-range: cover 0% 100%; }
-}
 
 /* Layout safety: long text inside a .badge (About page <p class="badge">) must wrap instead of forcing horizontal scroll */
 .badge { max-width: 100%; }
@@ -168,4 +97,4 @@ p.badge { white-space: normal; text-align: left; }
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
   .scroll-progress { display: none; }
 }
-@media (hover: none) { :is(.stat-card, .user-card, .service-card, .card):hover { background-image: none; } }
+@media (hover: none) { .card:hover { background-image: none; } }

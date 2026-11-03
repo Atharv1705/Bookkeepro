@@ -132,7 +132,7 @@ export default function AdminUserDetail() {
     } finally {
       setLoading(false);
     }
-  }, [authFetch, navigate, taxYear, userId]);
+  }, [authFetch, navigate, showToast, taxYear, userId]);
 
   useEffect(() => {
     if (!userId) {
@@ -684,14 +684,14 @@ export default function AdminUserDetail() {
                             {new Date(doc.uploaded_at).toLocaleDateString('en-US', {year:'numeric', month:'short', day:'numeric'})}
                             {doc.tax_year && <span style={{marginLeft:'8px', fontWeight:600, color:'var(--brass)'}}>TY {doc.tax_year}</span>}
                           </div>
-                          {doc.notes && <div style={{ fontSize:'12px', color:'var(--warn)', marginTop:'3px', fontWeight:500 }}>⚠ {doc.notes}</div>}
+                          {doc.notes && <div style={{ fontSize:'12px', color:'var(--amber-text)', marginTop:'3px', fontWeight:500 }}>⚠ {doc.notes}</div>}
                           {doc.review_status && (
                             <div style={{ marginTop:'5px', display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap' }}>
                               <span className={`badge ${doc.review_status === 'approved' ? 'badge-green' : doc.review_status === 'rejected' ? 'badge-red' : 'badge-yellow'}`} style={{fontWeight:700}}>
                                 {doc.review_status.toUpperCase()}
                               </span>
                               {doc.review_status === 'rejected' && doc.review_note && (
-                                <span style={{fontSize:'12px', color:'#c0392b', fontStyle:'italic'}}>"{doc.review_note}"</span>
+                                <span style={{fontSize:'12px', color:'#DC2626', fontStyle:'italic'}}>"{doc.review_note}"</span>
                               )}
                             </div>
                           )}
@@ -724,14 +724,14 @@ export default function AdminUserDetail() {
                         <div style={{
                           marginTop: '12px',
                           padding: '14px 16px',
-                          background: 'rgba(220,53,69,0.05)',
-                          border: '1px solid rgba(220,53,69,0.25)',
+                          background: 'rgba(220, 38, 38,0.05)',
+                          border: '1px solid rgba(220, 38, 38,0.25)',
                           borderRadius: 'var(--radius-sm)',
                           display: 'flex',
                           flexDirection: 'column',
                           gap: '10px'
                         }}>
-                          <div style={{fontWeight:600, fontSize:'13px', color:'#c0392b', display:'flex', alignItems:'center', gap:'6px'}}>
+                          <div style={{fontWeight:600, fontSize:'13px', color:'#DC2626', display:'flex', alignItems:'center', gap:'6px'}}>
                             <span className="material-symbols-outlined" style={{fontSize:'16px'}}>feedback</span>
                             Reason for Rejection (optional)
                           </div>
@@ -743,7 +743,7 @@ export default function AdminUserDetail() {
                             style={{
                               width: '100%',
                               padding: '10px 12px',
-                              border: '1px solid rgba(220,53,69,0.35)',
+                              border: '1px solid rgba(220, 38, 38,0.35)',
                               borderRadius: 'var(--radius-sm)',
                               fontSize: '13px',
                               resize: 'vertical',
@@ -800,37 +800,62 @@ export default function AdminUserDetail() {
               </div>
             </div>
             <div className="doc-review-sidebar">
-              <div className="card-flat" style={{display:'flex', flexDirection:'column', gap:'16px'}}>
-                <h3 className="card-title">Filing Timeline</h3>
+              <div className="timeline-sidebar-card">
+                <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#0A2540', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#1D4ED8' }}>event_upcoming</span>
+                  Filing Timeline
+                </h3>
                 {deadlines.filter(d => d.doc_type === 'personal').map(d => (
                   <div key="personal-dl" style={{
-                    margin: '0 0 16px', padding: '12px 16px',
-                    borderRadius: 'var(--radius-sm)',
-                    background: d.is_overdue ? 'rgba(220,53,69,0.08)' : d.days_left <= 1 ? 'rgba(255,140,0,0.10)' : 'rgba(44,122,91,0.08)',
-                    border: `1px solid ${d.is_overdue ? 'rgba(220,53,69,0.3)' : d.days_left <= 1 ? 'rgba(255,140,0,0.35)' : 'rgba(44,122,91,0.20)'}`,
-                    display: 'flex', alignItems: 'center', gap: '10px'
+                    margin: 0,
+                    padding: '12px 14px',
+                    borderRadius: '12px',
+                    background: d.is_overdue ? 'rgba(220,38,38,0.08)' : d.days_left <= 1 ? 'rgba(245,184,61,0.12)' : 'rgba(4,120,87,0.08)',
+                    border: `1px solid ${d.is_overdue ? 'rgba(220,38,38,0.25)' : d.days_left <= 1 ? 'rgba(245,184,61,0.35)' : 'rgba(4,120,87,0.20)'}`,
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '10px'
                   }}>
-                    <span className="material-symbols-outlined" style={{fontSize:'20px', color: d.is_overdue ? '#dc3545' : d.days_left <= 1 ? '#ff8c00' : 'var(--accent)'}}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '20px', color: d.is_overdue ? '#DC2626' : d.days_left <= 1 ? '#B7791F' : '#047857', marginTop: '1px' }}>
                       {d.is_overdue ? 'warning' : 'schedule'}
                     </span>
-                    <div>
-                      <div style={{fontWeight: 600, fontSize: '13px', color: d.is_overdue ? '#dc3545' : d.days_left <= 1 ? '#ff8c00' : 'var(--navy)'}}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: '12.5px', color: d.is_overdue ? '#DC2626' : d.days_left <= 1 ? '#92600A' : '#0A2540', lineHeight: 1.3 }}>
                         {d.is_overdue ? `OVERDUE by ${Math.abs(d.days_left)} day${Math.abs(d.days_left) !== 1 ? 's' : ''}` : `${d.days_left} day${d.days_left !== 1 ? 's' : ''} remaining`}
                       </div>
-                      <div style={{fontSize: '11px', color: 'var(--muted)'}}>Deadline: {new Date(d.deadline_date).toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'})}</div>
+                      <div style={{ fontSize: '11px', color: '#425466', marginTop: '2px' }}>
+                        Deadline: {new Date(d.deadline_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                      </div>
                     </div>
                   </div>
                 ))}
                 <div className="timeline-control">
                   <button className="tl-btn" onClick={() => setPersonalTimeline(Math.max(0, personalTimeline - 1))}>−</button>
-                  <div>
-                    <div className="tl-value">{personalTimeline}</div>
-                    <div className="tl-label">days</div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div className="tl-value" style={{ fontSize: '18px', lineHeight: 1.1 }}>{personalTimeline}</div>
+                    <div className="tl-label" style={{ fontSize: '11px' }}>days</div>
                   </div>
                   <button className="tl-btn" onClick={() => setPersonalTimeline(personalTimeline + 1)}>+</button>
                 </div>
-                <button className="btn btn-secondary w-full" style={{borderRadius:'var(--radius-sm)'}} onClick={() => sendEmail("personal")}>
-                  Send Personal Approval Email
+                <button
+                  className="artha-pill-btn artha-pill-primary"
+                  style={{
+                    width: '100%',
+                    justifyContent: 'center',
+                    padding: '10px 14px',
+                    fontSize: '12.5px',
+                    fontWeight: 600,
+                    borderRadius: '10px',
+                    whiteSpace: 'normal',
+                    lineHeight: 1.35,
+                    textAlign: 'center',
+                    boxShadow: '0 3px 10px rgba(4, 120, 87, 0.22)',
+                    gap: '8px'
+                  }}
+                  onClick={() => sendEmail("personal")}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>send</span>
+                  <span>Send Personal Approval Email</span>
                 </button>
               </div>
             </div>
@@ -857,14 +882,14 @@ export default function AdminUserDetail() {
                             {new Date(doc.uploaded_at).toLocaleDateString('en-US', {year:'numeric', month:'short', day:'numeric'})}
                             {doc.tax_year && <span style={{marginLeft:'8px', fontWeight:600, color:'var(--brass)'}}>TY {doc.tax_year}</span>}
                           </div>
-                          {doc.notes && <div style={{ fontSize:'12px', color:'var(--warn)', marginTop:'3px', fontWeight:500 }}>⚠ {doc.notes}</div>}
+                          {doc.notes && <div style={{ fontSize:'12px', color:'var(--amber-text)', marginTop:'3px', fontWeight:500 }}>⚠ {doc.notes}</div>}
                           {doc.review_status && (
                             <div style={{ marginTop:'5px', display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap' }}>
                               <span className={`badge ${doc.review_status === 'approved' ? 'badge-green' : doc.review_status === 'rejected' ? 'badge-red' : 'badge-yellow'}`} style={{fontWeight:700}}>
                                 {doc.review_status.toUpperCase()}
                               </span>
                               {doc.review_status === 'rejected' && doc.review_note && (
-                                <span style={{fontSize:'12px', color:'#c0392b', fontStyle:'italic'}}>"{doc.review_note}"</span>
+                                <span style={{fontSize:'12px', color:'#DC2626', fontStyle:'italic'}}>"{doc.review_note}"</span>
                               )}
                             </div>
                           )}
@@ -897,14 +922,14 @@ export default function AdminUserDetail() {
                         <div style={{
                           marginTop: '12px',
                           padding: '14px 16px',
-                          background: 'rgba(220,53,69,0.05)',
-                          border: '1px solid rgba(220,53,69,0.25)',
+                          background: 'rgba(220, 38, 38,0.05)',
+                          border: '1px solid rgba(220, 38, 38,0.25)',
                           borderRadius: 'var(--radius-sm)',
                           display: 'flex',
                           flexDirection: 'column',
                           gap: '10px'
                         }}>
-                          <div style={{fontWeight:600, fontSize:'13px', color:'#c0392b', display:'flex', alignItems:'center', gap:'6px'}}>
+                          <div style={{fontWeight:600, fontSize:'13px', color:'#DC2626', display:'flex', alignItems:'center', gap:'6px'}}>
                             <span className="material-symbols-outlined" style={{fontSize:'16px'}}>feedback</span>
                             Reason for Rejection (optional)
                           </div>
@@ -916,7 +941,7 @@ export default function AdminUserDetail() {
                             style={{
                               width: '100%',
                               padding: '10px 12px',
-                              border: '1px solid rgba(220,53,69,0.35)',
+                              border: '1px solid rgba(220, 38, 38,0.35)',
                               borderRadius: 'var(--radius-sm)',
                               fontSize: '13px',
                               resize: 'vertical',
@@ -973,37 +998,62 @@ export default function AdminUserDetail() {
               </div>
             </div>
             <div className="doc-review-sidebar">
-              <div className="card-flat" style={{display:'flex', flexDirection:'column', gap:'16px'}}>
-                <h3 className="card-title">Filing Timeline</h3>
+              <div className="timeline-sidebar-card">
+                <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#0A2540', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#1D4ED8' }}>event_upcoming</span>
+                  Filing Timeline
+                </h3>
                 {deadlines.filter(d => d.doc_type === 'business').map(d => (
                   <div key="business-dl" style={{
-                    margin: '0 0 16px', padding: '12px 16px',
-                    borderRadius: 'var(--radius-sm)',
-                    background: d.is_overdue ? 'rgba(220,53,69,0.08)' : d.days_left <= 1 ? 'rgba(255,140,0,0.10)' : 'rgba(44,122,91,0.08)',
-                    border: `1px solid ${d.is_overdue ? 'rgba(220,53,69,0.3)' : d.days_left <= 1 ? 'rgba(255,140,0,0.35)' : 'rgba(44,122,91,0.20)'}`,
-                    display: 'flex', alignItems: 'center', gap: '10px'
+                    margin: 0,
+                    padding: '12px 14px',
+                    borderRadius: '12px',
+                    background: d.is_overdue ? 'rgba(220,38,38,0.08)' : d.days_left <= 1 ? 'rgba(245,184,61,0.12)' : 'rgba(4,120,87,0.08)',
+                    border: `1px solid ${d.is_overdue ? 'rgba(220,38,38,0.25)' : d.days_left <= 1 ? 'rgba(245,184,61,0.35)' : 'rgba(4,120,87,0.20)'}`,
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '10px'
                   }}>
-                    <span className="material-symbols-outlined" style={{fontSize:'20px', color: d.is_overdue ? '#dc3545' : d.days_left <= 1 ? '#ff8c00' : 'var(--accent)'}}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '20px', color: d.is_overdue ? '#DC2626' : d.days_left <= 1 ? '#B7791F' : '#047857', marginTop: '1px' }}>
                       {d.is_overdue ? 'warning' : 'schedule'}
                     </span>
-                    <div>
-                      <div style={{fontWeight: 600, fontSize: '13px', color: d.is_overdue ? '#dc3545' : d.days_left <= 1 ? '#ff8c00' : 'var(--navy)'}}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: '12.5px', color: d.is_overdue ? '#DC2626' : d.days_left <= 1 ? '#92600A' : '#0A2540', lineHeight: 1.3 }}>
                         {d.is_overdue ? `OVERDUE by ${Math.abs(d.days_left)} day${Math.abs(d.days_left) !== 1 ? 's' : ''}` : `${d.days_left} day${d.days_left !== 1 ? 's' : ''} remaining`}
                       </div>
-                      <div style={{fontSize: '11px', color: 'var(--muted)'}}>Deadline: {new Date(d.deadline_date).toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'})}</div>
+                      <div style={{ fontSize: '11px', color: '#425466', marginTop: '2px' }}>
+                        Deadline: {new Date(d.deadline_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                      </div>
                     </div>
                   </div>
                 ))}
                 <div className="timeline-control">
                   <button className="tl-btn" onClick={() => setBusinessTimeline(Math.max(0, businessTimeline - 1))}>−</button>
-                  <div>
-                    <div className="tl-value">{businessTimeline}</div>
-                    <div className="tl-label">days</div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div className="tl-value" style={{ fontSize: '18px', lineHeight: 1.1 }}>{businessTimeline}</div>
+                    <div className="tl-label" style={{ fontSize: '11px' }}>days</div>
                   </div>
                   <button className="tl-btn" onClick={() => setBusinessTimeline(businessTimeline + 1)}>+</button>
                 </div>
-                <button className="btn btn-secondary w-full" style={{borderRadius:'var(--radius-sm)'}} onClick={() => sendEmail("business")}>
-                  Send Business Approval Email
+                <button
+                  className="artha-pill-btn artha-pill-primary"
+                  style={{
+                    width: '100%',
+                    justifyContent: 'center',
+                    padding: '10px 14px',
+                    fontSize: '12.5px',
+                    fontWeight: 600,
+                    borderRadius: '10px',
+                    whiteSpace: 'normal',
+                    lineHeight: 1.35,
+                    textAlign: 'center',
+                    boxShadow: '0 3px 10px rgba(4, 120, 87, 0.22)',
+                    gap: '8px'
+                  }}
+                  onClick={() => sendEmail("business")}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>send</span>
+                  <span>Send Business Approval Email</span>
                 </button>
               </div>
             </div>
@@ -1022,7 +1072,7 @@ export default function AdminUserDetail() {
                 <button className="btn btn-primary btn-sm" style={{borderRadius:'var(--radius-sm)'}} onClick={() => adminDocInputRef.current?.click()}>+ Upload Return</button>
                 <button
                   className="btn btn-secondary btn-sm"
-                  style={{borderRadius:'var(--radius-sm)', background:'#2c7a5b', color:'#fff', borderColor:'#2c7a5b'}}
+                  style={{borderRadius:'var(--radius-sm)', background:'#1D4ED8', color:'#fff', borderColor:'#1D4ED8'}}
                   onClick={markFiled}
                   disabled={markFiledLoading}
                   title={`Mark all approved docs for ${taxYear || 'selected year'} as Filed`}
@@ -1080,7 +1130,7 @@ export default function AdminUserDetail() {
                               ) : (doc.review_status !== 'filed' && doc.review_status !== 'approved') ? (
                                 <button
                                   className="btn btn-primary btn-sm"
-                                  style={{background:'#2c7a5b', borderColor:'#2c7a5b', fontSize:'12px'}}
+                                  style={{background:'#1D4ED8', borderColor:'#1D4ED8', fontSize:'12px'}}
                                   onClick={() => setSendApprovalPanel({ docId: doc.id, note: '' })}
                                   disabled={sendingApproval}
                                 >
@@ -1109,12 +1159,12 @@ export default function AdminUserDetail() {
                             <td colSpan={5} style={{padding:'0'}}>
                               <div style={{
                                 padding:'14px 16px',
-                                background:'rgba(44,122,91,0.05)',
-                                border:'1px solid rgba(44,122,91,0.25)',
+                                background:'rgba(4,120,87,0.08)',
+                                border:'1px solid rgba(4,120,87,0.25)',
                                 borderTop:'none',
                                 display:'flex', flexDirection:'column', gap:'10px'
                               }}>
-                                <div style={{fontWeight:600, fontSize:'13px', color:'#2c7a5b'}}>
+                                <div style={{fontWeight:600, fontSize:'13px', color:'#047857'}}>
                                   {doc.review_status === 'sent_for_approval' ? '📨 Resend this document to client for review' : '📤 Send this document to client for review'}
                                 </div>
                                 <textarea
@@ -1124,7 +1174,7 @@ export default function AdminUserDetail() {
                                   onChange={e => setSendApprovalPanel(prev => ({...prev, note: e.target.value}))}
                                   style={{
                                     width:'100%', padding:'8px 12px',
-                                    border:'1px solid rgba(44,122,91,0.35)', borderRadius:'var(--radius-sm)',
+                                    border:'1px solid rgba(4,120,87,0.35)', borderRadius:'var(--radius-sm)',
                                     fontSize:'13px', resize:'vertical', outline:'none',
                                     fontFamily:'inherit', background:'white', boxSizing:'border-box'
                                   }}
@@ -1133,7 +1183,7 @@ export default function AdminUserDetail() {
                                   <button className="btn btn-secondary btn-sm" onClick={() => setSendApprovalPanel(null)}>Cancel</button>
                                   <button
                                     className="btn btn-primary btn-sm"
-                                    style={{background:'#2c7a5b', borderColor:'#2c7a5b'}}
+                                    style={{background:'#1D4ED8', borderColor:'#1D4ED8'}}
                                     disabled={sendingApproval}
                                     onClick={() => sendReturnForApproval(doc.id, sendApprovalPanel.note)}
                                   >
